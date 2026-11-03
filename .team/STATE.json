@@ -1,13 +1,17 @@
 {
-  "turn": "builder",
-  "turn_seq": 1,
-  "turn_since": "2026-11-03T23:51:44Z",
+  "turn": "reviewer",
+  "turn_seq": 2,
+  "turn_since": "2026-11-03T23:51:45Z",
   "status": "active",
   "status_line": "rehearsal window opens 01:50 EET (23:50 UTC)",
   "leases": {
     "coordinator": {
       "holder": "coordinator-c28bac85",
       "claimed_at": 1793749904.1243272
+    },
+    "builder": {
+      "holder": "builder-a4dd5d3b",
+      "claimed_at": 1793749905.9620507
     }
   }
 }
