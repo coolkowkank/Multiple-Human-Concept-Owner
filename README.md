@@ -1,6 +1,6 @@
 # General Agentic Project Team Setup
 
-*Repository name: `agentic-project-team` - a reusable blueprint for human-led AI project teams: roles, coordination, handoffs, independent review, and project setup.*
+*Repository: `coolkowkank/Multiple-Human-Concept-Owner` - a reusable blueprint for human-led AI project teams: roles, coordination, handoffs, independent review, and project setup.*
 
 A reusable setup blueprint for running any project with a concept-led human team and a managed AI delivery team. It is project-, model- and framework-agnostic: copy this into a new project, fill in the placeholders, and the working setup is ready.
 
