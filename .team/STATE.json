@@ -1,8 +1,8 @@
 {
-  "turn": null,
+  "turn": "coordinator",
   "turn_seq": 0,
-  "turn_since": null,
-  "status": "forming",
-  "status_line": "team forming",
+  "turn_since": "2026-11-04T01:50:00Z",
+  "status": "active",
+  "status_line": "rehearsal window opens 01:50 EET (23:50 UTC)",
   "leases": {}
 }

@@ -14,7 +14,8 @@
       "role": "builder",
       "allowed_paths": [
         "src/",
-        "tests/"
+        "tests/",
+        "docs/rehearsal/"
       ],
       "adapter": {
         "type": "mock",
