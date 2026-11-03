@@ -22,13 +22,37 @@
 
 ## Acceptance criteria
 
-- <how the owners judge that the concept is delivered>
+- <how the owners judge that the concept is delivered - name the environment
+  where proof is required (mock / local / hosted), so evidence from a weaker
+  environment cannot close the criterion>
+
+## Definition of finished
+
+<What must be proven, at one named commit, for "done" to be called by rule
+instead of a fresh human call. A merge or go-live grant points to this
+section, never to an open-ended "when everything is finished".>
+
+## Accepted limits
+
+<The named residual limits the owners accept may stay open without blocking
+merge or go-live. Anything not listed here blocks until the owners accept,
+waive or require a fix (see Stated limits in templates/qc-verdict.md).>
+
+## Stop conditions
+
+<What the team may not resolve itself and must always escalate to the
+owners, regardless of the standing delegations.>
+
+## Status
+
+<One line, kept current by the Coordinator: whose turn, what is done, what
+is next. Routine status questions are answered here, not by waking seats.>
 
 ## Decisions log
 
-| Date | Decision | Agreed by |
-| --- | --- | --- |
-| | | |
+| Date | Decision | Evidence | Agreed by |
+| --- | --- | --- | --- |
+| | | <decision-record ID or channel reference> | |
 
 ## Change history
 
