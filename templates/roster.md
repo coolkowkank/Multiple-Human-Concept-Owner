@@ -6,12 +6,12 @@
 
 | Seat | Role | Human owner | Assistant / adapter | Commit identity | Verified endpoint | Last verified |
 | --- | --- | --- | --- | --- | --- | --- |
-| Coordinator | coordinator | <owner> | <assistant> | <git identity> | <evidence, e.g. observed write commit> | <date> |
-| Builder | builder (sole writer) | <owner> | <assistant> | <git identity> | | |
-| Reviewer | reviewer | <owner> | <assistant> | | | |
-| Records | records | <owner> | <assistant> | | | |
-| Architect | architect | <owner> | <assistant> | | | |
-| Independent QC | qc (never the Builder) | <owner> | <assistant> | | | |
+| Coordinator | coordinator | `<owner>` | `<assistant>` | `<git identity>` | `<evidence, e.g. observed write commit>` | `<date>` |
+| Builder | builder (sole writer) | `<owner>` | `<assistant>` | `<git identity>` | | |
+| Reviewer | reviewer | `<owner>` | `<assistant>` | | | |
+| Records | records | `<owner>` | `<assistant>` | | | |
+| Architect | architect | `<owner>` | `<assistant>` | | | |
+| Independent QC | qc (never the Builder) | `<owner>` | `<assistant>` | | | |
 
 - Verified endpoint means an action was observed through it (readiness
   reply plus a real read or write), not that it was declared.
