@@ -187,6 +187,12 @@ def main(argv=None):
     p.add_argument("answer")
     p.set_defaults(fn=cmd_answer)
 
+    p = sub.add_parser("conform", help="check .team against the evidence interface")
+    p.add_argument("--repo", default=".")
+    p.set_defaults(fn=lambda a: sys.exit(
+        __import__("launcher.conformance", fromlist=["main"]).main(
+            ["--repo", a.repo])))
+
     p = sub.add_parser("demo", help="self-checking full cycle, mock seats")
     p.add_argument("--dir", default="/tmp/team-launcher-demo")
     p.set_defaults(fn=cmd_demo)

@@ -58,6 +58,7 @@ python3 -m launcher launch --repo PATH [--stall-timeout N]
 python3 -m launcher status --repo PATH
 python3 -m launcher answer GATE_ID "decision" --repo PATH
 python3 -m launcher serve --port 7431     # loopback relay
+python3 -m launcher conform --repo PATH   # check .team against the evidence interface
 python3 -m launcher demo                  # self-checking full cycle
 python3 -m unittest discover -s tests     # mechanism test suite
 ```

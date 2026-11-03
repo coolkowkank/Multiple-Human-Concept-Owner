@@ -373,3 +373,69 @@ class WebhookTests(unittest.TestCase):
             self.assertTrue(seat.act_once())
         finally:
             shutil.rmtree(repo, ignore_errors=True)
+
+
+class ConformanceTests(unittest.TestCase):
+    def test_demo_repo_conforms(self):
+        from launcher.demo import run_demo
+        from launcher.conformance import check_repo
+        d = tempfile.mkdtemp(prefix="launcher-conform-")
+        try:
+            run_demo(d)
+            problems, notes = check_repo(d)
+            self.assertEqual(problems, [], f"demo repo nonconformant: {problems}")
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+
+    def test_broken_records_detected(self):
+        from launcher.conformance import check_repo
+        repo, bus = make_repo(seats={"builder": seat_spec([], ["src/"])})
+        try:
+            with open(os.path.join(repo, ".team", "LOG.jsonl"), "a") as fh:
+                fh.write('{"ts":"t","seat":"ghost","kind":"weird","body":"b","turn_seq":5}\n')
+                fh.write('{"ts":"t","seat":"builder","kind":"handoff","body":"did x | verify: `pytest`","turn_seq":3}\n')
+                fh.write('not json\n')
+            problems, _ = check_repo(repo)
+            text = "\n".join(problems)
+            self.assertIn("unknown kind", text)
+            self.assertIn("not a roster seat", text)
+            self.assertIn("not strictly increasing", text)
+            self.assertIn("records no exit code", text)
+            self.assertIn("invalid JSON", text)
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)
+
+    def test_orphan_gate_answer_detected(self):
+        from launcher.conformance import check_repo
+        repo, bus = make_repo(seats={"builder": seat_spec([], ["src/"])})
+        try:
+            bus.answer_gate("gate-nope", "yes")
+            problems, _ = check_repo(repo)
+            self.assertTrue(any("unknown gate" in p for p in problems))
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)
+
+
+class FalseGreenTests(unittest.TestCase):
+    def test_claimed_green_cannot_override_recorded_exit_code(self):
+        # Builder's prose claims green; the runtime records the true
+        # nonzero exit code, so the false claim is visible in the record.
+        script = [{"summary": "all suites green",
+                   "writes": {"src/a": "b"},
+                   "verify_command": "exit 1",
+                   "handoff": "reviewer"}]
+        seats = {"builder": seat_spec(script, ["src/"]),
+                 "reviewer": seat_spec([], ["review/"], role="reviewer")}
+        repo, bus = make_repo(seats=seats)
+        try:
+            state = bus.state()
+            state["turn"] = "builder"
+            state["status"] = "running"
+            bus.write_state(state)
+            bus.commit_all("human: go")
+            Seat(bus, "builder").act_once()
+            entry = [e for e in bus.log() if e["kind"] == "handoff"][-1]
+            self.assertIn("exit=1", entry["body"])
+            self.assertIn("all suites green", entry["body"])
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)
