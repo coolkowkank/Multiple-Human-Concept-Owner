@@ -69,6 +69,7 @@ class Seat:
 
     def act_once(self):
         """Take the turn if it is ours. Returns True if we acted."""
+        self.bus.pull()  # see handoffs published by other clones/machines
         state = self.bus.state()
         if state.get("turn") != self.name:
             return False

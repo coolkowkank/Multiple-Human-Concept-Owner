@@ -57,7 +57,13 @@ def cmd_seat(args):
     if relay_url and token:
         from .relay import RelayClient
         relay = RelayClient(relay_url, token)
-    seat = Seat(bus, args.name, poll_interval=args.poll, relay=relay)
+    webhook = None
+    hook_url = os.environ.get("TEAM_WAKE_WEBHOOK")
+    if hook_url:
+        from .relay import WebhookSink
+        webhook = WebhookSink(hook_url)
+    seat = Seat(bus, args.name, poll_interval=args.poll, relay=relay,
+                webhook=webhook)
     if args.once:
         acted = seat.act_once()
         print(f"{args.name}: {'acted' if acted else 'not our turn'}")
