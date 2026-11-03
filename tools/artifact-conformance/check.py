@@ -25,7 +25,7 @@ import sys
 
 SHA_RE = re.compile(r"\b[0-9a-f]{40}\b")
 DR_RE = re.compile(r"\bDR-\S+")
-PLACEHOLDER_RE = re.compile(r"`<[^>\n]*>`")
+PLACEHOLDER_RE = re.compile(r"`?<[^<>\n]{2,120}>`?")
 ENV_RE = re.compile(r"^(mock|local|hosted)\b", re.IGNORECASE)
 
 VIOLATIONS = []
@@ -74,7 +74,8 @@ def nonempty(val):
 
 def check_no_placeholders(text):
     for m in PLACEHOLDER_RE.finditer(text):
-        fail(f"unfilled placeholder: {m.group(0)}")
+        fail(f"unfilled placeholder / raw angle-bracket token: "
+                     f"{m.group(0)}")
 
 
 def require_fields(fields, names):
@@ -101,7 +102,13 @@ def check_owner_basis(val, decisions_dir):
         fail("owner basis is empty; state a DR-ID or 'none - no gated "
              "items'")
         return
-    if v.lower().startswith("none"):
+    if not re.fullmatch(r"none\s*-\s*no gated items\.?", v,
+                        re.IGNORECASE):
+        if not DR_RE.findall(v):
+            fail("owner basis must cite a DR-ID or be exactly "
+                 "'none - no gated items'")
+            return
+    else:
         return
     ids = DR_RE.findall(v)
     if not ids:
@@ -154,9 +161,10 @@ def check_qc_verdict(text, decisions_dir):
             kv[k.strip()] = v.strip()
     check_head(kv.get("Head reviewed", ""), "Head reviewed")
     check_owner_basis(kv.get("Owner basis", ""), decisions_dir)
-    if not re.search(r"^##\s*Verdict\s*\n+(PASS|FAIL)\b", text,
-                     re.MULTILINE):
-        fail("verdict must be exactly PASS or FAIL")
+    if not re.search(r"^##\s*Verdict[ \t]*\n+[ \t]*(PASS|FAIL)[ \t]*$",
+                     text, re.MULTILINE):
+        fail("verdict line must be exactly PASS or FAIL - no "
+                     "qualifiers such as 'PASS with reservations'")
     for sec in ("Reproduced", "Probed"):
         lines = [bullet(l) for l in section_lines(text, "What QC actually did")
                  if bullet(l).lower().startswith(sec.lower() + ":")]
