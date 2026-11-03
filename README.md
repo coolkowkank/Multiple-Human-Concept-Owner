@@ -55,6 +55,10 @@ This is a blueprint, not a running system: roles, rules, templates and diagrams.
 
 See [docs/operating-rules.md](docs/operating-rules.md) for the full rule set carried over from the reference project: written turn tokens, written findings, QC gates, recorded concept changes, human-level scope/spend/go-live decisions, and role rotation on long projects.
 
+## For research use
+
+This blueprint keeps a clear trail: [references](docs/references.md) for the public sources behind each idea, a versioned [design-decision log](docs/design-decisions.md), and an honest [proposed vs tested](docs/proposed-vs-tested.md) map. It claims no novelty: every component has a public precedent; the combination is what remains to be tested.
+
 ## Background
 
 This is harness engineering: designing the instructions, context, checks and feedback loops around AI work so it produces reliable results, rather than changing the model itself. The high-impact reasoning seats are where judgment moves the whole project; routine throughput never waits on them. See <https://martinfowler.com/articles/harness-engineering.html> for the terminology.
