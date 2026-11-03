@@ -35,6 +35,13 @@ INVALID_CASES = [
      "public/agreed"),
     ("review-findings-gate-no-dr.md", "review-findings",
      "no DR-ID"),
+    # regression: reviewer-reported false passes D1-D3
+    ("batch-handoff-owner-basis-loose.md", "batch-handoff",
+     "'none - no gated items'"),
+    ("qc-verdict-unquoted-placeholder.md", "qc-verdict",
+     "angle-bracket"),
+    ("qc-verdict-qualified-pass.md", "qc-verdict",
+     "exactly PASS or FAIL"),
 ]
 
 
