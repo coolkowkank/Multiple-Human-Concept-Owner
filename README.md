@@ -43,6 +43,14 @@ This is a blueprint, not a running system: roles, rules, templates and diagrams.
 - The Coordinator assigns work, sets priorities and resolves conflicts. Peers do not reassign each other.
 - Humans need only two interaction lines into the delivery team: the Coordinator and QC. Everything else flows through the brief.
 
+## Quick start
+
+1. Create a new, empty project repository (for example "WORK").
+2. Open a Coordinator session in an AI assistant that can read this repository and read/write your project repository. Give it your project repository URL and paste the contents of [templates/coordinator-starter-prompt.md](templates/coordinator-starter-prompt.md).
+3. The Coordinator checks its actual access first, then sets this blueprint up inside your project repository without overwriting anything, helps the owners agree the brief, and writes a short prompt for each other role. You open one new session per role, paste its prompt, and bring the reply back.
+
+Pasting the prompt grants no access, and one chat session cannot start or connect others. The humans open and relay the role sessions. The Coordinator marks a seat ready or access verified only after it has seen it work. The steps below are the manual version of the same process.
+
 ## Adopting this blueprint
 
 1. Name the concept owners and agree the concept in writing: copy `templates/concept_to_coordinator.md` and fill it in together.
