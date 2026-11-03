@@ -6,11 +6,13 @@
 > needs no new human ask.
 >
 > Privacy: this repository may be public. Quote the owner's exact words only
-> when they were already public or the owner agreed to publication. Otherwise
-> record the reference (channel, timestamp, locator) and a plain summary, and
-> keep the exact words on the owner's own channel. This record is evidence,
-> not a grant: the owner's own channel settles any dispute
-> (docs/delegation.md section 1).
+> when they were already public or the owner agreed to publication; otherwise
+> keep the exact words on the owner's own channel and say so here. The same
+> rule applies to locators: record the platform and timestamp by default, and
+> include a permalink or message reference only when the channel is already
+> public or the owner agreed - a link into a private channel is itself a
+> disclosure. This record is evidence, not a grant: the owner's own channel
+> settles any dispute (docs/delegation.md section 1).
 
 | Field | Value |
 | --- | --- |
@@ -19,7 +21,8 @@
 | Owner | <which owner decided> |
 | Decision | <what was decided, one or two lines> |
 | Owner words | <verbatim quote, or "on owner's channel: <reference>"> |
-| Channel + timestamp + locator | <platform, message time, permalink or message reference> |
+| Channel + timestamp | <platform and message time> |
+| Locator | <permalink or message reference - only if the channel is public or the owner agreed; otherwise "on owner's channel"> |
 | Covers | <the scope this decision covers> |
 | Limits | <spend, audience, accounts, expiry> |
 | Recorded by | <seat that wrote the record> |
