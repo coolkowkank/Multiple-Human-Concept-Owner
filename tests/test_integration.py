@@ -179,3 +179,116 @@ class FullTransportTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RaceAndResumeTests(unittest.TestCase):
+    """Stage 3 machinery: lost commit races and fresh-session resume."""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp(prefix="launcher-race-")
+        self.origin = os.path.join(self.root, "origin.git")
+        git(self.root, "init", "--bare", "--quiet", self.origin)
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def _clone(self, name):
+        path = os.path.join(self.root, name)
+        git(self.root, "clone", "--quiet", self.origin, path)
+        git(path, "config", "user.name", name)
+        git(path, "config", "user.email", f"{name}@example.com")
+        return path
+
+    def _seed_remote(self):
+        a = self._clone("a")
+        bus = Bus(a, "team-work")
+        bus.init_layout(brief_text="# Brief\nRace test.\n",
+                        roster={"seats": {
+                            "alpha": spec([], ["work/"], "builder"),
+                            "beta": spec([], ["work/"], "reviewer")}})
+        git(a, "checkout", "--quiet", "-B", "team-work")
+        bus.commit_all("human: layout")
+        git(a, "push", "--quiet", "-u", "origin", "team-work")
+        return a
+
+    def test_lost_race_retries_and_both_writes_survive(self):
+        a = self._seed_remote()
+        b = self._clone("b")
+        git(b, "checkout", "--quiet", "-B", "team-work", "origin/team-work")
+        bus_a, bus_b = Bus(a, "team-work"), Bus(b, "team-work")
+
+        # B commits and pushes first; A's transact must rebase and retry,
+        # and both writes must survive exactly once.
+        bus_b.transact("human: b first",
+                       lambda: bus_b.append_log("beta", "status", "b was here"))
+        bus_a.transact("human: a second",
+                       lambda: bus_a.append_log("alpha", "status", "a was here"))
+        bus_b.pull()
+        kinds = [(e["seat"], e["body"]) for e in bus_b.log()
+                 if e["kind"] == "status"]
+        self.assertEqual(sorted(kinds),
+                         [("alpha", "a was here"), ("beta", "b was here")])
+        log_b = git(b, "log", "--format=%s").stdout
+        self.assertEqual(log_b.count("a second"), 1)
+
+    def test_fresh_session_resumes_from_record_alone(self):
+        a = self._seed_remote()
+        bus_a = Bus(a, "team-work")
+        bus_a.transact("human: seed", lambda: (
+            bus_a.append_log("alpha", "handoff", "batch 3 done", turn_seq=7),
+            bus_a.open_gate("alpha", "proceed to hosted?", ["yes", "no"])))
+        state = bus_a.state()
+        state["turn"] = "beta"
+        state["turn_seq"] = 7
+        state["status"] = "running"
+        bus_a.write_state(state)
+        bus_a.commit_all("human: turn to beta")
+        bus_a.push()
+
+        b = self._clone("b")
+        git(b, "checkout", "--quiet", "-B", "team-work", "origin/team-work")
+        bus_b = Bus(b, "team-work")
+        bus_b.pull()
+        state = bus_b.state()
+        self.assertEqual((state["turn"], state["turn_seq"]), ("beta", 7))
+        self.assertEqual(len(bus_b.pending_gates()), 1)
+        self.assertEqual(bus_b.log()[-1]["turn_seq"], 7)
+
+    def test_stale_lease_takeover_after_crash(self):
+        repo, bus = make_repo_for(self.root)
+        state = bus.state()
+        state["turn"] = "builder"
+        state["status"] = "running"
+        bus.write_state(state)
+        bus.commit_all("human: go")
+        script = [{"summary": "s", "writes": {"work/a": "b"},
+                   "verify_command": None, "handoff": None}]
+        bus.transact("human: roster", lambda: None)
+        roster = bus.roster()
+        roster["seats"]["builder"]["adapter"] = {"type": "mock", "script": script}
+        with open(os.path.join(repo, ".team", "roster.json"), "w") as fh:
+            json.dump(roster, fh)
+        bus.commit_all("human: script")
+
+        # First instance crashes mid-turn: lease held, no work committed.
+        crashed = Seat(bus, "builder", instance_id="dead", lease_ttl=0)
+        crashed.claim_lease(state)
+        bus.write_state(state)
+        bus.commit_all("human: lease taken")
+        # Replacement process: stale lease (ttl 0) must not block takeover.
+        replacement = Seat(bus, "builder", instance_id="new", lease_ttl=0)
+        self.assertTrue(replacement.act_once())
+        self.assertEqual(bus.state()["leases"]["builder"]["holder"], "new")
+
+
+def make_repo_for(root):
+    repo = os.path.join(root, "lease-repo")
+    os.makedirs(repo)
+    git(repo, "init", "--quiet")
+    git(repo, "config", "user.name", "t")
+    git(repo, "config", "user.email", "t@example.com")
+    git(repo, "checkout", "--quiet", "-B", "team-work")
+    bus = Bus(repo, "team-work")
+    bus.init_layout(brief_text="# Brief\nLease test.\n",
+                    roster={"seats": {"builder": spec([], ["work/"], "builder")}})
+    return repo, bus
