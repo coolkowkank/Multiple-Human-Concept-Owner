@@ -2,38 +2,38 @@
 
 > No AI writes without holding the written turn token. One batch per turn.
 > With the launcher runtime the token is a mechanism: `.team/STATE.json`
-> names the holder and the `turn_seq` fencing token, and the pre-commit
+> names the holder and the `turn_seq` fencing token, and the commit-msg
 > guard rejects commits from any other seat or outside the seat's allowed
 > paths (docs/evidence-interface.md section 1). Without the runtime, this
 > file is the convention - and convention alone did not hold in the
 > reference project.
 
-TURN: <role or assistant holding the write turn>
-Turn seq: <integer from STATE.json>
+TURN: `<role or assistant holding the write turn>`
+Turn seq: `<integer from STATE.json>`
 
 ## Batch
 
 - Issued by: Coordinator
-- Assigned to: <role>
-- Batch scope: <what this batch changes, and nothing beyond it>
-- Spec / acceptance criteria: <link or reference>
+- Assigned to: `<assigned role>`
+- Batch scope: `<what this batch changes, and nothing beyond it>`
+- Spec / acceptance criteria: `<link or reference>`
 - Owner basis: <decision-record ID, or owner quote reference with channel +
   timestamp - required for any scope, spend or go-live item in this batch>
 
 ## Result
 
-- Files changed: <list>
-- Head: <full commit SHA>
-- Verify command: <one shell command that runs every required suite>
-- Exit code: <integer, from actually running it>
-- Suites: <one line per suite: `name: pass/fail`>
-- Environment: <mock / local / hosted + account type>
-- Evidence: <links, screenshots, logs>
+- Files changed: `<list of files>`
+- Head: `<full commit SHA>`
+- Verify command: `<one shell command that runs every required suite>`
+- Exit code: `<integer, from actually running it>`
+- Suites: `<one line per suite, formatted `name: pass/fail`>`
+- Environment: `<mock / local / hosted + account type>`
+- Evidence: `<links, screenshots, logs>`
 
 ## Handoff
 
-- Next: <role>
-- Open questions: <list, or none>
+- Next: `<next role>`
+- Open questions: `<list, or none>`
 
 ## Rules
 

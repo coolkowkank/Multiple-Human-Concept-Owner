@@ -8,13 +8,13 @@
 | Field | Value |
 | --- | --- |
 | Owner | |
-| Delegated decisions | <what the Coordinator may decide without asking again> |
-| Delegated actions | <what the team may do without asking again: builds, fixes, tests, docs, commits and pushes to the agreed branch under the turn token> |
-| Limits | <spend, audience, accounts, expiry> |
-| Never delegated | <what always needs this owner's own word - by default the section 4 list: spend, security/access, merge/go-live, external contact, brief changes> |
-| Owner words | <verbatim quote or channel reference, under the privacy rule in decision-record.md> |
-| Where to verify | <the owner's own channel and locator> |
-| Recorded at | <date, and by which seat> |
+| Delegated decisions | `<what the Coordinator may decide without asking again>` |
+| Delegated actions | `<what the team may do without asking again: builds, fixes, tests, docs, commits and pushes to the agreed branch under the turn token>` |
+| Limits | `<spend, audience, accounts, expiry>` |
+| Never delegated | `<what always needs this owner's own word - by default the section 4 list: spend, security/access, merge/go-live, external contact, brief changes>` |
+| Owner words | `<verbatim quote or channel reference, under the privacy rule in decision-record.md>` |
+| Where to verify | `<the owner's own channel and locator>` |
+| Recorded at | `<date, and by which seat>` |
 
 ## Notes
 

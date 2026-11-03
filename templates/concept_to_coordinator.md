@@ -6,19 +6,19 @@
 
 ## Concept
 
-<What we are building and why, in the owners' words.>
+`<What we are building and why, in the owners' words.>`
 
 ## Goals
 
-- <goal>
+- `<goal statement>`
 
 ## Non-goals
 
-- <what this project explicitly does not do>
+- `<what this project explicitly does not do>`
 
 ## Scope and constraints
 
-- <scope, budget/spend limits, deadlines, technical constraints>
+- `<scope, budget/spend limits, deadlines, technical constraints>`
 
 ## Acceptance criteria
 
@@ -52,7 +52,7 @@ is next. Routine status questions are answered here, not by waking seats.>
 
 | Date | Decision | Evidence | Agreed by |
 | --- | --- | --- | --- |
-| | | <decision-record ID or channel reference> | |
+| | | `<decision-record ID or channel reference>` | |
 
 ## Change history
 
