@@ -10,9 +10,9 @@ def t(x,y,s,size=13,fill=GR,anchor="start",weight="normal",extra=""):
     a(f'<text x="{x}" y="{y}" font-size="{size}" fill="{fill}" text-anchor="{anchor}" font-weight="{weight}" {extra}>{s}</text>')
 t(W/2,72,"Delivery flow: how the robots work below the Coordinator",34,INK,"middle",extra='font-family="Georgia, Noto Serif, serif"')
 t(W/2,104,"Working exchanges between roles. These are collaboration lines, not reassignment: the Coordinator manages priorities and conflicts.",15,GR,"middle")
-def robot(cx,cy,r,claude=False,big=False):
-    col=TE if claude else INK
-    dash=' stroke-dasharray="7 5"' if claude else ''
+def robot(cx,cy,r,reasoner=False,big=False):
+    col=TE if reasoner else INK
+    dash=' stroke-dasharray="7 5"' if reasoner else ''
     a(f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="#fff" stroke="{col}" stroke-width="2.6"{dash}/>')
     s=r/40
     a(f'<rect x="{cx-17*s}" y="{cy-9*s}" width="{34*s}" height="{26*s}" rx="{7*s}" fill="none" stroke="{col}" stroke-width="2.4"/>')
@@ -27,7 +27,7 @@ t(200,216,"the agreed brief - orders come from here",12.5,GR,"middle")
 a(f'<line x1="350" y1="{CY}" x2="{CX-44-2}" y2="{CY}" stroke="{INK}" stroke-width="2.4" marker-end="url(#mi)"/>')
 robot(CX,CY,44,False)
 t(CX+62,CY-2,"Coordinator",16,INK,"start","bold")
-t(CX+62,CY+17,"Instinct - owner: Human 1",12.5)
+t(CX+62,CY+17,"Assistant - owner: Human 1",12.5)
 t(CX+62,CY+35,"sets priorities, resolves conflicts",12.5)
 # bus
 xs=[120,390,660,930]; RY=430; R=40
@@ -38,10 +38,10 @@ for x in xs:
     a(f'<line x1="{x}" y1="{BY}" x2="{x}" y2="{RY-R-2}" stroke="{LG}" stroke-width="2.2" marker-end="url(#mg)"/>')
 t(CX-14,BY-9,"Coordinator assigns work and manages priorities",12.5,GR,"end")
 t(CX+14,BY-9,"Peers collaborate; they never reassign each other",12.5,GR,"start")
-nodes=[("Architect","Claude - owner: Human 2","specs and acceptance criteria",True),
-       ("Builder","Instinct - owner: Human 4","sole writer, one batch per turn",False),
-       ("Reviewer","Instinct - owner: Human 1","written findings on every batch",False),
-       ("Independent QC","Claude - owner: Human 3","consequential calls, a fail stands",True)]
+nodes=[("Architect","Reasoner - owner: Human 2","specs and acceptance criteria",True),
+       ("Builder","Assistant - owner: Human 4","sole writer, one batch per turn",False),
+       ("Reviewer","Assistant - owner: Human 1","written findings on every batch",False),
+       ("Independent QC","Reasoner - owner: Human 3","consequential calls, a fail stands",True)]
 for x,(n,m,d,c) in zip(xs,nodes):
     robot(x,RY,R,c)
     t(x+14,RY+R+26,n,16,INK,"start","bold")
@@ -63,7 +63,7 @@ RYB=700; RX1,RX2=60,1180
 a(f'<rect x="{RX1}" y="{RYB}" width="{RX2-RX1+0}" height="84" rx="14" fill="#fcf8f4" stroke="#b9a9a0" stroke-width="2"/>')
 robot(RX1+60,RYB+42,28,False)
 t(RX1+110,RYB+34,"Records",16,INK,"start","bold")
-t(RX1+110,RYB+53,"Instinct - owner: Human 4",12.5)
+t(RX1+110,RYB+53,"Assistant - owner: Human 4",12.5)
 t(RX1+110,RYB+71,"secondary: mostly idle",12.5)
 t(RX1+330,RYB+34,"Architect, Builder, Reviewer and QC write decisions, results and handoffs here,",13,INK)
 t(RX1+330,RYB+53,"so any human can reconstruct what happened. Concept changes are recorded too.",13,INK)
@@ -76,8 +76,8 @@ t(VX-8,162,"QC verdict to the Coordinator - a fail stands, no override",12.5,TE,
 LY=820
 a(f'<rect x="60" y="{LY}" width="1120" height="76" rx="14" fill="#faf7f5" stroke="#e6dedb" stroke-width="1.5"/>')
 t(80,LY+24,"LEGEND",12,INK,"start","bold",'letter-spacing="2"')
-robot(100,LY+54,14,False); t(124,LY+59,"Instinct robot",12.5,INK)
-robot(262,LY+54,14,True); t(286,LY+59,"Claude robot (high-impact seats)",12.5,INK)
+robot(100,LY+54,14,False); t(124,LY+59,"Assistant robot",12.5,INK)
+robot(262,LY+54,14,True); t(286,LY+59,"Reasoner robot (high-impact seats)",12.5,INK)
 def leg(x,col,mk,dash,txt):
     d=f' stroke-dasharray="{dash}"' if dash else ''
     a(f'<line x1="{x}" y1="{LY+54}" x2="{x+40}" y2="{LY+54}" stroke="{col}" stroke-width="2.4"{d} marker-end="url(#{mk})"/>')
@@ -88,7 +88,7 @@ leg(880,GR,'ml',"6 5","written record")
 leg(1030,TE,'mt',None,"QC verdict")
 t(W/2,918,"Neutral placeholders - the concept owners assign actual names, owners and roles when adopting this blueprint.",12.5,GR,"middle")
 a('<rect x="60" y="945" width="1120" height="95" rx="14" fill="#faf7f5" stroke="#e6dedb"/>')
-t(80,970,"Role circles are responsibilities, not a count of Instincts.",14,INK,"start","bold")
+t(80,970,"Role circles are responsibilities, not a count of assistants.",14,INK,"start","bold")
 t(80,993,"One main delivery job each. Human 4: Builder + Records only while Records is mostly idle; reassign when busy.",14,INK)
 t(80,1016,"Coordinator and Reviewer: separate delivery assignees. Own-human relay remains; independent QC stays separate from Builder.",14,INK)
 a('</svg>')
