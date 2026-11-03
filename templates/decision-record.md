@@ -16,11 +16,11 @@
 
 | Field | Value |
 | --- | --- |
-| ID | DR-<number> |
+| ID | DR-<sequence number> |
 | Date | <YYYY-MM-DD HH:MM, one named timezone> |
 | Owner | <which owner decided> |
 | Decision | <what was decided, one or two lines> |
-| Owner words | <verbatim quote, or "on owner's channel: <reference>"> |
+| Owner words | <verbatim quote, or "on owner's channel: <channel reference>"> |
 | Channel + timestamp | <platform and message time> |
 | Locator | <permalink or message reference - only if the channel is public or the owner agreed; otherwise "on owner's channel"> |
 | Covers | <the scope this decision covers> |

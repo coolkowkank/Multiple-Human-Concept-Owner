@@ -9,7 +9,7 @@
 - Head reviewed: <full commit SHA>
 - Owner basis: <decision-record IDs covering every gated item in scope; a
   gated item with no record is a blocker, not a pass>
-- Evidence reviewed: <links>
+- Evidence reviewed: <evidence links>
 
 ## Verdict
 

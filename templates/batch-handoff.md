@@ -14,7 +14,7 @@ Turn seq: <integer from STATE.json>
 ## Batch
 
 - Issued by: Coordinator
-- Assigned to: <role>
+- Assigned to: <assigned role>
 - Batch scope: <what this batch changes, and nothing beyond it>
 - Spec / acceptance criteria: <link or reference>
 - Owner basis: <decision-record ID, or owner quote reference with channel +
@@ -22,7 +22,7 @@ Turn seq: <integer from STATE.json>
 
 ## Result
 
-- Files changed: <list>
+- Files changed: <list of files>
 - Head: <full commit SHA>
 - Verify command: <one shell command that runs every required suite>
 - Exit code: <integer, from actually running it>
@@ -32,7 +32,7 @@ Turn seq: <integer from STATE.json>
 
 ## Handoff
 
-- Next: <role>
+- Next: <next role>
 - Open questions: <list, or none>
 
 ## Rules

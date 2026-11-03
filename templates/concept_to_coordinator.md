@@ -10,7 +10,7 @@
 
 ## Goals
 
-- <goal>
+- <goal statement>
 
 ## Non-goals
 

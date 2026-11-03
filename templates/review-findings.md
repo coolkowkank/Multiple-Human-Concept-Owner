@@ -3,7 +3,7 @@
 > The Reviewer returns written findings on every batch.
 
 - Batch: <reference + full head SHA>
-- Reviewer: <assignee>
+- Reviewer: <reviewer seat>
 
 ## Findings
 
