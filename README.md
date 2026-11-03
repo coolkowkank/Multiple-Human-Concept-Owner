@@ -1,4 +1,4 @@
-# General Agentic Project Team Setup
+# Autonomous AI-Human Teamwork - Work in Progress and Intended Operating Model
 
 *Repository: `coolkowkank/Multiple-Human-Concept-Owner` - a reusable blueprint for human-led AI project teams: roles, coordination, handoffs, independent review, and project setup.*
 
@@ -6,7 +6,7 @@ A reusable setup blueprint for running any project with a concept-led human team
 
 This is a blueprint, not a running system: roles, rules, templates and diagrams. It does not connect anyone's accounts or instantiate a live team.
 
-## Autonomous AI-Human Teamwork - Work in Progress and Intended Operating Model
+## The goal
 
 The goal is autonomous AI-human teamwork with very rare routine human supervision, led by a delegated AI Coordinator. Humans agree the concept, written brief and boundaries, retaining concept, scope, spending and go-live decisions. Within explicit delegated authority, one Coordinator manages planning, assignment, delivery, review and recovery through one work queue. The team handles routine handoffs and recoverable failures; humans are involved only for decisions outside the agreed brief or authority, genuine concept conflicts, or exceptions the team cannot safely resolve. Independent QC stays separate from the Builder, and a failed verdict stands until resolved.
 
