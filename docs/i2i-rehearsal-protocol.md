@@ -96,8 +96,8 @@ bus is ignored and logged.
 - Recovery: F2 and F3 recover without human repair; latency recorded.
 - Conformance: `launcher conform` green at the end of each batch.
 - Artifacts: every filled artifact passes tools/artifact-conformance
-  (after the D1-D4 repairs land; until then the checker is advisory and
-  its known false-pass gaps are listed alongside results).
+  at repair head 8d600ad or later (D1-D3 false-pass repairs plus the
+  boundary-wording correction, independently verified on receipt).
 - turn_seq strictly monotonic; no seat acts out of turn (guard log).
 
 ## 7. Boundaries
@@ -110,7 +110,29 @@ bus is ignored and logged.
 - Bus ack is not authorization; missing ack is not proof of no execution;
   landing is verified by pull after failure (interface v0.1).
 
-## 8. Agreement checklist (evidence needed before live work)
+## 8. Execution bounds (finite, observable)
+
+- Window: 3 hours wall-clock from the first batch commit, hard stop.
+  Whatever is incomplete at the stop is reported as not exercised.
+- Poll fallback: each side polls the branch every 15 minutes when no
+  wake has arrived; a wake is only a latency optimization.
+- Stall timeout: no progress (no push on the branch) for 30 minutes -
+  the waiting side reports the stall to its own main and pauses; two
+  consecutive stalls end the rehearsal as inconclusive.
+- Stop conditions: 3 batches complete, the 3-hour stop, an abort, or
+  two stalls - whichever comes first.
+- Abort: any effect outside the scratch branch and scratch clones
+  (unexpected path in a push, any platform or credential involvement in
+  a fault) aborts the rehearsal immediately and is reported.
+- Observable receipt: a handoff's receipt is the receiver's next push
+  on the branch; before that push the sender treats the handoff as
+  in-flight, not lost.
+- Fault procedure: each seeded fault (F1-F3) is announced in advance as
+  a `status` entry in LOG.jsonl naming the fault; recovery is verified
+  by pull plus `launcher conform`, and the outcome is recorded in the
+  same log.
+
+## 9. Agreement checklist (evidence needed before live work)
 
 From each side, before the first batch:
 
