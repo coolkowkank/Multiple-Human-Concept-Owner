@@ -1,0 +1,136 @@
+"""The supervisor: keeps the team alive without a human watcher.
+
+Starts one process per automated seat, restarts crashed seats with
+backoff, detects a stalled turn (the seat holding the turn has produced
+no bus write within stall_timeout) and restarts or escalates, and
+surfaces open human gates. This is the liveness layer the evaluations
+showed humans providing by hand ("are you still watching?").
+
+Interactive seats (a human pastes prompts into chat sessions on other
+platforms) join the same bus; the supervisor cannot restart those, so a
+stalled interactive seat becomes a gate for the humans instead.
+"""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+import time
+
+from .bus import Bus
+
+
+class Supervisor:
+    def __init__(self, repo, branch="team-work", stall_timeout=900,
+                 restart_limit=5, poll=5, notify_command=None):
+        self.bus = Bus(repo, branch)
+        self.repo = repo
+        self.stall_timeout = stall_timeout
+        self.restart_limit = restart_limit
+        self.poll = poll
+        self.notify_command = notify_command
+        self.procs = {}
+        self.restarts = {}
+        self._stalled_seats = set()
+        self._notified_gates = set()
+
+    def automated_seats(self):
+        roster = self.bus.roster().get("seats", {})
+        return {name: spec for name, spec in roster.items()
+                if spec.get("adapter", {}).get("type") != "interactive"}
+
+    def start_seat(self, name):
+        import os
+        pkg_parent = os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__)))
+        env = dict(os.environ)
+        env["PYTHONPATH"] = pkg_parent + os.pathsep + env.get("PYTHONPATH", "")
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "launcher", "seat", name,
+             "--repo", self.repo, "--branch", self.bus.branch], env=env)
+        self.procs[name] = proc
+        return proc
+
+    def run(self, max_seconds=None):
+        start = time.time()
+        for name in self.automated_seats():
+            self.start_seat(name)
+        while True:
+            state = self.bus.state()
+            if state.get("status") == "done":
+                self._stop_all()
+                return "done"
+            if max_seconds and time.time() - start > max_seconds:
+                self._stop_all()
+                return "timeout"
+            self._reap_and_restart()
+            self._check_stall(state)
+            self._report_gates()
+            time.sleep(self.poll)
+
+    # -- internals -------------------------------------------------------
+
+    def _reap_and_restart(self):
+        for name, proc in list(self.procs.items()):
+            if proc.poll() is None:
+                continue
+            count = self.restarts.get(name, 0)
+            if count >= self.restart_limit:
+                self._escalate(
+                    f"seat {name} crashed {count + 1} times; not restarting")
+                del self.procs[name]
+                continue
+            self.restarts[name] = count + 1
+            self.bus.append_log("supervisor", "restart",
+                                f"seat {name} exited {proc.returncode}; "
+                                f"restart {count + 1}")
+            self.bus.commit_all(f"supervisor: restart seat {name}")
+            self.start_seat(name)
+
+    def _check_stall(self, state):
+        turn = state.get("turn")
+        if not turn or state.get("status") != "running":
+            return
+        since = state.get("turn_since")
+        if not since:
+            return
+        try:
+            ts = time.mktime(time.strptime(since, "%Y-%m-%dT%H:%M:%SZ"))
+        except ValueError:
+            return
+        if time.time() - ts < self.stall_timeout:
+            return
+        if turn in self._stalled_seats:
+            return
+        self._stalled_seats.add(turn)
+        if turn in self.procs:
+            self.bus.append_log("supervisor", "stall",
+                                f"turn stalled on {turn}; restarting seat")
+            self.bus.commit_all(f"supervisor: stall on {turn}")
+            self.procs[turn].terminate()
+        else:
+            self._escalate(
+                f"turn stalled on interactive seat {turn}; "
+                "a human must nudge or re-open that session")
+
+    def _escalate(self, text):
+        self.bus.open_gate("supervisor", text,
+                           options=["restart the seat", "stop the team"],
+                           recommendation="restart the seat")
+        self.bus.commit_all("supervisor: escalation")
+
+    def _report_gates(self):
+        for gate in self.bus.pending_gates():
+            if gate["id"] in self._notified_gates:
+                continue
+            self._notified_gates.add(gate["id"])
+            line = (f"[gate {gate['id']}] {gate['seat']} asks: "
+                    f"{gate['question']}")
+            print(line, flush=True)
+            if self.notify_command:
+                subprocess.run(self.notify_command + [line], check=False)
+
+    def _stop_all(self):
+        for proc in self.procs.values():
+            if proc.poll() is None:
+                proc.terminate()
