@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="1070" viewBox="0 0 1240 1070" font-family="Helvetica, Arial, sans-serif">
+<defs><marker id="mi" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#2b2625"/></marker><marker id="mt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#3f7a73"/></marker><marker id="mg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#a39a96"/></marker><marker id="ml" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#6b605d"/></marker></defs>
+<rect width="1240" height="1070" fill="#f4efec"/><rect x="14" y="14" width="1212" height="1042" rx="26" fill="#fff"/>
+<text x="620.0" y="72" font-size="34" fill="#2b2625" text-anchor="middle" font-weight="normal" font-family="Georgia, Noto Serif, serif">Delivery flow: how the robots work below the Coordinator</text>
+<text x="620.0" y="104" font-size="15" fill="#6b605d" text-anchor="middle" font-weight="normal" >Working exchanges between roles. These are collaboration lines, not reassignment: the Coordinator manages priorities and conflicts.</text>
+<rect x="50" y="165" width="300" height="70" rx="14" fill="#fcf8f4" stroke="#b9a9a0" stroke-width="2"/>
+<text x="200" y="196" font-size="15" fill="#2b2625" text-anchor="middle" font-weight="bold" font-family="Courier New, monospace">concept_to_coordinator.md</text>
+<text x="200" y="216" font-size="12.5" fill="#6b605d" text-anchor="middle" font-weight="normal" >the agreed brief - orders come from here</text>
+<line x1="350" y1="200" x2="514" y2="200" stroke="#2b2625" stroke-width="2.4" marker-end="url(#mi)"/>
+<circle cx="560" cy="200" r="44" fill="#fff" stroke="#2b2625" stroke-width="2.6"/>
+<rect x="541.3" y="190.1" width="37.400000000000006" height="28.6" rx="7.700000000000001" fill="none" stroke="#2b2625" stroke-width="2.4"/>
+<circle cx="552.3" cy="204.4" r="2.8600000000000003" fill="#2b2625"/><circle cx="567.7" cy="204.4" r="2.8600000000000003" fill="#2b2625"/>
+<line x1="560" y1="190.1" x2="560" y2="181.3" stroke="#2b2625" stroke-width="2.4"/><circle cx="560" cy="180.2" r="2.64" fill="#2b2625"/>
+<text x="622" y="198" font-size="16" fill="#2b2625" text-anchor="start" font-weight="bold" >Coordinator</text>
+<text x="622" y="217" font-size="12.5" fill="#6b605d" text-anchor="start" font-weight="normal" >Instinct - owner: Human 1</text>
+<text x="622" y="235" font-size="12.5" fill="#6b605d" text-anchor="start" font-weight="normal" >sets priorities, resolves conflicts</text>
+<line x1="560" y1="244" x2="560" y2="335" stroke="#a39a96" stroke-width="2.2"/>
+<line x1="120" y1="335" x2="930" y2="335" stroke="#a39a96" stroke-width="2.2"/>
+<line x1="120" y1="335" x2="120" y2="388" stroke="#a39a96" stroke-width="2.2" marker-end="url(#mg)"/>
+<line x1="390" y1="335" x2="390" y2="388" stroke="#a39a96" stroke-width="2.2" marker-end="url(#mg)"/>
+<line x1="660" y1="335" x2="660" y2="388" stroke="#a39a96" stroke-width="2.2" marker-end="url(#mg)"/>
+<line x1="930" y1="335" x2="930" y2="388" stroke="#a39a96" stroke-width="2.2" marker-end="url(#mg)"/>
+<text x="546" y="326" font-size="12.5" fill="#6b605d" text-anchor="end" font-weight="normal" >Coordinator assigns work and manages priorities</text>
+<text x="574" y="326" font-size="12.5" fill="#6b605d" text-anchor="start" font-weight="normal" >Peers collaborate; they never reassign each other</text>
+<circle cx="120" cy="430" r="40" fill="#fff" stroke="#3f7a73" stroke-width="2.6" stroke-dasharray="7 5"/>
+<rect x="103.0" y="421.0" width="34.0" height="26.0" rx="7.0" fill="none" stroke="#3f7a73" stroke-width="2.4"/>
+<circle cx="113.0" cy="434.0" r="2.6" fill="#3f7a73"/><circle cx="127.0" cy="434.0" r="2.6" fill="#3f7a73"/>
+<line x1="120" y1="421.0" x2="120" y2="413.0" stroke="#3f7a73" stroke-width="2.4"/><circle cx="120" cy="412.0" r="2.4" fill="#3f7a73"/>
+<text x="134" y="496" font-size="16" fill="#2b2625" text-anchor="start" font-weight="bold" >Architect</text>
+<text x="134" y="515" font-size="12.5" fill="#6b605d" text-anchor="start" font-weight="normal" >Claude - owner: Human 2</text>
+<text x="134" y="533" font-size="12.5" fill="#6b605d" text-anchor="start" font-weight="normal" >specs and acceptance criteria</text>
+<circle cx="390" cy="430" r="40" fill="#fff" stroke="#2b2625" stroke-width="2.6"/>
+<rect x="373.0" y="421.0" width="34.0" height="26.0" rx="7.0" fill="none" stroke="#2b2625" stroke-width="2.4"/>
+<circle cx="383.0" cy="434.0" r="2.6" fill="#2b2625"/><circle cx="397.0" cy="434.0" r="2.6" fill="#2b2625"/>
+<line x1="390" y1="421.0" x2="390" y2="413.0" stroke="#2b2625" stroke-width="2.4"/><circle cx="390" cy="412.0" r="2.4" fill="#2b2625"/>
+<text x="404" y="496" font-size="16" fill="#2b2625" text-anchor="start" font-weight="bold" >Builder</text>
+<text x="404" y="515" font-size="12.5" fill="#6b605d" text-anchor="start" font-weight="normal" >Instinct - owner: Human 4</text>
+<text x="404" y="533" font-size="12.5" fill="#6b605d" text-anchor="start" font-weight="normal" >sole writer, one batch per turn</text>
+<circle cx="660" cy="430" r="40" fill="#fff" stroke="#2b2625" stroke-width="2.6"/>
+<rect x="643.0" y="421.0" width="34.0" height="26.0" rx="7.0" fill="none" stroke="#2b2625" stroke-width="2.4"/>
+<circle cx="653.0" cy="434.0" r="2.6" fill="#2b2625"/><circle cx="667.0" cy="434.0" r="2.6" fill="#2b2625"/>
+<line x1="660" y1="421.0" x2="660" y2="413.0" stroke="#2b2625" stroke-width="2.4"/><circle cx="660" cy="412.0" r="2.4" fill="#2b2625"/>
+<text x="674" y="496" font-size="16" fill="#2b2625" text-anchor="start" font-weight="bold" >Reviewer</text>
+<text x="674" y="515" font-size="12.5" fill="#6b605d" text-anchor="start" font-weight="normal" >Instinct - owner: Human 1</text>
+<text x="674" y="533" font-size="12.5" fill="#6b605d" text-anchor="start" font-weight="normal" >written findings on every batch</text>
+<circle cx="930" cy="430" r="40" fill="#fff" stroke="#3f7a73" stroke-width="2.6" stroke-dasharray="7 5"/>
+<rect x="913.0" y="421.0" width="34.0" height="26.0" rx="7.0" fill="none" stroke="#3f7a73" stroke-width="2.4"/>
+<circle cx="923.0" cy="434.0" r="2.6" fill="#3f7a73"/><circle cx="937.0" cy="434.0" r="2.6" fill="#3f7a73"/>
+<line x1="930" y1="421.0" x2="930" y2="413.0" stroke="#3f7a73" stroke-width="2.4"/><circle cx="930" cy="412.0" r="2.4" fill="#3f7a73"/>
+<text x="944" y="496" font-size="16" fill="#2b2625" text-anchor="start" font-weight="bold" >Independent QC</text>
+<text x="944" y="515" font-size="12.5" fill="#6b605d" text-anchor="start" font-weight="normal" >Claude - owner: Human 3</text>
+<text x="944" y="533" font-size="12.5" fill="#6b605d" text-anchor="start" font-weight="normal" >consequential calls, a fail stands</text>
+<line x1="161" y1="430" x2="349" y2="430" stroke="#2b2625" stroke-width="2.4" marker-start="url(#mi)" marker-end="url(#mi)"/>
+<text x="255.0" y="420" font-size="12.5" fill="#2b2625" text-anchor="middle" font-weight="normal" >specs, constraints &#8594;</text>
+<text x="255.0" y="452" font-size="12.5" fill="#2b2625" text-anchor="middle" font-weight="normal" >&#8592; design questions</text>
+<line x1="431" y1="430" x2="619" y2="430" stroke="#2b2625" stroke-width="2.4" marker-start="url(#mi)" marker-end="url(#mi)"/>
+<text x="525.0" y="420" font-size="12.5" fill="#2b2625" text-anchor="middle" font-weight="normal" >implementation &#8594;</text>
+<text x="525.0" y="452" font-size="12.5" fill="#2b2625" text-anchor="middle" font-weight="normal" >&#8592; findings, fixes</text>
+<line x1="701" y1="430" x2="889" y2="430" stroke="#2b2625" stroke-width="2.4" marker-end="url(#mi)"/>
+<text x="795.0" y="420" font-size="12.5" fill="#2b2625" text-anchor="middle" font-weight="normal" >critical findings</text>
+<text x="795.0" y="452" font-size="12.5" fill="#2b2625" text-anchor="middle" font-weight="normal" >milestone evidence</text>
+<rect x="60" y="700" width="1120" height="84" rx="14" fill="#fcf8f4" stroke="#b9a9a0" stroke-width="2"/>
+<circle cx="120" cy="742" r="28" fill="#fff" stroke="#2b2625" stroke-width="2.6"/>
+<rect x="108.1" y="735.7" width="23.799999999999997" height="18.2" rx="4.8999999999999995" fill="none" stroke="#2b2625" stroke-width="2.4"/>
+<circle cx="115.1" cy="744.8" r="1.8199999999999998" fill="#2b2625"/><circle cx="124.9" cy="744.8" r="1.8199999999999998" fill="#2b2625"/>
+<line x1="120" y1="735.7" x2="120" y2="730.1" stroke="#2b2625" stroke-width="2.4"/><circle cx="120" cy="729.4" r="1.68" fill="#2b2625"/>
+<text x="170" y="734" font-size="16" fill="#2b2625" text-anchor="start" font-weight="bold" >Records</text>
+<text x="170" y="753" font-size="12.5" fill="#6b605d" text-anchor="start" font-weight="normal" >Instinct - owner: Human 4</text>
+<text x="170" y="771" font-size="12.5" fill="#6b605d" text-anchor="start" font-weight="normal" >secondary: mostly idle</text>
+<text x="390" y="734" font-size="13" fill="#2b2625" text-anchor="start" font-weight="normal" >Architect, Builder, Reviewer and QC write decisions, results and handoffs here,</text>
+<text x="390" y="753" font-size="13" fill="#2b2625" text-anchor="start" font-weight="normal" >so any human can reconstruct what happened. Concept changes are recorded too.</text>
+<line x1="120" y1="472" x2="120" y2="698" stroke="#6b605d" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#ml)"/>
+<line x1="390" y1="472" x2="390" y2="698" stroke="#6b605d" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#ml)"/>
+<line x1="660" y1="472" x2="660" y2="698" stroke="#6b605d" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#ml)"/>
+<line x1="930" y1="472" x2="930" y2="698" stroke="#6b605d" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#ml)"/>
+<text x="134" y="680" font-size="12.5" fill="#6b605d" text-anchor="start" font-weight="normal" >roles below the Coordinator write to Records</text>
+<path d="M 972 430 L 1196 430 L 1196 172 L 594.9 172" fill="none" stroke="#3f7a73" stroke-width="2.4" stroke-linejoin="round" marker-end="url(#mt)"/>
+<text x="1188" y="162" font-size="12.5" fill="#3f7a73" text-anchor="end" font-weight="normal" >QC verdict to the Coordinator - a fail stands, no override</text>
+<rect x="60" y="820" width="1120" height="76" rx="14" fill="#faf7f5" stroke="#e6dedb" stroke-width="1.5"/>
+<text x="80" y="844" font-size="12" fill="#2b2625" text-anchor="start" font-weight="bold" letter-spacing="2">LEGEND</text>
+<circle cx="100" cy="874" r="14" fill="#fff" stroke="#2b2625" stroke-width="2.6"/>
+<rect x="94.05" y="870.85" width="11.899999999999999" height="9.1" rx="2.4499999999999997" fill="none" stroke="#2b2625" stroke-width="2.4"/>
+<circle cx="97.55" cy="875.4" r="0.9099999999999999" fill="#2b2625"/><circle cx="102.45" cy="875.4" r="0.9099999999999999" fill="#2b2625"/>
+<line x1="100" y1="870.85" x2="100" y2="868.05" stroke="#2b2625" stroke-width="2.4"/><circle cx="100" cy="867.7" r="0.84" fill="#2b2625"/>
+<text x="124" y="879" font-size="12.5" fill="#2b2625" text-anchor="start" font-weight="normal" >Instinct robot</text>
+<circle cx="262" cy="874" r="14" fill="#fff" stroke="#3f7a73" stroke-width="2.6" stroke-dasharray="7 5"/>
+<rect x="256.05" y="870.85" width="11.899999999999999" height="9.1" rx="2.4499999999999997" fill="none" stroke="#3f7a73" stroke-width="2.4"/>
+<circle cx="259.55" cy="875.4" r="0.9099999999999999" fill="#3f7a73"/><circle cx="264.45" cy="875.4" r="0.9099999999999999" fill="#3f7a73"/>
+<line x1="262" y1="870.85" x2="262" y2="868.05" stroke="#3f7a73" stroke-width="2.4"/><circle cx="262" cy="867.7" r="0.84" fill="#3f7a73"/>
+<text x="286" y="879" font-size="12.5" fill="#2b2625" text-anchor="start" font-weight="normal" >Claude robot (high-impact seats)</text>
+<line x1="520" y1="874" x2="560" y2="874" stroke="#2b2625" stroke-width="2.4" marker-end="url(#mi)"/>
+<text x="570" y="879" font-size="12.5" fill="#2b2625" text-anchor="start" font-weight="normal" >working exchange</text>
+<line x1="690" y1="874" x2="730" y2="874" stroke="#a39a96" stroke-width="2.4" marker-end="url(#mg)"/>
+<text x="740" y="879" font-size="12.5" fill="#2b2625" text-anchor="start" font-weight="normal" >assignment, priorities</text>
+<line x1="880" y1="874" x2="920" y2="874" stroke="#6b605d" stroke-width="2.4" stroke-dasharray="6 5" marker-end="url(#ml)"/>
+<text x="930" y="879" font-size="12.5" fill="#2b2625" text-anchor="start" font-weight="normal" >written record</text>
+<line x1="1030" y1="874" x2="1070" y2="874" stroke="#3f7a73" stroke-width="2.4" marker-end="url(#mt)"/>
+<text x="1080" y="879" font-size="12.5" fill="#2b2625" text-anchor="start" font-weight="normal" >QC verdict</text>
+<text x="620.0" y="918" font-size="12.5" fill="#6b605d" text-anchor="middle" font-weight="normal" >Neutral placeholders - the concept owners assign actual names, owners and roles when adopting this blueprint.</text>
+<rect x="60" y="945" width="1120" height="95" rx="14" fill="#faf7f5" stroke="#e6dedb"/>
+<text x="80" y="970" font-size="14" fill="#2b2625" text-anchor="start" font-weight="bold" >Role circles are responsibilities, not a count of Instincts.</text>
+<text x="80" y="993" font-size="14" fill="#2b2625" text-anchor="start" font-weight="normal" >One main delivery job each. Human 4: Builder + Records only while Records is mostly idle; reassign when busy.</text>
+<text x="80" y="1016" font-size="14" fill="#2b2625" text-anchor="start" font-weight="normal" >Coordinator and Reviewer: separate delivery assignees. Own-human relay remains; independent QC stays separate from Builder.</text>
+</svg>
