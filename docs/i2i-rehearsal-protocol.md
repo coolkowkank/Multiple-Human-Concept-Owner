@@ -6,16 +6,21 @@ the message format are joint, same rule as docs/evidence-interface.md.
 
 ## 1. Purpose
 
-Prove the launcher mechanism works when the turn signal crosses between
-two real Instincts over the existing coordination channel, instead of a
-loopback relay. This is the beyond-GitHub transport pass: GitHub carries
-the record (bus, artifacts, code), the coordination channel carries only
-ephemeral wake hints.
+A limited transport and operator-glue rehearsal: prove the launcher
+mechanism works when the turn signal crosses between two real operators
+over the existing coordination channel, instead of a loopback relay.
+GitHub carries the record (bus, artifacts, code); the coordination
+channel carries only ephemeral wake hints.
 
-Explicitly not proven by this rehearsal: real-model judgment quality,
-sustained unattended operation, any day- or week-long claim. The rehearsal
-is hours, with mock work adapters. It proves transport, fencing, dedup and
-recovery across two real operators - nothing more.
+Scope honesty, stated up front:
+
+- The two sides are two operators of the same kind, not heterogeneous AI
+  platforms. This rehearsal says nothing about cross-platform generality.
+- It is not Stage 2.5 and not proof of a generic autonomous launcher.
+- Mock work adapters say nothing about model judgment quality.
+- It is hours long. It proves transport, fencing, dedup and recovery
+  across two real operators - not sustained autonomy, and no day- or
+  week-long claim follows from it.
 
 ## 2. Mechanism vs operator glue
 
@@ -76,9 +81,12 @@ bus is ignored and logged.
   applied turn. Measure: LOG.jsonl entries per turn_seq == 1.
 - F2 lost wake: one TEAM-WAKE suppressed. Expect recovery on the
   receiver's next scheduled poll. Measure: recovery latency in minutes.
-- F3 crash mid-seat: kill the seat process mid-turn. Expect lease expiry
-  and takeover with no half-applied commit. Measure: time to resume;
-  verify no duplicate or partial commit on the branch.
+- F3 crash mid-seat: kill one rehearsal-local seat process mid-turn, in
+  its own scratch clone. Scratch repo and scratch seat processes only -
+  no platform-level faults, no interference with credentials, accounts or
+  anything outside the rehearsal clone. Expect lease expiry and takeover
+  with no half-applied commit. Measure: time to resume; verify no
+  duplicate or partial commit on the branch.
 
 ## 6. Acceptance metrics
 
