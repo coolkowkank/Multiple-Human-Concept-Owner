@@ -51,7 +51,13 @@ def cmd_init(args):
 
 def cmd_seat(args):
     bus = Bus(args.repo, args.branch)
-    seat = Seat(bus, args.name, poll_interval=args.poll)
+    relay = None
+    relay_url = args.relay_url or os.environ.get("TEAM_RELAY_URL")
+    token = os.environ.get("TEAM_RELAY_TOKEN")
+    if relay_url and token:
+        from .relay import RelayClient
+        relay = RelayClient(relay_url, token)
+    seat = Seat(bus, args.name, poll_interval=args.poll, relay=relay)
     if args.once:
         acted = seat.act_once()
         print(f"{args.name}: {'acted' if acted else 'not our turn'}")
@@ -86,6 +92,16 @@ def cmd_answer(args):
     bus = Bus(args.repo, args.branch)
     bus.transact(f"gate {args.gate_id} answered",
                  lambda: bus.answer_gate(args.gate_id, args.answer))
+
+
+def _cmd_serve(args):
+    import secrets
+    from .relay import serve
+    token = os.environ.get("TEAM_RELAY_TOKEN") or secrets.token_hex(16)
+    print(f"relay on 127.0.0.1:{args.port} "
+          f"(token in TEAM_RELAY_TOKEN env, never committed)", flush=True)
+    os.environ["TEAM_RELAY_TOKEN"] = token
+    serve(args.port, token)
 
 
 def default_roster():
@@ -140,6 +156,7 @@ def main(argv=None):
     p.add_argument("name")
     p.add_argument("--once", action="store_true")
     p.add_argument("--poll", type=int, default=5)
+    p.add_argument("--relay-url")
     p.set_defaults(fn=cmd_seat)
 
     p = sub.add_parser("launch", help="supervise all automated seats")
@@ -153,6 +170,10 @@ def main(argv=None):
     base(p)
     p.add_argument("--lines", type=int, default=10)
     p.set_defaults(fn=cmd_status)
+
+    p = sub.add_parser("serve", help="loopback relay server (127.0.0.1)")
+    p.add_argument("--port", type=int, required=True)
+    p.set_defaults(fn=lambda a: _cmd_serve(a))
 
     p = sub.add_parser("answer", help="answer a human gate")
     base(p)

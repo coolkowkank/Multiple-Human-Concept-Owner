@@ -34,11 +34,13 @@ def _now():
 
 class Seat:
     def __init__(self, bus: Bus, name, poll_interval=5, lease_ttl=900,
-                 instance_id=None):
+                 instance_id=None, relay=None):
         self.bus = bus
         self.name = name
         self.poll_interval = poll_interval
         self.lease_ttl = lease_ttl
+        self.relay = relay
+        self._relay_seq = 0
         self.instance_id = instance_id or f"{name}-{uuid.uuid4().hex[:8]}"
         roster = bus.roster()
         if name not in roster.get("seats", {}):
@@ -92,11 +94,35 @@ class Seat:
                 self.bus.append_log(self.name, "error", str(exc))
                 self.bus.commit_all(f"seat {self.name}: error recorded")
                 raise
+            if acted and self.relay:
+                self._signal()
             passes += 1
             if max_passes is not None and passes >= max_passes:
                 return
             if not acted:
-                time.sleep(self.poll_interval)
+                self._wait()
+
+    def _signal(self):
+        """Wake the next seat through the relay (ephemeral hint only)."""
+        try:
+            state = self.bus.state()
+            self.relay.post(self.name, "wake",
+                            f"turn -> {state.get('turn')}")
+        except Exception:
+            pass  # relay down costs latency, never correctness
+
+    def _wait(self):
+        """Long-poll the relay for a wake signal; fall back to sleep."""
+        if self.relay:
+            try:
+                msgs = self.relay.since(self._relay_seq,
+                                        wait=self.poll_interval)
+                for m in msgs:
+                    self._relay_seq = max(self._relay_seq, m["seq"])
+                return
+            except Exception:
+                self.relay = None  # permanent fallback to git polling
+        time.sleep(self.poll_interval)
 
     # -- internals -------------------------------------------------------
 

@@ -280,3 +280,51 @@ class SupervisorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RelayTests(unittest.TestCase):
+    def _server(self):
+        import threading
+        from http.server import ThreadingHTTPServer
+        from launcher.relay import RelayState, make_handler
+        state = RelayState("tok")
+        server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(state))
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        return server, server.server_address[1]
+
+    def test_post_and_longpoll(self):
+        from launcher.relay import RelayClient
+        server, port = self._server()
+        try:
+            c = RelayClient(f"http://127.0.0.1:{port}", "tok")
+            seq = c.post("builder", "wake", "turn -> reviewer")
+            self.assertEqual(seq, 1)
+            msgs = c.since(0, wait=1)
+            self.assertEqual(msgs[0]["body"], "turn -> reviewer")
+            self.assertEqual(c.since(1, wait=0), [])
+        finally:
+            server.shutdown()
+
+    def test_bad_token_rejected(self):
+        from launcher.relay import RelayClient
+        server, port = self._server()
+        try:
+            c = RelayClient(f"http://127.0.0.1:{port}", "wrong")
+            with self.assertRaises(Exception):
+                c.post("x", "wake", "y")
+        finally:
+            server.shutdown()
+
+    def test_seat_falls_back_when_relay_down(self):
+        from launcher.relay import RelayClient
+        script = [{"summary": "s", "writes": {"src/a": "b"},
+                   "verify_command": None, "handoff": None}]
+        seats = {"builder": seat_spec(script, ["src/"])}
+        repo, bus = make_repo(seats=seats)
+        try:
+            dead = RelayClient("http://127.0.0.1:1", "tok", timeout=1)
+            seat = Seat(bus, "builder", poll_interval=0, relay=dead)
+            seat._wait()  # must not raise; drops the dead relay
+            self.assertIsNone(seat.relay)
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)

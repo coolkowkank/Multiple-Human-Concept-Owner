@@ -25,3 +25,22 @@ An honest map of what this blueprint is built on. It claims no novelty and no co
 ## Next useful test
 
 Whether a fresh team can adopt this blueprint on a new project and run one full batch cycle - brief, turn token, build, review, QC gate, records - without outside explanation.
+
+## Team launcher runtime (added 4 Nov 2026, branch team-launcher)
+
+Tested by the mechanism suite (22 tests) and the self-checking demo, all
+on mock adapters in local git repos: turn-token enforcement (off-turn
+and out-of-path commits rejected), single-session leases, adapter crash
+leaving the turn for retry with no duplicate write, verify exit codes
+recorded per batch, gate open/answer cycle, supervisor crash-restart
+with escalation after the restart limit, relay wake/long-poll/auth and
+silent fallback to git polling.
+
+Implemented but not yet exercised live: the cli and http adapters
+against real models, cross-machine bus sharing over a remote, the relay
+beyond loopback.
+
+Proposed, not started: a real-model rehearsal (routes in
+docs/launcher.md), the staged fault-injection and days-long soak tests
+(method: MAS-FIRE and chaos-engineering sources in docs/references.md).
+No sustained unattended run has happened; nothing here claims one.
