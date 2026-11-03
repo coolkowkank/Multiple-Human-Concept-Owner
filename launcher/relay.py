@@ -121,3 +121,28 @@ class RelayClient:
     def since(self, after, wait=0):
         return self._req(
             "GET", f"/messages?since={after}&wait={wait}")["messages"]
+
+
+class WebhookSink:
+    """Outbound-only wake channel to any HTTPS webhook the team
+    configures (Slack/Discord-compatible incoming webhook, an
+    automation endpoint, another platform's listener).
+
+    This is the beyond-git, beyond-loopback signal route that needs no
+    exposed server of ours: seats POST a short wake message, the
+    receiving platform's own integration delivers it. The webhook URL
+    is a secret: from env (TEAM_WAKE_WEBHOOK), never committed.
+    Delivery is best-effort; the git bus remains the record.
+    """
+
+    def __init__(self, url, timeout=10):
+        self.url = url
+        self.timeout = timeout
+
+    def post(self, seat, kind, body):
+        data = json.dumps({"text": f"[{seat}] {kind}: {body}"}).encode()
+        req = urllib.request.Request(
+            self.url, data=data,
+            headers={"content-type": "application/json"})
+        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            return resp.status

@@ -328,3 +328,48 @@ class RelayTests(unittest.TestCase):
             self.assertIsNone(seat.relay)
         finally:
             shutil.rmtree(repo, ignore_errors=True)
+
+
+class WebhookTests(unittest.TestCase):
+    def test_wake_reaches_configured_endpoint(self):
+        import threading
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        got = []
+
+        class H(BaseHTTPRequestHandler):
+            def do_POST(self):
+                n = int(self.headers.get("content-length", 0))
+                got.append(self.rfile.read(n).decode())
+                self.send_response(200)
+                self.end_headers()
+
+            def log_message(self, *a):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            from launcher.relay import WebhookSink
+            url = f"http://127.0.0.1:{server.server_address[1]}/hook"
+            self.assertEqual(WebhookSink(url).post("builder", "wake", "turn -> qc"), 200)
+            self.assertIn("turn -> qc", got[0])
+        finally:
+            server.shutdown()
+
+    def test_seat_signals_webhook_without_breaking_on_failure(self):
+        from launcher.relay import WebhookSink
+        script = [{"summary": "s", "writes": {"src/a": "b"},
+                   "verify_command": None, "handoff": None}]
+        seats = {"builder": seat_spec(script, ["src/"])}
+        repo, bus = make_repo(seats=seats)
+        try:
+            state = bus.state()
+            state["turn"] = "builder"
+            bus.write_state(state)
+            bus.commit_all("human: go")
+            # Dead endpoint: the seat still completes its turn.
+            seat = Seat(bus, "builder",
+                        webhook=WebhookSink("http://127.0.0.1:1", timeout=1))
+            self.assertTrue(seat.act_once())
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)

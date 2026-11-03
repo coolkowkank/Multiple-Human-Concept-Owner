@@ -34,12 +34,13 @@ def _now():
 
 class Seat:
     def __init__(self, bus: Bus, name, poll_interval=5, lease_ttl=900,
-                 instance_id=None, relay=None):
+                 instance_id=None, relay=None, webhook=None):
         self.bus = bus
         self.name = name
         self.poll_interval = poll_interval
         self.lease_ttl = lease_ttl
         self.relay = relay
+        self.webhook = webhook
         self._relay_seq = 0
         self.instance_id = instance_id or f"{name}-{uuid.uuid4().hex[:8]}"
         roster = bus.roster()
@@ -103,13 +104,22 @@ class Seat:
                 self._wait()
 
     def _signal(self):
-        """Wake the next seat through the relay (ephemeral hint only)."""
-        try:
-            state = self.bus.state()
-            self.relay.post(self.name, "wake",
-                            f"turn -> {state.get('turn')}")
-        except Exception:
-            pass  # relay down costs latency, never correctness
+        """Wake the next seat through every configured hint channel.
+
+        Hints are ephemeral: the bus is the record, a failed hint costs
+        latency, never correctness."""
+        state = self.bus.state()
+        body = f"turn -> {state.get('turn')}"
+        if self.relay:
+            try:
+                self.relay.post(self.name, "wake", body)
+            except Exception:
+                pass
+        if self.webhook:
+            try:
+                self.webhook.post(self.name, "wake", body)
+            except Exception:
+                pass
 
     def _wait(self):
         """Long-poll the relay for a wake signal; fall back to sleep."""

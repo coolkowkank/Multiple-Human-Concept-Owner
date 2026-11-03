@@ -39,6 +39,11 @@ gate queue. Stdlib-only Python 3.10+: nothing to install.
   waiting out a poll. It carries hints only; the bus remains the
   record, and seats fall back to git polling when the relay is down.
   Loopback-only by design - exposing it is an owner security decision.
+- **Webhook wake** (`TEAM_WAKE_WEBHOOK` env): outbound-only wake posts
+  to any HTTPS endpoint the team configures (a chat-platform incoming
+  webhook, an automation listener on another platform). No server of
+  ours is exposed; delivery is best-effort and the bus stays the
+  record. The URL is a secret and is never committed.
 - **Adapters**: how a seat's AI is called: `mock` (scripted, no keys),
   `cli` (any installed agent CLI), `http` (OpenAI-compatible endpoint,
   key from env), `interactive` (human-pasted session). This is where AI

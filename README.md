@@ -20,7 +20,7 @@ This is the intended operating model, not a claim of proven unattended delivery.
 | Requirement (from the concept owners) | Status |
 | --- | --- |
 | Fast launch: concept in, team running | Implemented: `python3 -m launcher init / seat / launch / demo`; tested by the suite and demo on mock adapters |
-| Agents communicate with each other, not through humans | Implemented: the git-backed bus (`LOG.jsonl`, turn token, gates) is the shared communication place; a lightweight relay for faster cross-platform messaging is in progress |
+| Agents communicate with each other, not through humans | Implemented and tested: the git-backed bus (`LOG.jsonl`, turn token, gates) is the durable shared communication place; a loopback relay gives in-machine millisecond wake-ups; outbound webhook wakes reach other platforms' own endpoints. Tested: relay auth/long-poll/fallback, webhook delivery and failure-tolerance |
 | AI from different platforms working together | Designed: any platform that can run a CLI command or answer an HTTP prompt can occupy a seat (adapter interface). GitHub is the team's main work platform - code, artifacts, the durable record - but communication is not limited to GitHub; the relay and adapter interface exist so seats on different platforms talk directly. Support beyond that (A2A protocol, MCP) is mapped in docs, not yet implemented |
 | Days-to-week unsupervised operation with recovery | Partially implemented: supervisor restarts crashed seats, detects stalled turns, escalates to humans only at gates. Tested in short fault-injection runs (crash, restart, resume). **Not yet proven**: no sustained multi-day run has happened; a staged soak test is planned and will be reported honestly |
 | Rare routine human supervision; human gates kept | Implemented: gates for scope, spend, access, merge/go-live; everything inside the brief proceeds without asking |
@@ -92,7 +92,7 @@ Creates a fresh project repo, launches the full seat cycle (Coordinator drafts c
 3. `python3 -m launcher launch --repo /path/to/project` - the supervisor starts every automated seat, restarts crashes, escalates stalls, and prints human gates as they open.
 4. Watch progress with `python3 -m launcher status --repo /path/to/project`; answer gates with `python3 -m launcher answer <gate-id> "<decision>"`.
 
-Seats on any platform join the same bus. The git repository is the durable record and work platform; direct seat-to-seat messaging beyond git (the relay) is being added so cross-platform seats coordinate without human relaying. Pasting a prompt grants no access: a seat's access is verified by observed action, not claimed (docs/evidence-interface.md §5).
+Seats on any platform join the same bus. The git repository is the durable record and work platform - not the only channel: the loopback relay and outbound webhook wakes let cross-platform seats signal each other directly without human relaying. Network-exposed relays or server-side enforcement are owner security decisions, not defaults. Pasting a prompt grants no access: a seat's access is verified by observed action, not claimed (docs/evidence-interface.md §5).
 
 ## Adopting the blueprint without the runtime
 
