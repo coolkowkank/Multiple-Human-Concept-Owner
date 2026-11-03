@@ -119,10 +119,26 @@ class Bus:
                 self.push()
                 return result
             except BusError:
+                # A failed push does NOT prove the commit never landed
+                # (missing ack != no execution). Check before retrying,
+                # or a retry would duplicate the batch's external
+                # effects (model calls, verify runs).
+                if self._confirm_landed():
+                    return result
                 _git(self.repo, "reset", "--hard", "HEAD~1", check=False)
                 if attempt == self.retries - 1:
                     raise BusError(f"lost {self.retries} commit races on {self.branch}")
         return result
+
+    def _confirm_landed(self):
+        """True when the remote already contains our local HEAD commit."""
+        if not self.has_remote():
+            return True  # local-only bus: the commit itself is the record
+        head = _git(self.repo, "rev-parse", "HEAD").stdout.strip()
+        _git(self.repo, "fetch", "origin", self.branch, check=False)
+        proc = _git(self.repo, "merge-base", "--is-ancestor",
+                    head, f"origin/{self.branch}", check=False)
+        return proc.returncode == 0
 
     # -- state -----------------------------------------------------------
 
