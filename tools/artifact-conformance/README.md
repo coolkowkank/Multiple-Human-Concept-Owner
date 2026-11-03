@@ -15,14 +15,16 @@ listed, 2 usage error. Stdlib only, no third-party dependencies.
 
 ## What it checks
 
-- No template placeholders left unfilled
+- No template placeholders left unfilled - backticked or raw
+  angle-bracket tokens both count as unfilled
 - Full 40-hex commit SHAs where a head is recorded (never an abbreviation)
 - A verify command with an integer exit code from actually running it
 - Per-suite `name: pass/fail` lines on batch handoffs
 - Environment labeled mock / local / hosted plus account type
-- `owner_basis` present and citing a decision-record ID (or an explicit
-  "none - no gated items"); with `--decisions DIR` the cited DR-IDs must
-  exist in the supplied decision records (cross-file resolution)
+- `owner_basis` cites a decision-record ID, or is exactly
+  "none - no gated items" (looser wordings such as "none whatsoever" are
+  rejected); with `--decisions DIR` the cited DR-IDs must exist in the
+  supplied decision records (cross-file resolution)
 - Reproduced / Probed / Read-only honesty lines present and non-empty
 - Every stated limit resolved as accept / waive / must fix
 - Defect vs remaining-work typed separately, with severity and priority
@@ -40,8 +42,11 @@ establish:
   re-running the verify command on the named head.
 - **Security or correctness proof** - a conformant artifact says nothing
   about whether the system is safe or correct.
-- **Transport or turn-token enforcement** - that is the runtime checker's
-  job (`launcher/conformance.py`), not this file's.
+- **Transport or turn-token enforcement** - out of scope here, and bounded
+  on the runtime side too: `launcher/conformance.py` inspects and reports
+  after the fact, its commit-msg hook is client-side and bypassable, and
+  turn_seq fencing reconciles rather than prevents. Neither layer is a
+  proof of transport enforcement.
 
 These limits are accepted as stated: the checker is a tripwire for
 structure, one layer under human review, not a replacement for it.
