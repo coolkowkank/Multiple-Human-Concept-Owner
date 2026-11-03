@@ -2,8 +2,8 @@
 
 > The Reviewer returns written findings on every batch.
 
-- Batch: <reference + full head SHA>
-- Reviewer: <reviewer seat>
+- Batch: `<reference + full head SHA>`
+- Reviewer: `<reviewer seat>`
 
 ## Findings
 
@@ -21,14 +21,14 @@
 
 ## What the Reviewer actually did
 
-- Reproduced: <claims re-run, with results>
-- Probed: <neighbouring paths tested, and how>
-- Read only: <what was inspected but not executed>
+- Reproduced: `<claims re-run, with results>`
+- Probed: `<neighbouring paths tested, and how>`
+- Read only: `<what was inspected but not executed>`
 
 ## Verdict recommendation
 
-<pass / pass with fixes / escalate to QC>
+`<pass / pass with fixes / escalate to QC>`
 
 ## Escalated to QC
 
-<which findings are consequential and why, or none>
+`<which findings are consequential and why, or none>`

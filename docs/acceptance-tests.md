@@ -1,8 +1,9 @@
 # Acceptance tests
 
-> Status: proposed protocol. No stage here has been run against this
-> blueprint yet; results belong in docs/proposed-vs-tested.md when they
-> exist. These tests measure protocol machinery and supervision load. They
+> Status: proposed staged protocol. The launcher's mechanism suite
+> (24 tests at the time of writing) exercises parts of the Stage 2
+> machinery; Stages 1, 2.5, 3 and 4 have not been run as staged here, and
+> no result belongs in docs/proposed-vs-tested.md until it has. These tests measure protocol machinery and supervision load. They
 > do not measure model quality, and no short pass proves week-long
 > autonomy - only Stage 4 speaks to that, and only for the window it ran.
 
@@ -37,7 +38,7 @@ paths, a seat change with no owner decision record, a gated item with no
 `owner_basis`. Pass: every seeded fault is detected mechanically (guard or
 reviewer re-run), none needs a human to notice.
 
-**Stated limits of the mechanism.** The guard is a local pre-commit hook:
+**Stated limits of the mechanism.** The guard is a local commit-msg hook:
 it is bypassable (`--no-verify`, a client where it was never installed, a
 push from another machine). `turn_seq` fencing detects and reconciles lost
 races after the fact through rebase and dedup; it does not cryptographically

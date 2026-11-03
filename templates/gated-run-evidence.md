@@ -7,15 +7,15 @@
 
 | Field | Value |
 | --- | --- |
-| Decision record | <DR-ID covering this run, from templates/decision-record.md> |
-| Target and scope | <what was run, against what> |
-| Environment | <mock / local / hosted + account type used> |
-| Counts before / after | <rows, objects or resources, both sides of the run> |
-| Test identity | <verify command + full head SHA, per docs/evidence-interface.md section 3> |
+| Decision record | `<DR-ID covering this run, from templates/decision-record.md>` |
+| Target and scope | `<what was run, against what>` |
+| Environment | `<mock / local / hosted + account type used>` |
+| Counts before / after | `<rows, objects or resources, both sides of the run>` |
+| Test identity | `<verify command + full head SHA, per docs/evidence-interface.md section 3>` |
 | Rows / objects touched | |
-| Cleanup | <cleanup action or query, and its observed result> |
-| Not proven | <what this run did not establish> |
-| No-secrets check | <confirmation that no credential or private data reached the repo, logs or evidence> |
+| Cleanup | `<cleanup action or query, and its observed result>` |
+| Not proven | `<what this run did not establish>` |
+| No-secrets check | `<confirmation that no credential or private data reached the repo, logs or evidence>` |
 
 ## Rules
 

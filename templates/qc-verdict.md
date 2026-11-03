@@ -5,11 +5,11 @@
 > critical findings. A fail stands - the Coordinator cannot override it.
 > Merge or go-live needs a QC pass.
 
-- Gate: <milestone / change under review>
-- Head reviewed: <full commit SHA>
+- Gate: `<milestone / change under review>`
+- Head reviewed: `<full commit SHA>`
 - Owner basis: <decision-record IDs covering every gated item in scope; a
   gated item with no record is a blocker, not a pass>
-- Evidence reviewed: <evidence links>
+- Evidence reviewed: `<evidence links>`
 
 ## Verdict
 
@@ -17,10 +17,10 @@ PASS / FAIL
 
 ## What QC actually did
 
-- Reproduced: <claims re-run, with the verify command, head and exit codes>
+- Reproduced: `<claims re-run, with the verify command, head and exit codes>`
 - Probed: <neighbouring paths tested, and how. In the reference project the
   highest-value findings sat next to the fix, not in it>
-- Read only: <what was inspected but not executed>
+- Read only: `<what was inspected but not executed>`
 
 Scratch environments (a throwaway clone, a fake client, a local database)
 are allowed for probing, provided nothing live is touched and they are
@@ -33,8 +33,8 @@ batched, with options and a recommendation (docs/delegation.md section 3).>
 
 ## Reasoning
 
-<why, tied to the acceptance criteria and the agreed brief>
+`<why, tied to the acceptance criteria and the agreed brief>`
 
 ## Conditions
 
-<what must change for a FAIL to become a PASS, if anything>
+`<what must change for a FAIL to become a PASS, if anything>`
