@@ -1,6 +1,8 @@
-# Agentic Team Harness
+# General Agentic Project Team Setup
 
-A reusable setup blueprint for running a project with a concept-led human team and a managed AI delivery team. Copy this into a new project, fill in the placeholders, and the working setup is ready.
+*Repository name: `agentic-project-team` - a reusable blueprint for human-led AI project teams: roles, coordination, handoffs, independent review, and project setup.*
+
+A reusable setup blueprint for running any project with a concept-led human team and a managed AI delivery team. It is project-, model- and framework-agnostic: copy this into a new project, fill in the placeholders, and the working setup is ready.
 
 This is a blueprint, not a running system: roles, rules, templates and diagrams. It does not connect anyone's accounts or instantiate a live team.
 
