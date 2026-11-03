@@ -1,0 +1,55 @@
+{
+  "seats": {
+    "coordinator": {
+      "role": "coordinator",
+      "allowed_paths": [
+        ".team/"
+      ],
+      "adapter": {
+        "type": "mock",
+        "script": []
+      }
+    },
+    "builder": {
+      "role": "builder",
+      "allowed_paths": [
+        "src/",
+        "tests/"
+      ],
+      "adapter": {
+        "type": "mock",
+        "script": []
+      }
+    },
+    "reviewer": {
+      "role": "reviewer",
+      "allowed_paths": [
+        "review/"
+      ],
+      "adapter": {
+        "type": "mock",
+        "script": []
+      }
+    },
+    "qc": {
+      "role": "qc",
+      "allowed_paths": [
+        "review/"
+      ],
+      "adapter": {
+        "type": "mock",
+        "script": []
+      }
+    },
+    "records": {
+      "role": "records",
+      "allowed_paths": [
+        "records/"
+      ],
+      "adapter": {
+        "type": "mock",
+        "script": []
+      }
+    }
+  }
+}
