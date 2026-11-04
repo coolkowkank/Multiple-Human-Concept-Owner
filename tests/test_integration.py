@@ -340,3 +340,94 @@ def make_repo_for(root):
     bus.init_layout(brief_text="# Brief\nLease test.\n",
                     roster={"seats": {"builder": spec([], ["work/"], "builder")}})
     return repo, bus
+
+
+class CrossCloneQueueBindingTests(unittest.TestCase):
+    """Stale queued responses are refused across real clones and real
+    processes - the cross-machine case from the live-1 major finding,
+    proven through the actual CLI + seat path, not a unit mock."""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp(prefix="launcher-xbind-")
+        self.origin = os.path.join(self.root, "origin.git")
+        git(self.root, "init", "--bare", "--quiet", self.origin)
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def _clone(self, name):
+        path = os.path.join(self.root, name)
+        git(self.root, "clone", "--quiet", self.origin, path)
+        git(path, "config", "user.name", name)
+        git(path, "config", "user.email", f"{name}@example.com")
+        return path
+
+    def _repo(self, path):
+        from launcher.bus import Bus
+        bus = Bus(path, "team-work")
+        bus.init_layout(brief_text="# Brief\n", roster={
+            "seats": {
+                "builder": {"role": "builder", "allowed_paths": ["src/"],
+                            "adapter": {"type": "queue",
+                                        "path": ".team/queues/b.jsonl"}},
+                "reviewer": {"role": "reviewer", "allowed_paths": ["review/"],
+                             "adapter": {"type": "mock", "script": []}},
+            }})
+        git(path, "checkout", "--quiet", "-B", "team-work")
+        bus.commit_all("operator: init layout")
+        return bus
+
+    def _respond(self, repo, summary):
+        cli = os.path.join(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))), "launcher", "cli.py")
+        payload = os.path.join(repo, "resp.json")
+        with open(payload, "w") as fh:
+            json.dump({"summary": summary, "writes": {}, "handoff":
+                       "reviewer", "status_line": "s"}, fh)
+        proc = subprocess.run(
+            [sys.executable, "-m", "launcher", "respond", "builder",
+             "--repo", repo, "--branch", "team-work", "--file", payload],
+            capture_output=True, text=True,
+            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        assert proc.returncode == 0, proc.stderr
+        return proc.stdout
+
+    def test_stale_response_refused_across_clones(self):
+        a = self._clone("a")
+        bus_a = self._repo(a)
+        bus_a.push()
+        state = bus_a.state()
+        state["turn"] = "builder"
+        state["status"] = "running"
+        bus_a.write_state(state)
+        bus_a.commit_all("operator: turn to builder")
+        bus_a.push()
+        # operator reasons against turn=builder seq=0 and queues
+        out = self._respond(a, "reasoned at seq 0")
+        self.assertIn("seq=0", out)
+        # the bus moves meanwhile: two turns pass in another clone
+        b = self._clone("b")
+        bus_b = self._repo_pull(b)
+        state = bus_b.state()
+        state["turn_seq"] += 2
+        bus_b.write_state(state)
+        bus_b.commit_all("operator: two turns passed elsewhere")
+        bus_b.push()
+        # clone a pulls the movement, then the seat refuses the stale line
+        from launcher.runtime import Seat, SeatError
+        with self.assertRaises(SeatError) as ctx:
+            Seat(bus_a, "builder").act_once()
+        self.assertIn("stale", str(ctx.exception))
+        with open(os.path.join(a, ".team/queues/b.jsonl")) as fh:
+            self.assertNotEqual(fh.read().strip(), "")
+        # nothing was applied: seq and turn are exactly as clone b left them
+        self.assertEqual(bus_a.state()["turn_seq"], state["turn_seq"])
+        self.assertEqual(bus_a.state()["turn"], "builder")
+
+    def _repo_pull(self, path):
+        from launcher.bus import Bus
+        git(path, "checkout", "--quiet", "-B", "team-work",
+            "origin/team-work")
+        bus = Bus(path, "team-work")
+        bus.pull()
+        return bus
