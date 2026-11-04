@@ -1,13 +1,17 @@
-# Builder task v5: fix null-handoff routing failure + stall-clock timezone bug
+# Builder task v6: fix null-handoff routing failure + stall-clock timezone bug
 
 Tools: edit_file, write_file, git_commit, git_push ONLY (no read/list/shell).
 edit_file replaces ONE exact occurrence of old_string with new_string in an
-existing file. old_string must match the file BYTE-EXACTLY and be UNIQUE;
-on "not found" or "N locations" the file is UNCHANGED - retry with more
-surrounding context. write_file is for NEW files only (content <= 6000
-bytes). STRICT JSON: escape newlines as \n and quotes as \" inside argument
-strings - a raw line break inside a JSON string fails provider validation.
-ONE tool call per round.
+existing file. old_string MUST be copied VERBATIM from the embedded source
+below - every space, quote and line break; do NOT reformat or paraphrase it.
+It must match exactly once; on "not found" or "N locations" the file is
+UNCHANGED - retry with a longer verbatim anchor. write_file is for NEW
+files only (content <= 2000 bytes for this task).
+JSON: each newline inside a string value is the two characters \ and n
+(JSON escaping) - exactly once, never double-escaped. A string value ends
+with one plain quote, then a comma or the closing brace. The arguments
+object of write_file has EXACTLY two keys: "path" and "content". Never add
+a third key. ONE tool call per round.
 
 ## Defects (from the live run record)
 
@@ -35,33 +39,30 @@ B. When state["status"]=="running" and state["turn"] is falsy, treat as a
    status "done" is a VALID terminal state: do nothing there.
 C. Do not change any other file. Do not modify tests/test_launcher.py.
 
-## Plan (one tool call per round)
+## Plan (one tool call per round; calls are spaced >=65s apart)
 
-Round 1: edit_file launcher/supervisor.py - anchor the import block:
-  old_string: "import os\nimport subprocess\nimport sys\nimport time"
-  new_string: "import calendar\nimport os\nimport subprocess\nimport sys\nimport time"
-Round 2: edit_file launcher/supervisor.py - old_string = the ENTIRE current
+Round 1: edit_file launcher/supervisor.py, old_string (verbatim):
+  "import os\nimport subprocess\nimport sys\nimport time"
+  new_string:
+  "import calendar\nimport os\nimport subprocess\nimport sys\nimport time"
+Round 2: edit_file launcher/supervisor.py, old_string = the ENTIRE current
   _check_stall method copied VERBATIM from the embedded source below; new
-  string = your fixed method (UTC parse + routing-failure branch before the
-  stall logic; keep the existing stall/escalate behavior otherwise).
+  string = your fixed method (UTC parse + routing-failure branch before
+  the stall logic; keep the existing stall/escalate behavior otherwise).
 Round 3: write_file tests/test_deadlock_fix.py (NEW, TINY: <= 2000 bytes,
-  3 short test methods, no comments needed). The write_file arguments object
-  has EXACTLY two keys, "path" and "content" - NEVER add a third key (no
-  "timeout", nothing else). End the content string with its closing quote
-  followed immediately by the closing brace of the arguments object.
-  unittest tests for A and B: stub the bus/state; a 5-second-old UTC
-  turn_since must NOT be stalled under a non-UTC local TZ (set
-  os.environ["TZ"]+time.tzset(), restore after); running+turn=None =>
-  re-issue to coordinator + "routing-failure" log; second consecutive =>
-  escalation gate; done+turn=None => nothing. Plain unittest, temp dirs,
-  no network.
-Round 4: git_commit (message must contain a line exactly `TURN: builder`).
+  3 short test methods, no comments needed): a 5-second-old UTC turn_since
+  must NOT be stalled under a non-UTC local TZ (set os.environ["TZ"] +
+  time.tzset(), restore after); running+turn=None => re-issue to
+  coordinator + "routing-failure" log; second consecutive => escalation
+  gate; done+turn=None => nothing. Plain unittest, temp dirs, no network.
+Round 4: git_commit (message must contain a line exactly `TURN: builder`;
+  describe what YOU actually changed - if a round failed, say so).
 Round 5: git_push. The run ends automatically after a successful push.
 
 ## Current launcher/supervisor.py (verbatim - copy anchors from this)
 
 ```python
-'''The supervisor: keeps the team alive without a human watcher.
+"""The supervisor: keeps the team alive without a human watcher.
 
 Starts one process per automated seat, restarts crashed seats with
 backoff, detects a stalled turn (the seat holding the turn has produced
@@ -72,26 +73,163 @@ showed humans providing by hand ("are you still watching?").
 Interactive seats (a human pastes prompts into chat sessions on other
 platforms) join the same bus; the supervisor cannot restart those, so a
 stalled interactive seat becomes a gate for the humans instead.
-'''\n\nfrom __future__ import annotations\n\nimport os\nimport subprocess\nimport sys\nimport time\nimport calendar\n\nfrom .bus import Bus\n\n\nclass Supervisor:\n    def __init__(self, repo, branch="team-work", stall_timeout=900,
-                 restart_limit=5, poll=5, notify_command=None):\n        self.bus = Bus(repo, branch)\n        self.repo = repo\n        self.stall_timeout = stall_timeout\n        self.restart_limit = restart_limit\n        self.poll = poll\n        self.notify_command = notify_command\n        self.procs = {}\n        self.restarts = {}\n        self._stalled_seats = set()\n        self._notified_gates = set()\n\n    # Seats whose responses are reasoned outside a managed process\n    # (interactive human paste, assistant-mediated queue) join the same\n    # bus but have no process for the supervisor to start or restart.\n    EXTERNAL_TYPES = {"interactive", "queue"}\n\n    def automated_seats(self):\n        roster = self.bus.roster().get("seats", {})\n        return {name: spec for name, spec in roster.items()\n                if spec.get("adapter", {}).get("type")\n                not in self.EXTERNAL_TYPES}\n\n    def start_seat(self, name):\n        import os\n        pkg_parent = os.path.dirname(os.path.dirname(
-            os.path.abspath(__file__)))\n        env = dict(os.environ)\n        env["PYTHONPATH"] = pkg_parent + os.pathsep + env.get("PYTHONPATH", "")\n        proc = subprocess.Popen(
+"""
+
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+import time
+
+from .bus import Bus
+
+
+class Supervisor:
+    def __init__(self, repo, branch="team-work", stall_timeout=900,
+                 restart_limit=5, poll=5, notify_command=None):
+        self.bus = Bus(repo, branch)
+        self.repo = repo
+        self.stall_timeout = stall_timeout
+        self.restart_limit = restart_limit
+        self.poll = poll
+        self.notify_command = notify_command
+        self.procs = {}
+        self.restarts = {}
+        self._stalled_seats = set()
+        self._notified_gates = set()
+
+    # Seats whose responses are reasoned outside a managed process
+    # (interactive human paste, assistant-mediated queue) join the same
+    # bus but have no process for the supervisor to start or restart.
+    EXTERNAL_TYPES = {"interactive", "queue"}
+
+    def automated_seats(self):
+        roster = self.bus.roster().get("seats", {})
+        return {name: spec for name, spec in roster.items()
+                if spec.get("adapter", {}).get("type")
+                not in self.EXTERNAL_TYPES}
+
+    def start_seat(self, name):
+        import os
+        pkg_parent = os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__)))
+        env = dict(os.environ)
+        env["PYTHONPATH"] = pkg_parent + os.pathsep + env.get("PYTHONPATH", "")
+        proc = subprocess.Popen(
             [sys.executable, "-m", "launcher", "seat", name,
-             "--repo", self.repo, "--branch", self.bus.branch], env=env)\n        self.procs[name] = proc\n        return proc\n\n    def run(self, max_seconds=None):\n        start = time.time()\n        self._seed_first_turn()\n        for name in self.automated_seats():\n            self.start_seat(name)\n        while True:\n            state = self.bus.state()\n            if state.get("status") == "done":\n                self._stop_all()\n                return "done"\n            if max_seconds and time.time() - start > max_seconds:\n                self._stop_all()\n                return "timeout"\n            self._reap_and_restart()\n            self._check_stall(state)\n            self._report_gates()\n            time.sleep(self.poll)\n\n    def _seed_first_turn(self):\n        """Issue the first turn token when the brief is in and nobody has.
-\n        The adopter path is clone -> init -> brief -> launch: with the\n        concept already in .team/brief.md and the state still "forming",\n        the coordinator reads its orders from the brief - no separate\n        start command, matching the demo's manual seed. Without a brief\n        the team stays forming and the owner gets a gate, not a guess."""\n        state = self.bus.state()\n        if state.get("status") != "forming" or state.get("turn"):\n            return\n        brief_path = os.path.join(self.bus.repo, ".team", "brief.md")\n        try:\n            brief = open(brief_path).read().strip()\n        except OSError:\n            brief = ""\n        roster = self.bus.roster().get("seats", {})\n        if not brief or "coordinator" not in roster:\n            return\n        state["turn"] = "coordinator"\n        state["status"] = "running"\n        self.bus.write_state(state)\n        self.bus.append_log("supervisor", "seed",
-                            "brief present; first turn issued to coordinator")\n        self.bus.commit_all("supervisor: brief present, first turn issued")\n\n    # -- internals -------------------------------------------------------\n\n    def _reap_and_restart(self):\n        for name, proc in list(self.procs.items()):\n            if proc.poll() is None:\n                continue\n            count = self.restarts.get(name, 0)\n            if count >= self.restart_limit:\n                self._escalate(
-                    f"seat {name} crashed {count + 1} times; not restarting")\n                del self.procs[name]\n                continue\n            self.restarts[name] = count + 1\n            self.bus.append_log("supervisor", "restart",
+             "--repo", self.repo, "--branch", self.bus.branch], env=env)
+        self.procs[name] = proc
+        return proc
+
+    def run(self, max_seconds=None):
+        start = time.time()
+        self._seed_first_turn()
+        for name in self.automated_seats():
+            self.start_seat(name)
+        while True:
+            state = self.bus.state()
+            if state.get("status") == "done":
+                self._stop_all()
+                return "done"
+            if max_seconds and time.time() - start > max_seconds:
+                self._stop_all()
+                return "timeout"
+            self._reap_and_restart()
+            self._check_stall(state)
+            self._report_gates()
+            time.sleep(self.poll)
+
+    def _seed_first_turn(self):
+        """Issue the first turn token when the brief is in and nobody has.
+
+        The adopter path is clone -> init -> brief -> launch: with the
+        concept already in .team/brief.md and the state still "forming",
+        the coordinator reads its orders from the brief - no separate
+        start command, matching the demo's manual seed. Without a brief
+        the team stays forming and the owner gets a gate, not a guess."""
+        state = self.bus.state()
+        if state.get("status") != "forming" or state.get("turn"):
+            return
+        brief_path = os.path.join(self.bus.repo, ".team", "brief.md")
+        try:
+            brief = open(brief_path).read().strip()
+        except OSError:
+            brief = ""
+        roster = self.bus.roster().get("seats", {})
+        if not brief or "coordinator" not in roster:
+            return
+        state["turn"] = "coordinator"
+        state["status"] = "running"
+        self.bus.write_state(state)
+        self.bus.append_log("supervisor", "seed",
+                            "brief present; first turn issued to coordinator")
+        self.bus.commit_all("supervisor: brief present, first turn issued")
+
+    # -- internals -------------------------------------------------------
+
+    def _reap_and_restart(self):
+        for name, proc in list(self.procs.items()):
+            if proc.poll() is None:
+                continue
+            count = self.restarts.get(name, 0)
+            if count >= self.restart_limit:
+                self._escalate(
+                    f"seat {name} crashed {count + 1} times; not restarting")
+                del self.procs[name]
+                continue
+            self.restarts[name] = count + 1
+            self.bus.append_log("supervisor", "restart",
                                 f"seat {name} exited {proc.returncode}; "
-                                f"restart {count + 1}")\n            self.bus.commit_all(f"supervisor: restart seat {name}")\n            self.start_seat(name)\n\n    def _check_stall(self, state):\n        turn = state.get("turn")\n        status = state.get("status")\n        # Handle routing failure when turn is falsy but status is running\n        if status == "running" and not turn:\n            # Record occurrence count in state for escalation gating\n            count = state.get("_routing_failure_count", 0) + 1\n            state["_routing_failure_count"] = count\n            self.bus.append_log("supervisor", "routing-failure",
-                                f"routing failure detected; state: {state}")\n            # Re‑issue turn to coordinator with fresh timestamp\n            state["turn"] = "coordinator"\n            state["turn_since"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())\n            self.bus.write_state(state)\n            self.bus.commit_all("supervisor: routing-failure re‑issued turn")\n            if count >= 2:\n                self._escalate("repeated routing failure, escalating")\n            return\n        if not turn or status != "running":\n            return\n        since = state.get("turn_since")\n        if not since:
-            return\n        # Parse turn_since as UTC using calendar.timegm\n        try:\n            ts = calendar.timegm(time.strptime(since, "%Y-%m-%dT%H:%M:%SZ"))\n        except ValueError:\n            return\n        if time.time() - ts < self.stall_timeout:
-            return\n        if turn in self._stalled_seats:
-            return\n        self._stalled_seats.add(turn)\n        if turn in self.procs:\n            self.bus.append_log("supervisor", "stall",
-                                f"turn stalled on {turn}; restarting seat")\n            self.bus.commit_all(f"supervisor: stall on {turn}")\n            self.procs[turn].terminate()\n        else:\n            self._escalate(
+                                f"restart {count + 1}")
+            self.bus.commit_all(f"supervisor: restart seat {name}")
+            self.start_seat(name)
+
+    def _check_stall(self, state):
+        turn = state.get("turn")
+        if not turn or state.get("status") != "running":
+            return
+        since = state.get("turn_since")
+        if not since:
+            return
+        try:
+            ts = time.mktime(time.strptime(since, "%Y-%m-%dT%H:%M:%SZ"))
+        except ValueError:
+            return
+        if time.time() - ts < self.stall_timeout:
+            return
+        if turn in self._stalled_seats:
+            return
+        self._stalled_seats.add(turn)
+        if turn in self.procs:
+            self.bus.append_log("supervisor", "stall",
+                                f"turn stalled on {turn}; restarting seat")
+            self.bus.commit_all(f"supervisor: stall on {turn}")
+            self.procs[turn].terminate()
+        else:
+            self._escalate(
                 f"turn stalled on interactive seat {turn}; "
-                "a human must nudge or re-open that session")\n\n    def _escalate(self, text):\n        self.bus.open_gate("supervisor", text,
+                "a human must nudge or re-open that session")
+
+    def _escalate(self, text):
+        self.bus.open_gate("supervisor", text,
                            options=["restart the seat", "stop the team"],
-                           recommendation="restart the seat")\n        self.bus.commit_all("supervisor: escalation")\n\n    def _report_gates(self):\n        for gate in self.bus.pending_gates():\n            if gate["id"] in self._notified_gates:
-                continue\n            self._notified_gates.add(gate["id"])\n            line = (f"[gate {gate['id']}] {gate['seat']} asks: "
-                    f"{gate['question']}")\n            print(line, flush=True)\n            if self.notify_command:
-                subprocess.run(self.notify_command + [line], check=False)\n\n    def _stop_all(self):\n        for proc in self.procs.values():\n            if proc.poll() is None:
-                proc.terminate()\n```
+                           recommendation="restart the seat")
+        self.bus.commit_all("supervisor: escalation")
+
+    def _report_gates(self):
+        for gate in self.bus.pending_gates():
+            if gate["id"] in self._notified_gates:
+                continue
+            self._notified_gates.add(gate["id"])
+            line = (f"[gate {gate['id']}] {gate['seat']} asks: "
+                    f"{gate['question']}")
+            print(line, flush=True)
+            if self.notify_command:
+                subprocess.run(self.notify_command + [line], check=False)
+
+    def _stop_all(self):
+        for proc in self.procs.values():
+            if proc.poll() is None:
+                proc.terminate()
+```
