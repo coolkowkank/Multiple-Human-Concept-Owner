@@ -64,5 +64,17 @@
       },
       "service_tier": "on_demand"
     }
+  },
+  {
+    "tool_call": "edit_file",
+    "args": {
+      "new_string": "",
+      "old_string": "",
+      "path": "launcher/runtime.py"
+    },
+    "result": {
+      "ok": false,
+      "error": "old_string must be non-empty"
+    }
   }
 ]
