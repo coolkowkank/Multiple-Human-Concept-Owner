@@ -11,11 +11,14 @@ checks go back for one correction round before Ryan sees anything.
 
 - `tools/ryan_cycle.py`: one request per step; reserve-before-call ledger.
 - Caps: 4 cycles/day, 6 requests/cycle, 24/day combined; 10 s spacing.
+  A question may use at most 5 requests (clean path 3), so allocation +
+  question stays within 6; budget exhausted means needs-human, with no
+  promised correction for every seat.
 - Any 429, unknown outcome, auth error or cost above 0 pauses the pipeline.
   Resuming needs a human-sourced note, never a timer.
 - Ryan picks models for the other roles (`assignments.json`). The runner
   accepts a pick only if the exact id is price 0 in a fresh listing, the
-  verifier differs in model and family from the researcher, and the route
+  verifier differs in exact model and in the listing's own model_lab field from the researcher (an id prefix is a reseller name, never a family; unknown lab fails closed), and the route
   record is not blocked.
 - Job-description scan (`jobdesc_scan`) is change-driven and uses no model
   call; it measures bytes only (chars/4 is a heuristic, not tokens).

@@ -57,6 +57,7 @@ ROLES = ("researcher", "verifier", "ryan")
 CEILINGS = {"researcher": 2048, "verifier": 1536, "ryan": 2048,
             "allocation": 1024}
 ROLE_CAP = {"researcher": 2, "verifier": 2, "ryan": 2}  # per question
+QUESTION_BUDGET = 5  # + 1 allocation = 6 requests per cycle; clean = 3
 DAILY_CAP = 24      # 4 cycles x 6 requests, all three roles combined
 CYCLES_PER_DAY = 4
 SPACING_S = 10
@@ -223,8 +224,28 @@ def free_gate(listing, model, now):
         raise Halt("%s not price-0 (or absent) in fresh listing" % model)
 
 
-def family(model_id):
-    return model_id.split("/")[0]
+def lab(listing, model_id):
+    """Model lab from the provider listing's own model_lab field for the
+    EXACT id. An id prefix is a reseller/route name, never a family.
+    None = unknown (fail closed)."""
+    for m in listing.get("data", []):
+        if m.get("id") == model_id:
+            v = m.get("model_lab")
+            if isinstance(v, str) and v.strip():
+                return v.strip().lower()
+    return None
+
+
+def independent(listing, researcher, verifier):
+    """'' or reason: different exact model AND different listed lab."""
+    if researcher == verifier:
+        return "verifier must be a different model than the researcher"
+    a, b = lab(listing, researcher), lab(listing, verifier)
+    if a is None or b is None:
+        return "model_lab unknown in listing (independence unverifiable)"
+    if a == b:
+        return "verifier must be from a different model lab (%s)" % a
+    return ""
 
 
 OK_STATUS = ("working", "untested")  # untested = human-recorded, first
@@ -268,11 +289,7 @@ def validate_assignments(assign, record, listing, now):
         bad = route_gate(record, m[r])
         if bad:
             return bad
-    if m["verifier"] == m["researcher"]:
-        return "verifier must be a different model than the researcher"
-    if family(m["verifier"]) == family(m["researcher"]):
-        return "verifier must be a different model family"
-    return ""
+    return independent(listing, m["researcher"], m["verifier"])
 
 
 def load_assignments(root):
@@ -302,11 +319,12 @@ def allocate(root, post, list_models, record, now):
                 bad, "calls": 0}
     listing = list_models()
     free_gate(listing, BOOTSTRAP_RYAN, now)
-    pool = sorted(m["id"] for m in listing.get("data", [])
+    pool = sorted("%s (lab: %s)" % (m["id"], m.get("model_lab"))
+                  for m in listing.get("data", [])
                   if mr.price_zero(listing, m["id"]))
     prompt = ("Choose one model per role (researcher, verifier, ryan) "
               "from this price-0 list ONLY. Verifier must be a different "
-              "model family than the researcher. Candidates already "
+              "model lab than the researcher (labs shown). Candidates already "
               "tried: %s. Route record: %s\nPrice-0 ids: %s\nReply "
               'with ONE JSON object: {"models":{"researcher":"id",'
               '"verifier":"id","ryan":"id"},"why":{"researcher":"...",'
@@ -533,10 +551,11 @@ def step(root, post, list_models, now, record):
         if assign is None:
             return {"action": "needs-allocation", "calls": 0}
         model = assign["models"][role]
-        if role == "verifier" and (model == assign["models"]["researcher"]
-                                   or family(model) == family(
-                                       assign["models"]["researcher"])):
-            raise Halt("verifier not independent of researcher")
+        if sum(q["attempts"].values()) >= QUESTION_BUDGET:
+            q["status"] = "needs-human"
+            q["reason"] = "question budget %d requests used" % QUESTION_BUDGET
+            store.save_queue(queue)
+            return {"action": "needs-human", "qid": qid, "calls": 0}
         if q["attempts"].get(role, 0) >= ROLE_CAP[role]:
             q["status"] = "needs-human"
             q["reason"] = role + " attempts exhausted"
@@ -556,7 +575,13 @@ def step(root, post, list_models, now, record):
             q["reason"] = "input over %d bytes" % MAX_INPUT_BYTES
             store.save_queue(queue)
             return {"action": "needs-human", "qid": qid, "calls": 0}
-        free_gate(list_models(), model, now)
+        listing = list_models()
+        free_gate(listing, model, now)
+        if role == "verifier":
+            why_not = independent(listing, assign["models"]["researcher"],
+                                  model)
+            if why_not:
+                raise Halt("verifier not independent: " + why_not)
         rid = "%s-%s-%d" % (qid, role, len(store.ledger()))
         store.append({"phase": "reserved", "rid": rid, "ts": iso(now),
                       "qid": qid, "role": role, "model": model})
@@ -620,7 +645,7 @@ def step(root, post, list_models, now, record):
                 "calls": 1}
 
 
-def jobdesc_scan(repo, root, now, max_packet=8, passage_chars=360):
+def jobdesc_scan(repo, root, now, max_packet=6, passage_chars=600):
     """Standing job: keep project job descriptions lean. Deterministic
     and zero-token: hash each blueprint, and only when the set changed
     since the last reviewed digest enqueue ONE question whose packet is
@@ -686,16 +711,49 @@ def jobdesc_scan(repo, root, now, max_packet=8, passage_chars=360):
                 j = e
             else:
                 j += 1
-    reps = sorted((v for v in runs.values() if len(v) > 1),
-                  key=lambda v: -len(v) * len(v[0][2]))[:max_packet]
+    reps = sorted((v for v in runs.values()
+                   if len(v) > 1 and len(v[0][2]) >= 80),
+                  key=lambda v: -len(v) * len(v[0][2]))[:2]
+    # Largest blocks (verbatim, file:line) are the usual real waste;
+    # duplicated wording is rare in these files, so it is only added when
+    # it exists and is 80+ chars.
+    blocks = []
+    for rel, t in texts.items():
+        start, cur = 1, []
+        lines = t.split("\n")
+        for i, line in enumerate(lines + [""], 1):
+            if line.startswith("|"):  # each table row is its own block
+                if cur:
+                    blocks.append((len("\n".join(cur)), rel, start,
+                                   "\n".join(cur)))
+                    cur = []
+                blocks.append((len(line), rel, i, line))
+            elif line.strip():
+                if not cur:
+                    start = i
+                cur.append(line)
+            elif cur:
+                blocks.append((len("\n".join(cur)), rel, start,
+                               "\n".join(cur)))
+                cur = []
+    blocks.sort(key=lambda b: -b[0])
     packet = []
-    for n, v in enumerate(reps, 1):
-        packet.append({"id": "P%d" % n,
+    for size, rel, ln, text in blocks[:max_packet - len(reps)]:
+        cut = text[:passage_chars]
+        if len(text) > passage_chars:
+            cut += " [truncated: %d of %d chars shown]" % (passage_chars,
+                                                           len(text))
+        packet.append({"id": "P%d" % (len(packet) + 1),
+                       "title": "block in %s (%d chars)" % (rel, size),
+                       "locations": ["%s:%d" % (rel, ln)],
+                       "passage": cut})
+    for v in reps:
+        packet.append({"id": "P%d" % (len(packet) + 1),
                        "title": "repeated passage x%d" % len(v),
                        "locations": ["%s:%d" % (r, i) for r, i, _ in v],
                        "passage": v[0][2][:passage_chars]})
     if not packet:
-        base["note"] = "no repeated lines of 40+ chars found"
+        base["note"] = "no blocks found"
         with open(sp, "w") as f:
             json.dump(base, f, indent=2)
         return {"action": "changed-no-repeats", "total_bytes": total,
@@ -705,10 +763,12 @@ def jobdesc_scan(repo, root, now, max_packet=8, passage_chars=360):
     if not any(x["id"] == qid for x in q["questions"]):
         q["questions"].append({
             "id": qid, "status": "open", "attempts": {},
-            "question": "Which of these repeated passages in the project "
-                        "job descriptions can be shortened or merged "
-                        "without removing a duty or a safety check? Cite "
-                        "packet ids only.",
+            "question": "Which of these job-description passages (largest "
+                        "blocks or repeated wording) can be shortened or "
+                        "merged without removing a duty or a safety "
+                        "check? Each finding names the passage id, what "
+                        "can be cut, and a shorter wording. Cite packet "
+                        "ids only.",
             "packet": packet, "kind": "jobdesc-efficiency"})
         store.save_queue(q)
     with open(sp, "w") as f:

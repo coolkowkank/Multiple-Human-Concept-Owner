@@ -6,8 +6,16 @@ T0 = 1_800_000_000.0
 FRESH = lambda: {"fetched_at": rc.iso(T0 - 60), "source": "mock /v1/models",
                  "data": [
     {"id": "nvidia/nemotron-3-ultra-550b-a55b", "input_price": 0,
-     "output_price": 0},
-    {"id": "google/gemma-4-31b-it", "input_price": 0, "output_price": 0},
+     "output_price": 0, "model_lab": "nvidia"},
+    {"id": "google/gemma-4-31b-it", "input_price": 0, "output_price": 0,
+     "model_lab": "google"},
+    {"id": "novita/ling", "input_price": 0, "output_price": 0,
+     "model_lab": "inclusionAI"},
+    {"id": "deepinfra/google/gemma-4-31B-it", "input_price": 0,
+     "output_price": 0, "model_lab": "Google"},
+    {"id": "nvidia/other", "input_price": 0, "output_price": 0,
+     "model_lab": "nvidia"},
+    {"id": "nolab/model", "input_price": 0, "output_price": 0},
     {"id": "paid/model", "input_price": 1, "output_price": 1}]}
 PACKET = [{"id": "P1", "title": "t", "passage": "alpha passage text here"},
           {"id": "P2", "title": "t", "passage": "beta passage text here"}]
@@ -153,10 +161,13 @@ class Safety(Base):
     def test_same_family_verifier_halts(self):
         bad = json.loads(json.dumps(ASSIGN))
         bad["models"]["verifier"] = "nvidia/other"
+        rec = dict(RECORD, routes=RECORD["routes"] + [
+            {"id": "nvidia/other", "provider": "requesty",
+             "status": "working"}])
         self.seed(assign=bad)
-        self.run_step([ok(R_OK)])
+        self.run_step([ok(R_OK)], record=rec)
         with self.assertRaises(rc.Halt):
-            self.run_step([])
+            self.run_step([], record=rec)
 
     def test_stale_or_paid_listing_refuses_before_any_call(self):
         self.seed()
@@ -443,6 +454,40 @@ class Review3(Base):
             self.run_step([])
 
 
+class Review4(Base):
+    def test_independence_uses_listed_lab_not_prefix(self):
+        L = FRESH()
+        i = rc.independent
+        r = "nvidia/nemotron-3-ultra-550b-a55b"
+        self.assertEqual(i(L, r, "novita/ling"), "")          # other lab
+        self.assertIn("lab", i(L, r, "nvidia/other"))          # same lab
+        self.assertIn("lab", i(L, "google/gemma-4-31b-it",
+                               "deepinfra/google/gemma-4-31B-it"))  # reseller
+        self.assertIn("unknown", i(L, r, "nolab/model"))       # fail closed
+        self.assertIn("different model", i(L, r, r))
+
+    def test_question_budget_stops_at_five_requests(self):
+        self.seed()
+        v_bad = {"verdicts": [{"id": "C1", "verdict": "NOT_SUPPORTED",
+                               "evidence": "x"}]}
+        acts = [self.run_step([ok(r)])["action"]
+                for r in (R_OK, v_bad, R_OK, V_OK, {"usefulness": []})]
+        self.assertEqual(sum(self.store.queue()["questions"][0]
+                             ["attempts"].values()), 5)
+        out = self.run_step([])
+        self.assertLessEqual(len([e for e in self.store.ledger()
+                                  if e["phase"] == "reserved"]), 5)
+
+    def test_budget_exhaustion_goes_needs_human_without_call(self):
+        self.store.save_queue({"questions": [{
+            "id": "q1", "status": "open", "question": "?", "packet": PACKET,
+            "attempts": {"researcher": 1, "verifier": 2, "ryan": 2}}]})
+        with open(os.path.join(self.d, "assignments.json"), "w") as f:
+            json.dump(ASSIGN, f)
+        out = self.run_step([])
+        self.assertEqual((out["action"], out["calls"]), ("needs-human", 0))
+
+
 class JobDesc(unittest.TestCase):
     def mk(self, extra=""):
         repo = tempfile.mkdtemp()
@@ -463,7 +508,10 @@ class JobDesc(unittest.TestCase):
         self.assertEqual((out["action"], out["calls"]), ("enqueued", 0))
         q = rc.Store(root).queue()["questions"][0]
         self.assertEqual(q["kind"], "jobdesc-efficiency")
-        self.assertTrue(q["packet"][0]["title"].startswith("repeated"))
+        self.assertTrue(any(x["title"].startswith("repeated")
+                            for x in q["packet"]))
+        self.assertTrue(all(x["locations"] and x["passage"]
+                            for x in q["packet"]))
         self.assertEqual(rc.jobdesc_scan(repo, root, T0 + 5)["action"],
                          "unchanged")
         self.assertEqual(len(rc.Store(root).queue()["questions"]), 1)
