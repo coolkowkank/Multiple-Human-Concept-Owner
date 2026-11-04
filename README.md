@@ -1,10 +1,15 @@
 # Autonomous AI-Human Teamwork - Work in Progress and Intended Operating Model
 
-## Project Team
+## Current Project Team
 
-*Latest update: 2026-11-04 15:44 EET.*
+*Latest update: 2026-11-04 16:26 EET. [Scrollable full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/team/) (GitHub Pages). Active members and vacant roles are shown separately; "not project-configured" means no documented model or provider.*
 
-![Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/f329630e727ba939c2900084834beb885dbee438/docs/progress/team.png)
+<details open>
+<summary><b>Current Project Team</b> - hierarchy chart (click to collapse)</summary>
+
+![Current Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/543d4ccc8d6895baf920756264aef87e462b6a94/docs/progress/team.png)
+
+</details>
 
 ### Coordinator work timeline
 
@@ -39,6 +44,8 @@
 ![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/f329630e727ba939c2900084834beb885dbee438/docs/progress/gantt.png)
 
 ![Progress S-curve](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/f329630e727ba939c2900084834beb885dbee438/docs/progress/s-curve.png)
+
+**[Open the Gantt chart and S-curve as a page](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/charts/)** (click a row for status and evidence). The page and these pictures change only when the project evidence changes; a check that finds nothing new leaves them as they are.
 
 The large icon on each Gantt row is the accountable current owner (a role assignment, not authorship). Small icons are contributors. A legend under the chart gives names and roles. Telkomsel, Alex, Nora and Bill are project aliases for the four roles, not separate GitHub accounts. Nora (Researcher) uses the owner's @coolkowkank account through a shared research token that Eva (Evidence verifier) may also use, by the owner's grant, with the role as commit author, so each has a role icon instead of an avatar.
 
