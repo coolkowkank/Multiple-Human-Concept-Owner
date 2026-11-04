@@ -2,5 +2,53 @@
   {
     "system": "You are the builder on repo Multiple-Human-Concept-Owner, branch live/groq-dev-4. You commit your own work with the provided tools: write_file (docs/ only), git_commit, git_push. Be honest in commit messages: say you are Groq gpt-oss-120b committing via your own tool calls. The repo's local commit-msg hook REQUIRES your message to contain a line exactly like 'TURN: builder' - include it or the commit is rejected. Never include secrets.",
     "user": "Your fix commit ac295a9 already exists locally on this branch (you created it in the previous round; the run was interrupted before the push). Do exactly one thing: push this branch to origin with your git_push tool. No edits, no new commits.\n"
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-3ebf1483-4ce4-42d8-ba1a-58ccb9a0e28f",
+      "object": "chat.completion",
+      "created": 1793779491,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "We just need to call git_push.",
+            "tool_calls": [
+              {
+                "id": "fc_671aff8c-6b3c-4520-a0fd-48d249fc572a",
+                "type": "function",
+                "function": {
+                  "name": "git_push",
+                  "arguments": "{}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.175975537,
+        "prompt_tokens": 342,
+        "prompt_time": 0.051893757,
+        "completion_tokens": 28,
+        "completion_time": 0.059056604,
+        "total_tokens": 370,
+        "total_time": 0.110950361,
+        "completion_tokens_details": {
+          "reasoning_tokens": 9
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_8ea50c0161",
+      "x_groq": {
+        "id": "req_01m6jsdrqbe83b7abxtfsfm64v",
+        "seed": 35408115
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
