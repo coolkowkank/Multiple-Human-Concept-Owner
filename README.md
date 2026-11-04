@@ -11,7 +11,7 @@
 
 *Latest update: 2026-11-04 17:50 EET. [Static full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/team/) (GitHub Pages, selectable text, responsive cards; the picture below is the fallback). No role is currently vacant; Sam sits beside the Coordinator (two-way, status drafts reviewed); Ryan (Team Resources) is a side branch of the Coordinator-to-teams line, with a narrow status-draft backup and no qualified code or research backup, so replacement proposals go to the Coordinator; "not project-configured" means no documented model or provider.*
 
-![Current Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/6ca4dcc6ab077b53b463f08a682a460890faad6f/docs/progress/team.png)
+![Current Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/a0f9d3abc2396e0c86b8b4cbbf301395d752ed32/docs/progress/team.png)
 
 ### Coordinator work timeline
 
@@ -40,7 +40,7 @@
 
 **Research work packages: RW1-RW6**. Researcher plan and dependencies are tracked separately from WP milestone credit. Dates are evidenced publications/replays, not continuous work time; no RW deadlines were specified. [Plan](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/Research_lab/research/PLAN.md) · [Status and dependencies](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/charts/)
 
-![Research work packages RW1-RW6: dated output timeline](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/6ca4dcc6ab077b53b463f08a682a460890faad6f/docs/progress/research-gantt.png)
+![Research work packages RW1-RW6: dated output timeline](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/a0f9d3abc2396e0c86b8b4cbbf301395d752ed32/docs/progress/research-gantt.png)
 
 | ID | Research work | Current research state | Dependencies / related work |
 |---|---|---|---|
@@ -63,9 +63,9 @@
 | Sam - Coordinator Assistant | Coordinator Assistant role: status drafts, each reviewed | **Assigned** | Unknown, not currently observed | One Gemma draft was produced earlier (T3) with a Groq backup (T4). No current draft observed. The 17:50 update was prepared by the maintainer, not by Sam's model. Source: Earlier trial record | no output evidence |
 | Ryan's Verifier | Dedicated Researcher and Verifier support requested; model assignments unresolved | **Awaiting staffing** | No project model assigned; no current verification run observed | One-shot independent operator verification complete; no standing running verifier. Dedicated support request remains open, models not qualified. Source: team-launcher 001448b | 18:17 (6 min) |
 
-![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/6ca4dcc6ab077b53b463f08a682a460890faad6f/docs/progress/gantt.png)
+![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/a0f9d3abc2396e0c86b8b4cbbf301395d752ed32/docs/progress/gantt.png)
 
-![Progress S-curve](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/6ca4dcc6ab077b53b463f08a682a460890faad6f/docs/progress/s-curve.png)
+![Progress S-curve](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/a0f9d3abc2396e0c86b8b4cbbf301395d752ed32/docs/progress/s-curve.png)
 
 **[Open the Gantt chart and S-curve as a page](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/charts/)** (click a row for status and evidence). The page and these pictures change only when the project evidence changes; a check that finds nothing new leaves them as they are.
 
