@@ -255,5 +255,16 @@
       "seconds": 56.3,
       "min_interval": 65.0
     }
+  },
+  {
+    "rate_headers": {
+      "x-ratelimit-limit-requests": "1000",
+      "x-ratelimit-limit-tokens": "8000",
+      "x-ratelimit-remaining-requests": "992",
+      "x-ratelimit-remaining-tokens": "4202",
+      "x-ratelimit-reset-requests": "11m31.2s",
+      "x-ratelimit-reset-tokens": "28.485s"
+    },
+    "call": 4
   }
 ]
