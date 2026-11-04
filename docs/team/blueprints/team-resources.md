@@ -115,3 +115,14 @@ stay with the task's authorized operator flow):
 - **Retirement conditions:** role absorbed into coordinator tooling.
 - **Reactivation checklist:** re-verify every recorded route (terms
   and prices drift); stale records are unknowns, not facts.
+
+## Continuous pipeline (offline build, not running)
+
+Owner direction (relayed through the delegation chain) asks for Ryan,
+Ryan's Researcher and Ryan's Verifier to run continuously with AI models.
+Status: runner `tools/ryan_cycle.py` is built and mock-tested only; no
+model is assigned or running. Details and caps: `docs/team/ryan/README.md`.
+Ryan allocates models for the other roles inside the validation gates; paid
+use and access changes stay owner-held. Ryan may draft project policy
+(roles, model allocation, token budgets, handoff standards) and keep job
+descriptions token-lean; adoption follows the existing approval chain.
