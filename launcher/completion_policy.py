@@ -71,7 +71,7 @@ def evaluate_completion(*, current, roster, builder, evidence, policy,
         reasons.append('acceptance_binding_missing')
     if worktree_binding_validated is not True:
         reasons.append('post_write_worktree_binding_unvalidated')
-    if not isinstance(roster, dict) or roster.get(builder) != 'builder':
+    if not isinstance(builder, str) or not builder.strip() or not isinstance(roster, dict) or roster.get(builder) != 'builder':
         reasons.append('builder_identity_missing')
         roster = {} if not isinstance(roster, dict) else roster
     seats = {}
@@ -91,7 +91,10 @@ def evaluate_completion(*, current, roster, builder, evidence, policy,
     for role, seat in seats.items():
         # Latest supplied runtime-validated turn for this seat controls. An
         # earlier PASS must not hide a later FAIL or conflicting verdict.
-        rows = [row for row in evidence if row.seat == seat and row.role == role]
+        rows = [row for row in evidence if row.seat == seat]
+        if any(row.role != role for row in rows):
+            reasons.append(role + '_role_provenance_mismatch')
+            continue
         if not rows:
             reasons.append(role + '_evidence_missing')
             continue
@@ -104,7 +107,9 @@ def evaluate_completion(*, current, roster, builder, evidence, policy,
             reasons.append(role + '_latest_evidence_ambiguous')
             continue
         row = latest_rows[0]
-        if row.provenance_validated is not True or not row.source_commit or not row.evidence_digest:
+        if row.provenance_validated is not True or any(
+                not isinstance(value, str) or not value.strip()
+                for value in (row.source_commit, row.evidence_digest)):
             reasons.append(role + '_runtime_provenance_missing')
         if row.binding != current:
             reasons.append(role + '_binding_stale')
