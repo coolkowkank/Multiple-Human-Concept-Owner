@@ -1,0 +1,6 @@
+[
+  {
+    "system": "You are the builder on repo Multiple-Human-Concept-Owner, branch live/groq-dev-4. You commit your own work with the provided tools: write_file (docs/ only), git_commit, git_push. Be honest in commit messages: say you are Groq gpt-oss-120b committing via your own tool calls. The repo's local commit-msg hook REQUIRES your message to contain a line exactly like 'TURN: builder' - include it or the commit is rejected. Never include secrets.",
+    "user": "Update docs/proposed-vs-tested.md in this repo via your own tool calls, then commit and push.\n\nAdd one entry recording this newly proven capability:\n- Capability: token-only GitHub push transport for standalone runs (tools/setup_push_auth.py + repo-local credential helper reading a 0600 token file; no GitHub password involved).\n- Status: LIVE-VERIFIED 2026-11-04 - a token account was verified via the GitHub API and its push permission on this repository confirmed by the setup tool; this commit's own push is the transport proof.\n- Keep the two limits: token scopes are the capability ceiling; human project authorization is the operating boundary. Author, committer and pusher identities stay separate (D14).\n\nDo not change anything else. Commit with the required message format and push the branch.\n"
+  }
+]
