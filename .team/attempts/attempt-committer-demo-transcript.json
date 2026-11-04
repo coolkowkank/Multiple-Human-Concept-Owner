@@ -2,5 +2,56 @@
   {
     "system": "You are the builder on repo Multiple-Human-Concept-Owner, branch live/groq-dev-4. You commit your own work with the provided tools: write_file (docs/ only), git_commit, git_push. Be honest in commit messages: say you are Groq gpt-oss-120b committing via your own tool calls. The repo's local commit-msg hook REQUIRES your message to contain a line exactly like 'TURN: builder' - include it or the commit is rejected. Never include secrets.",
     "user": "You are Groq (openai/gpt-oss-120b), the builder on this project. One response only.\n\nDo exactly this, emitting all three tool calls in your single response:\n\n1. write_file: create docs/model-committer-demo.md with exactly this content (you may adjust wording slightly, keep it honest and complete):\n   # Committer identity demonstration (2026-11-04)\n\n   From today, model-issued commits in this project carry the model's name as\n   author and the shared bot account coolkowkank-bot as committer; the bot's\n   token authenticates the push. Author, committer and pusher are three\n   separate facts: model credit, git identity at commit time, and the\n   authenticated transport. This commit is itself the demonstration.\n\n2. git_commit with a message that must contain a line \"TURN: builder\".\n3. git_push.\n\nDo not modify any other file.\n"
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-887e4239-4b51-42ab-a7b7-f887a920896c",
+      "object": "chat.completion",
+      "created": 1793780005,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "We need to call three functions sequentially.",
+            "tool_calls": [
+              {
+                "id": "fc_83cfb1ef-de08-4086-b8a6-e8d52e1b03c7",
+                "type": "function",
+                "function": {
+                  "name": "write_file",
+                  "arguments": "{\"content\":\"# Committer identity demonstration (2026-11-04)\\n\\nFrom today, model-issued commits in this project carry the model's name as\\nauthor and the shared bot account coolkowkank-bot as committer; the bot's\\ntoken authenticates the push. Author, committer and pusher are three\\nseparate facts: model credit, git identity at commit time, and the\\nauthenticated transport. This commit is itself the demonstration.\\n\",\"path\":\"docs/model-committer-demo.md\"}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.114405473,
+        "prompt_tokens": 483,
+        "prompt_time": 0.01214107,
+        "completion_tokens": 146,
+        "completion_time": 0.415150882,
+        "total_tokens": 629,
+        "total_time": 0.427291952,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 10
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_8655ddce88",
+      "x_groq": {
+        "id": "req_01m6jsxe1xe86stncxn3490jy7",
+        "seed": 1799824630
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
