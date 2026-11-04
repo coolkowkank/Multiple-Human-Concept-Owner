@@ -4,6 +4,11 @@ Status: PAUSED after the first live attempt (see incident-1.md): one
 allocation request ended with an unknown outcome. No assignment exists and
 nothing is running. Earlier text below describes the design.
 
+Update 2026-11-04 20:11 EET: one operator-controlled Verifier attempt
+(novita/ling-3.1-flash) returned HTTP 200 with empty content and
+finish_reason length at the 1536 ceiling. No verdicts, not qualified, PAUSED
+again. See incident-1.md.
+
 Update 2026-11-04 20:09 EET: the operator authorised ONE bounded diagnostic
 Researcher attempt (cause of the earlier unknown outcome still unknown, no
 provider clearance claimed). It returned a well-formed draft: HTTP ok, cost 0,

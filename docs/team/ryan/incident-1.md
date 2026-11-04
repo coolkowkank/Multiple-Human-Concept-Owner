@@ -31,3 +31,15 @@ reasoning_effort low). Result: ok, cost 0, 1 request, 1207/1423/2630 tokens.
 This does not identify the cause of the first unknown outcome and is not an
 external provider recovery signal. Requests consumed in total: 2 of the first
 qualification envelope of 6 (4 remain); no other call is authorised.
+
+## Follow-up 2026-11-04 20:11 EET (Verifier diagnostic)
+
+Operator-controlled single Verifier attempt, novita/ling-3.1-flash,
+max_tokens 1536, reasoning_effort low, prompt 1754 tokens. Result: HTTP 200,
+EMPTY content, finish_reason length, completion_tokens 1536 (the whole ceiling),
+reasoning present, cost 0, 12.9 s. Recorded as an unknown/response-shape
+(empty-content) outcome and the run halted by design. No verdicts exist. The
+route is NOT qualified for this job at these settings; the reason beyond
+'ceiling reached with empty content' is not established. Requests consumed in
+total: 3 of the first qualification envelope of 6 (3 remain). No retry,
+review or schedule ran.
