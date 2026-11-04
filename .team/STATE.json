@@ -1,9 +1,9 @@
 {
-  "turn": "reviewer",
-  "turn_seq": 2,
-  "turn_since": "2026-11-04T00:20:14Z",
+  "turn": "qc",
+  "turn_seq": 3,
+  "turn_since": "2026-11-04T00:21:44Z",
   "status": "active",
-  "status_line": "i2i-2 configured; awaiting peer read-only check + joint GO",
+  "status_line": "i2i-2: batch 1 review PASS, qc turn next",
   "leases": {
     "coordinator": {
       "holder": "coordinator-973cb2de",
@@ -12,6 +12,10 @@
     "builder": {
       "holder": "builder-62672e9e",
       "claimed_at": 1793751614.91968
+    },
+    "reviewer": {
+      "holder": "reviewer-67847ca5",
+      "claimed_at": 1793751704.825814
     }
   }
 }
