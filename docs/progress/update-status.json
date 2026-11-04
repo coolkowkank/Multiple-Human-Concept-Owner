@@ -1,10 +1,10 @@
 {
  "content_as_of": "2026-11-04T20:57:00+02:00",
- "next_check_at": "2026-11-05T00:50:52+02:00",
- "schedule_recorded_at": "2026-11-04T23:51:04+02:00",
+ "next_check_at": "2026-11-05T01:51:06+02:00",
+ "schedule_recorded_at": "2026-11-05T00:51:17+02:00",
  "schedule_expires_at": "2026-11-05T14:38:28+02:00",
  "cadence": "Hourly evidence check; publish only when something changes",
  "notice": "This is the recorded next check, not a promise that new content will be published then. Sam model execution is not confirmed by this timer. The published page cannot see an uncommitted check or a deployment waiting in GitHub.",
- "last_check_at": "2026-11-04T23:50:58+02:00",
+ "last_check_at": "2026-11-05T00:51:12+02:00",
  "check_result": "Branches unchanged. Source-schema integration independently accepted offline; Eva still blocked on qualified model/live verification. No new qualified cycle or WP credit; charts unchanged."
 }
