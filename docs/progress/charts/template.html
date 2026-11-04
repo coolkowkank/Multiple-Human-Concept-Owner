@@ -26,6 +26,7 @@ table{border-collapse:collapse;font-size:14px;width:100%}td,th{padding:6px 8px;b
 <div class="scroll"><svg id="gantt" role="img" aria-label="Gantt chart"></svg></div>
 <div class="detail" id="detail" aria-live="polite"><p class="mut">Tap a row to see its status, weight and evidence.</p></div>
 <div class="people" id="people"></div>
+<h2 id="rtitle"></h2><p class="mut" id="rnote"></p><img src="../research-gantt.png" alt="Research timeline with dated output markers, not duration" style="width:100%;height:auto"><div id="researchRows"></div>
 <h2 id="ctitle"></h2>
 <p class="mut" id="cnote"></p>
 <div class="scroll"><table id="ctbl"></table></div>
@@ -95,6 +96,9 @@ $('sinfo').textContent='No plan existed before '+D.as_of.slice(0,10)+', so there
 // table
 const tb=$('tbl');tb.innerHTML='<tr><th>ID</th><th>Package</th><th>Weight</th><th>Status</th><th>Credit</th></tr>';
 P.forEach(p=>{const r=tb.insertRow();[p.id,p.name,p.weight+'%',LAB[p.status],(p.weight*(CRED[p.status]||0)).toFixed(1)+'%'].forEach(v=>{r.insertCell().textContent=v})});
+
+// Research cards preserve IDs, source state, dependencies; dates never inferred.
+(function(){const R=D.research;if(!R)return;$('rtitle').textContent=R.title;$('rnote').textContent=R.note;R.rows.forEach(r=>{const box=document.createElement('section');box.className='detail';const h=document.createElement('h3');h.textContent=r.id+' '+r.name;box.appendChild(h);for(const [label,text] of [['Owner',r.owner],['Research state',r.state],['Evidence',r.evidence],['Dependencies',r.dependencies],['Related WPs',r.links_to],['Approval',r.approved],['Dates','No start, end or deadline specified. '+(r.markers.length?r.markers.map(m=>m.at.slice(11,16)+' EET '+m.label).join('; '):'No dated output')]]){const p=document.createElement('p');const b=document.createElement('b');b.textContent=label+': ';p.appendChild(b);p.appendChild(document.createTextNode(text));box.appendChild(p)}const a=document.createElement('a');a.href=r.url;a.textContent='Research source';box.appendChild(a);$('researchRows').appendChild(box)});})();
 
 // continuous work
 (function(){const C=D.continuous;if(!C)return;$('ctitle').textContent=C.title;$('cnote').textContent=C.note;const t=$('ctbl');t.innerHTML='<tr><th>Member</th><th>Assignment</th><th>Role status</th><th>Model execution</th><th>Latest evidenced output</th><th>Output age at '+hhmm(D.as_of)+'</th></tr>';

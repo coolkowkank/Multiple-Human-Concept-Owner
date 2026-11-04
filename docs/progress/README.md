@@ -67,3 +67,7 @@ Owner: the maintainer of this repo's progress chart (currently the Telkomsel Ins
 The primary timeline is interactive: https://files.instinct.com/9ikwv5puwqvj-coordinator-work-timeline (data: `timeline/events.json`, built by `timeline/build_events.py` from git history; past events are never rewritten, errors are corrected by a later superseding entry).
 
 A static PNG is a daily chart only. It is exported once, after the Europe/Helsinki calendar day has ended, to `archive/YYYY-MM-DD-coordinator-timeline.png` and linked from `archive/README.md`. No static timeline picture is posted during the day.
+
+## Research work packages
+
+RW1-RW6 come from Research_lab/research/PLAN.md, reconciled with later dated findings in progress.json. render_research.py shows dated outputs/replays only, not duration. The plan gives no RW start/end/deadline dates. Research stages are separate from implementation, approval and weighted WPs. Related WP references do not add credit. Refresh render_research.py and charts/build_charts.py with substantive research changes only.

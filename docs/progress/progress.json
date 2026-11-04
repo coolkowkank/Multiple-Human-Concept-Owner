@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04T18:16:09+02:00",
+ "as_of": "2026-11-04T18:23:44+02:00",
  "timezone": "EET (UTC+2), same as commit timestamps",
  "rules": "Weighted milestone progress, not independently verified completion. Milestone done = 100% of weight (tests pass or an independent review passed). Partial = 50%. In progress / not started = 0%. Weights are judgment calls. Commits alone never count.",
  "packages": [
@@ -103,7 +103,7 @@
    "weight": 6,
    "status": "verified",
    "start": "2026-11-04T14:58",
-   "evidence": "Review 1 on 45cec13 returned changes-required (no credit then). A later independent project review of the corrected fix (26ff4bc) accepted it, which meets the frozen criterion. This review was not written by Bill (the seat that wrote the first review); the owner icon is therefore left off. Gate-spam follow-up stays open; no live multi-seat run.",
+   "evidence": "Review 1 on 45cec13 returned changes-required (no credit then). A later independent project review of the corrected fix (26ff4bc) accepted it, which meets the frozen criterion. This review was not written by Bill (the seat that wrote the first review); the owner icon is therefore left off. Gate-spam follow-up stays open; no live multi-seat run. Bill/Christina subsequently independently re-reviewed exact 26ff4bc at 18:19: F1-F4 resolved, 8 deadlock/167 suite unit tests. Earlier no-Bill-review statement is historical and superseded; latch not part of that review.",
    "pic": [],
    "contributors": [],
    "baseline_end": "2026-11-04T19:00",
@@ -155,7 +155,7 @@
    "status": "in_progress",
    "start": "2026-11-04T14:33",
    "forecast_end": "2026-11-04T20:00",
-   "evidence": "Delta-only handoff rule adopted. One run (batch 7) logged 11037 prompt + 570 completion = 11607 tokens: composition only, not proof of savings or of redundant context. Savings not yet measured Current execution transferred to Recovery Executor (operator, no project model configured), registry 63de5d0 available at 7c5b753. Earlier Telkomsel work retains its historical attribution. Acceptance gaps unchanged.",
+   "evidence": "Delta-only handoff rule adopted. One run (batch 7) logged 11037 prompt + 570 completion = 11607 tokens: composition only, not proof of savings or of redundant context. Savings not yet measured Current execution transferred to Recovery Executor (operator, no project model configured), registry 63de5d0 available at 7c5b753. Earlier Telkomsel work retains its historical attribution. Acceptance gaps unchanged. Recovery Executor prompt-source audit 3cb4fcc independently accepted offline, opt-in and unwired (16 focused/212 suite). Follow-up ac42a04 published, error-semantics review pending. Request-ID join and matched comparison remain pending; no savings.",
    "pic": [
     "recovery-executor"
    ],
@@ -285,21 +285,21 @@
    {
     "member": "Bill - Independent reviewer",
     "assignment": "Independent reviewer role for Builder commits",
-    "last": null,
-    "ref": null,
-    "what": "No Bill-authored review recorded since review 1 on 45cec13. The latch reviews came from an independent reviewer who is not Bill, Nora or Eva",
-    "state": "Unknown",
-    "source": "No Bill activity evidence",
+    "last": "2026-11-04T18:19",
+    "ref": "26ff4bc",
+    "what": "Bill/Christina peer re-review: F1-F4 resolved; 8 deadlock and 167 full-suite unit tests independently passed. Not a latch review or live/autonomy pass",
+    "state": "Review complete",
+    "source": "Independent peer confirmation; original fix compare",
     "exec": "Unknown, not currently observed"
    },
    {
     "member": "Ryan - Team Resources",
     "assignment": "Team Resources role: model-route checks; team performance analysis (assigned 17:48)",
-    "last": "2026-11-04T17:54",
-    "ref": "0584bbe",
-    "what": "Role contract update by the operator, not Ryan model analysis: performance job, proposal review chain, support functions",
-    "state": "Assigned",
-    "source": "team-launcher commit",
+    "last": "2026-11-04T18:17",
+    "ref": "001448b",
+    "what": "Operator performance research and independent source/citation check completed. One corrected-packet Groq second-opinion sample, 3076 tokens, provider-reported cost 0, not general qualification",
+    "state": "Analysis complete",
+    "source": "team-launcher registry and availability record",
     "exec": "Unknown, not currently observed"
    },
    {
@@ -314,13 +314,135 @@
    },
    {
     "member": "Ryan's Verifier",
-    "assignment": "Independent analysis verification: checks claims before Ryan sends proposals",
-    "last": null,
+    "assignment": "Dedicated Researcher and Verifier support requested; model assignments unresolved",
+    "last": "2026-11-04T18:17",
     "ref": null,
-    "what": "An active assignment now exists. It is not a project-model-staffed seat",
-    "state": "Assigned",
-    "source": "Current assignment",
-    "exec": "Not project-model staffed; not currently observed"
+    "what": "One-shot independent operator verification complete; no standing running verifier. Dedicated support request remains open, models not qualified",
+    "state": "Awaiting staffing",
+    "source": "team-launcher 001448b",
+    "exec": "No project model assigned; no current verification run observed"
+   }
+  ]
+ },
+ "research": {
+  "title": "Research work packages (RW1-RW6)",
+  "source": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/Research_lab/research/PLAN.md",
+  "note": "Research plan v3, reconciled with later publications. No RW start/end dates or deadlines were specified. Diamonds are dated outputs/replays, not continuous runtime or completion bars. S0 scoped, S1 sources read, S2 finding published, S3 experiment designed, S4 experiment run, S5 reviewed with decision. Research and implementation are separate; proposals are not approved features. No extra weights or S-curve credit. Priority: RW2, RW1, RW3, RW4; RW5 feeds RW1-RW4.",
+  "rows": [
+   {
+    "id": "RW1",
+    "name": "Reliable handoffs",
+    "owner": "Researcher role (Nora); output authorship varies, see evidence",
+    "state": "S3 design published; pending review",
+    "evidence": "F3 literature finding plus offline validator spec (328cec7). V1-V5 are proposals; fixture list is not an executed validator. Acceptance: reject recorded null handoff, zero manual recovery in predeclared rehearsals, token comparison.",
+    "dependencies": "Builder validator; incident/replay fixture; RW3 token data",
+    "links_to": "WP4, WP9; WP8a literature, WP8b experiments",
+    "markers": [
+     {
+      "at": "2026-11-04T14:42",
+      "label": "F3 finding"
+     },
+     {
+      "at": "2026-11-04T17:34",
+      "label": "Validator spec"
+     }
+    ],
+    "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/Research_lab/research/findings/2026-11-04-rw1-handoff-validator-spec.md",
+    "approved": "Research tracking only; implementation/adoption not approved by this chart",
+    "deadline": null
+   },
+   {
+    "id": "RW2",
+    "name": "Independent review and acceptance gates",
+    "owner": "Researcher role (Nora); output authorship varies, see evidence",
+    "state": "S2 sources/findings; comparison not run",
+    "evidence": "F1/F2 source findings; F2 corrected with independent PDF verification (bbb310d). Spec+diff+tests review and matching acceptance pin remain proposed research comparison, not a deployed gate.",
+    "dependencies": "Reviewer agreement on input format; pin/gate workstream",
+    "links_to": "WP5, WP7, WP4; WP8a literature",
+    "markers": [
+     {
+      "at": "2026-11-04T14:42",
+      "label": "F1/F2 findings"
+     },
+     {
+      "at": "2026-11-04T18:12",
+      "label": "F2 correction/source check"
+     }
+    ],
+    "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/Research_lab/research/findings/2026-11-04-initial-literature-scan.md",
+    "approved": "Research tracking only; implementation/adoption not approved by this chart",
+    "deadline": null
+   },
+   {
+    "id": "RW3",
+    "name": "Token efficiency",
+    "owner": "Researcher role (Nora); output authorship varies, see evidence",
+    "state": "Baseline note published; pending review; savings unmeasured",
+    "evidence": "328cec7: N=1 recorded run, 7 calls, token composition only. No source-token split or savings demonstrated. WP9 prompt audit is a separate implementation prerequisite, not RW3 completion.",
+    "dependencies": "Read-only ledger export; RW1/RW2 variants; matched comparison with equal acceptance outcome",
+    "links_to": "WP9; WP8b experiments",
+    "markers": [
+     {
+      "at": "2026-11-04T17:34",
+      "label": "N=1 composition baseline"
+     }
+    ],
+    "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/Research_lab/research/findings/2026-11-04-rw3-token-baseline-requesty-run.md",
+    "approved": "Research tracking only; implementation/adoption not approved by this chart",
+    "deadline": null
+   },
+   {
+    "id": "RW4",
+    "name": "Stall and liveness detection",
+    "owner": "Researcher role (Nora); output authorship varies, see evidence",
+    "state": "S4 partial offline replay; E4b blocked on data",
+    "evidence": "Design ad93523 and replay 9115552: N=1 history confirms 3 timezone false-stall flags; fixed-time and progress-aware rules both give zero, so no discrimination. Independent review pending.",
+    "dependencies": "Builder repair; defined liveness/wait signal; histories with real stall, wait and long multi-call turn",
+    "links_to": "WP5; WP8b experiment E4",
+    "markers": [
+     {
+      "at": "2026-11-04T15:11",
+      "label": "Liveness design"
+     },
+     {
+      "at": "2026-11-04T16:43",
+      "label": "E4 v2 offline replay"
+     }
+    ],
+    "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/Research_lab/research/findings/2026-11-04-e4-stall-rule-replay.md",
+    "approved": "Research tracking only; implementation/adoption not approved by this chart",
+    "deadline": null
+   },
+   {
+    "id": "RW5",
+    "name": "Prior art in public systems",
+    "owner": "Researcher role (Nora); output authorship varies, see evidence",
+    "state": "S2 notes; partial level-2 read, no tested adoption decision",
+    "evidence": "947a498: OpenHands implementation read partially but unpinned; LangGraph official docs only. Level 1 claim, level 2 code read, level 3 behavior tested. No level-3 result.",
+    "dependencies": "None; feeds RW1-RW4. Re-pin implementation and write adopt/skip decisions",
+    "links_to": "Supports RW1-RW4, no separate WP credit",
+    "markers": [
+     {
+      "at": "2026-11-04T15:10",
+      "label": "Prior-art notes"
+     }
+    ],
+    "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/Research_lab/research/findings/2026-11-04-rw5-prior-art-stall-and-gates.md",
+    "approved": "Research tracking only; implementation/adoption not approved by this chart",
+    "deadline": null
+   },
+   {
+    "id": "RW6",
+    "name": "Rate-limit-aware provider routing",
+    "owner": "Coordinator workstream scope; Researcher contribution unassigned",
+    "state": "S0 placeholder; not started",
+    "evidence": "No sources or findings gathered under RW6. Coordinator workstream owns scope; Researcher contributes only if asked. No research task or model activity inferred from Ryan routing work.",
+    "dependencies": "Research scope must be assigned; no date committed",
+    "links_to": "WP6 context only",
+    "markers": [],
+    "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/Research_lab/research/PLAN.md",
+    "approved": "Research tracking only; implementation/adoption not approved by this chart",
+    "deadline": null
    }
   ]
  }
