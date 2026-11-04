@@ -11,8 +11,31 @@
   checks are deterministic (provider model-listing price check plus
   bounded probes tied to a real task need) and are coordination-run;
   no model qualification trial is needed for deterministic checks.
-- **Owns (scope):** docs/team/model-availability.md (the living
-  availability record) and replacement proposals.
+- **Owns (scope):** docs/team/model-availability.md +
+  docs/team/model-availability.json (the living availability record),
+  tools/model_resources.py + tests/test_model_resources.py (the
+  executable mechanism), and replacement proposals.
+
+## Executable mechanism
+
+tools/model_resources.py (stdlib, deterministic, credential-free - it
+never calls a provider; credentialed fetches and actual model calls
+stay with the task's authorized operator flow):
+
+- `check-price <listing.json> <model-id>`: PASS only when the EXACT id
+  is present with all-zero prices; paid prefixed variants never match.
+- `record-event <record.json> <route> ok|cap|error <evidence>`: dated
+  status update to the machine record.
+- `propose <record.json> <listing.json|-> <job-shape> <failed-route>
+  <remaining-attempts>`: prints DECISION (automatic replacement choice,
+  authorized under the owner's 2026-11-04 resource-fit grant) ONLY when
+  all scope fits: exact id price-0 in a FRESH listing, working per the
+  record, fits the job shape, remaining attempts > 0 (a replacement
+  never expands the task's existing call cap), no new access. Anything
+  else prints COORDINATOR with the unresolved qualification/context/
+  budget gap. Automatic choice is route selection only - never
+  credentialed execution. tests/test_model_resources.py: 8 tests, all
+  offline.
 - **Explicitly NOT in scope:** task assignment and model substitution
   decisions (coordinator - one model per task, swaps need coordinator
   approval), acceptance, credentials and access (owner), paid routes,
