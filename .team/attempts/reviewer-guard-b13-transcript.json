@@ -61,5 +61,19 @@
       },
       "service_tier": "on_demand"
     }
+  },
+  {
+    "tool_call": "edit_file",
+    "args": {
+      "new_string": "# placeholder",
+      "old_string": "if response.get(\"status_line\", \"\").startswith(\"DONE\"):",
+      "path": "launcher/runtime.py"
+    },
+    "result": {
+      "ok": true,
+      "path": "launcher/runtime.py",
+      "replacements": 1,
+      "bytes": 25625
+    }
   }
 ]
