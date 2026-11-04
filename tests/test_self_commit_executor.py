@@ -170,5 +170,26 @@ class ExecutorCase(unittest.TestCase):
         self.assertEqual(self.checkpoint_commits(), len(ns["transcript"]))
 
 
+
+    # 8. Standalone mode: identities/provider are env-configurable, defaults preserved
+    def test_env_configurable_identities(self):
+        ns = self.load()
+        self.assertIn("Groq (gpt-oss-120b model)", ns["MODEL_AUTHOR"])      # default preserves in-flight loop
+        self.assertIn("instinct-telkomsel", ns["RECORDS_COMMITTER"])
+        self.assertEqual(ns["MODEL"], "openai/gpt-oss-120b")
+        self.assertIn("api.groq.com", ns["API_URL"])
+        os.environ["MODEL_AUTHOR"] = "Kimi (k2 model) <350571665+coolkowkank-bot@users.noreply.github.com>"
+        os.environ["RECORDS_COMMITTER"] = "alice <alice@users.noreply.github.com>"
+        os.environ["PROVIDER_MODEL"] = "kimi-k2"
+        os.environ["PROVIDER_API_URL"] = "https://example.test/v1/chat/completions"
+        ns = self.load()
+        self.assertEqual(ns["MODEL_AUTHOR"], "Kimi (k2 model) <350571665+coolkowkank-bot@users.noreply.github.com>")
+        self.assertEqual(ns["RECORDS_COMMITTER"], "alice <alice@users.noreply.github.com>")
+        self.assertEqual(ns["MODEL"], "kimi-k2")
+        self.assertEqual(ns["API_URL"], "https://example.test/v1/chat/completions")
+        for k in ("MODEL_AUTHOR", "RECORDS_COMMITTER", "PROVIDER_MODEL", "PROVIDER_API_URL"):
+            os.environ.pop(k, None)
+
 if __name__ == "__main__":
     unittest.main()
+

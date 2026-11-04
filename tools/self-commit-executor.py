@@ -26,9 +26,10 @@ Usage: GROQ_KEY_FILE=... RECORDS_DIR=... groq-harness.py REPO_PATH BRANCH ATTEMP
 import json, os, re, subprocess, sys, atexit
 
 REPO, BRANCH, ATTEMPT, TASK_FILE = sys.argv[1:5]
-KEY = open(os.environ["GROQ_KEY_FILE"]).read().strip()
+KEY = open(os.environ.get("PROVIDER_KEY_FILE", os.environ.get("GROQ_KEY_FILE", ""))).read().strip()
 TASK = open(TASK_FILE).read()
-MODEL = "openai/gpt-oss-120b"
+MODEL = os.environ.get("PROVIDER_MODEL", "openai/gpt-oss-120b")
+API_URL = os.environ.get("PROVIDER_API_URL", "https://api.groq.com/openai/v1/chat/completions")
 MAX_ROUNDS = 6
 MAX_CALLS = int(os.environ.get("MAX_CALLS", "6"))  # coordinator passes the loop's REMAINING global budget; every attempted provider request counts, including failed/error responses; the executor never retries
 CALLS = {"n": 0}
@@ -41,7 +42,7 @@ MAX_BYTES = 20000
 # committer (git identity configured at commit time, operator), and pusher
 # (whichever credential authenticates the push) - committer metadata is
 # configured independently of push authentication.
-MODEL_AUTHOR = "Groq (gpt-oss-120b model) <350571665+coolkowkank-bot@users.noreply.github.com>"
+MODEL_AUTHOR = os.environ.get("MODEL_AUTHOR", "Groq (gpt-oss-120b model) <350571665+coolkowkank-bot@users.noreply.github.com>")
 CRED = re.compile(r"(gsk_[A-Za-z0-9]|ghp_[A-Za-z0-9]|github_pat_|gho_[A-Za-z0-9]|AKIA[0-9A-Z]{16}|xox[baprs]-|Bearer\s+[A-Za-z0-9._-]{20,}|-----BEGIN)")
 transcript = []
 
@@ -49,6 +50,7 @@ OUT = os.path.join(REPO, ".team", "attempts", f"{ATTEMPT}-transcript.json")
 RECORDS_DIR = os.environ.get("RECORDS_DIR")
 CHECKPOINT = {"n": 0}
 PERSIST = {"halt": False, "saved": 0}
+RECORDS_COMMITTER = os.environ.get("RECORDS_COMMITTER", "instinct-telkomsel <instinct-telkomsel@users.noreply.github.com>")
 
 def save_transcript():
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
@@ -63,8 +65,9 @@ def save_transcript():
     with open(dst, "w") as f:
         json.dump(transcript, f, indent=2)
     subprocess.run(["git", "-C", RECORDS_DIR, "add", "--", rel], check=True, capture_output=True)
-    subprocess.run(["git", "-C", RECORDS_DIR, "-c", "user.name=instinct-telkomsel",
-                    "-c", "user.email=instinct-telkomsel@users.noreply.github.com",
+    _rn, _re_ = RECORDS_COMMITTER.rsplit("<", 1)
+    subprocess.run(["git", "-C", RECORDS_DIR, "-c", f"user.name={_rn.strip()}",
+                    "-c", f"user.email={_re_.rstrip('>').strip()}",
                     "commit", "--quiet", "-m",
                     f"operator: {ATTEMPT} transcript checkpoint {CHECKPOINT['n']} (auto, per-event durability)"],
                    check=True, capture_output=True)
@@ -113,7 +116,7 @@ def api(messages):
     payload = {"model": MODEL, "messages": messages, "tools": TOOLS,
                "reasoning_effort": "low", "max_completion_tokens": 4096}
     p = subprocess.run(["curl", "-sS", "--max-time", "120", "-w", "\n%{http_code}",
-        "https://api.groq.com/openai/v1/chat/completions",
+        API_URL,
         "-H", f"Authorization: Bearer {KEY}", "-H", "Content-Type: application/json",
         "-d", json.dumps(payload)], capture_output=True, text=True)
     if p.returncode != 0:
