@@ -9,9 +9,9 @@
 
 ### Current Project Team
 
-*Latest update: 2026-11-04 17:36 EET. [Static full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/team/) (GitHub Pages, selectable text, responsive cards; the picture below is the fallback). No role is currently vacant; Sam works alongside the Coordinator (status drafts, reviewed); Ryan (Team Resources) sits below the Coordinator and above the teams, has a narrow status-draft backup, and no qualified code or research backup, so replacement proposals go to the Coordinator; "not project-configured" means no documented model or provider.*
+*Latest update: 2026-11-04 17:36 EET. [Static full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/team/) (GitHub Pages, selectable text, responsive cards; the picture below is the fallback). No role is currently vacant; Sam sits beside the Coordinator (two-way, status drafts reviewed); Ryan (Team Resources) is a side branch of the Coordinator-to-teams line, with a narrow status-draft backup and no qualified code or research backup, so replacement proposals go to the Coordinator; "not project-configured" means no documented model or provider.*
 
-![Current Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/58f21b7dcc935ae4afc52e27282ccb16c73851ae/docs/progress/team.png)
+![Current Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/5a01952abbb31a9e6b326879224e7b08502ea217/docs/progress/team.png)
 
 ### Coordinator work timeline
 
