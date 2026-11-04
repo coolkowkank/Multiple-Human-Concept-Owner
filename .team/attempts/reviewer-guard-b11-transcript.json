@@ -98,5 +98,53 @@
       "x-ratelimit-reset-tokens": "11.325s"
     },
     "call": 2
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-f948474e-333f-4929-b112-9feebec42b35",
+      "object": "chat.completion",
+      "created": 1793797487,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "We need to actually view file to edit correctly.",
+            "tool_calls": [
+              {
+                "id": "fc_6aad19d1-aa76-451f-809a-880b19beb8e8",
+                "type": "function",
+                "function": {
+                  "name": "edit_file",
+                  "arguments": "{\"new_string\":\"# placeholder\",\"old_string\":\"if response.get(\\\"status_line\\\", \\\"\\\").startswith(\\\"DONE\\\"):\",\"path\":\"launcher/runtime.py\"}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.167985725,
+        "prompt_tokens": 1105,
+        "prompt_time": 0.053549993,
+        "completion_tokens": 58,
+        "completion_time": 0.122317982,
+        "total_tokens": 1163,
+        "total_time": 0.175867975,
+        "completion_tokens_details": {
+          "reasoning_tokens": 11
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_c3da0d4bb9",
+      "x_groq": {
+        "id": "req_01m6kajyxge4dsyzc1nwa83kg2",
+        "seed": 1939512641
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
