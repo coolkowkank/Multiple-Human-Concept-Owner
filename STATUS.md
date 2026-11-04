@@ -28,19 +28,25 @@ readiness for parallel or unattended operation.**
 
 ### Patch review of `9407acc` (independent, read-only)
 
+Second review round (`dbeb842`, independent, read-only): P2
+**verified**. P3 **verified** with residual R3. P4 `init` **verified**;
+gate-answer route broken (R2). P1 **partial** - residual R1. No
+overall PASS.
+
 | ID | Finding | State |
 | --- | --- | --- |
-| P1 | Recovery blocker: stale first queue line kept; re-`respond` appended behind it; seat refuses same stale line forever | fixed-unverified |
-| P2 | Head binding incomplete: `_queue.head` stored but only turn/seq compared; head-only operator commit still applied | fixed-unverified |
-| P3 | `commit_paths` committed the whole pre-staged index, not just its paths | fixed-unverified |
-| P4 | `init` and gate-answer routes still used `git add -A`; audit wording corrected | fixed-unverified |
+| P1 | Recovery blocker: stale first queue line kept; re-`respond` appended behind it | partial: turn/seq recovery verified; residual R1 |
+| P2 | Head binding incomplete: only turn/seq compared | verified (`dbeb842`) |
+| P3 | `commit_paths` committed the whole pre-staged index | verified (`dbeb842`); residual R3 |
+| P4 | `init` and gate-answer routes used `git add -A` | init verified (`dbeb842`); answer broken (R2) |
+| R1 | `respond` stale scan checks only turn/seq, not head: a head-stale line (non-queue commit, same token) is refused by the seat, but `--discard-stale` does not drop it and appends behind it; manual edit only | open |
+| R2 | Gate-answer commit message lacks the required prefix; the installed pre-commit guard rejects it, leaving ANSWERS staged and blocking later `respond` (P3). Test fixture had no hook installed | open |
+| R3 | Pre-staged refusal runs after the queue line is appended: uncommitted line left behind; unstage + retry duplicates it | open |
+| R4 | Seat-turn `commit_all` sweeps in-domain dirt; outside-domain dirt fails the guard only after mutation, leaving advanced uncommitted state | open |
 
-P1-P4 fixes: P1 `respond` refuses to queue behind stale lines;
-`--discard-stale` is the verified recovery. P2 full head check
-(ancestor + queue-files-only diff). P3 pre-staged index is refused,
-never swept. P4 `init` and gate answers stage exactly their files.
-Regression tests pin each. Independent re-review pending; states move
-to `verified` only after it.
+R1-R4 fixes in progress on the working branch; each gets a regression
+test, including hook-installed and failure-atomicity cases. States
+move only on independent review.
 
 ## Provider routes (credential-level validation only)
 
@@ -66,8 +72,9 @@ autonomy.
 
 ## Next actions
 
-1. Independent read-only re-review of the P1-P4 fixes (this head).
-2. Then, under a fresh explicit go-ahead: bounded live cycle on the
+1. Fix R1-R4 (in progress), then independent review.
+2. Independent review of the R1-R4 fixes (this section).
+3. Then, under a fresh explicit go-ahead: bounded live cycle on the
    fixed head, live-1 protocol, hard stop.
 3. Open gaps before any unattended claim: cooperative local leases;
    best-effort relay; supervisor restart untested; models may not
