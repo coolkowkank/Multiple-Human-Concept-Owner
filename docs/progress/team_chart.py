@@ -63,7 +63,7 @@ def render(here, updated):
     labels(REV,"Bill - Independent reviewer","@instinct-christina","Reviews the Builder's pinned commits","Model: not project-configured")
     labels(EVA,"Eva - Evidence verifier","Uses @coolkowkank","shared research token",("Gemma 4 31B (free), trialed","Rq"),"runtime integration pending")
     labels(RES,"Nora - Researcher","Uses @coolkowkank","shared research token",("Nemotron-3 Ultra 550B (free)","Rq"),"synthesis; citations reviewed")
-    labels(RYN,"Ryan - Team Resources","active, coordination-run","Route checks + replacement proposals (free only)","Backup coverage: GAP, none qualified yet","Model: not project-configured")
+    labels(RYN,"Ryan - Team Resources","active, coordination-run","Route checks + replacement proposals (free only)","Status-draft backup qualified (narrow); code, research: GAP","Model: not project-configured")
     labels(AST,"Sam - Coordinator Assistant","active, status drafts only",("Model: gemma-4-31b-it (free)","Rq"),"Coordinator reviews every draft","Publication stays coordination-run")
     # hierarchy: owner > coordinator > others (plain lines, no arrowheads)
     HL="#b4b8c6"
