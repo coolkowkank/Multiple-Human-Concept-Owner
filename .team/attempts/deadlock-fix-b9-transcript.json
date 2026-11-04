@@ -300,5 +300,13 @@
       "ok": false,
       "error": "push fail-closed: gate /tmp/push-gate-b9 absent or unreadable; do other work or retry git_push in a later round"
     }
+  },
+  {
+    "budget_stop": {
+      "used": 6,
+      "budget": 6,
+      "ledger": "/tmp/budget-ledger-batch3.json",
+      "durable": true
+    }
   }
 ]
