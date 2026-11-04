@@ -1,1 +1,2 @@
 {"ts": "2026-11-04T11:12:55.163361+00:00", "model": "google/gemma-4-31b-it", "attempt": 1, "outcome": "ok", "usage": {"completion_tokens": 338, "completion_tokens_details": {"reasoning_tokens": 265}, "prompt_tokens": 430, "total_tokens": 768, "cost": 0}}
+{"ts": "2026-11-04T11:19:52.506658+00:00", "model": "google/gemma-4-31b-it", "attempt": 1, "outcome": "ok", "usage": {"completion_tokens": 564, "completion_tokens_details": {"reasoning_tokens": 494}, "prompt_tokens": 804, "total_tokens": 1368, "cost": 0}}

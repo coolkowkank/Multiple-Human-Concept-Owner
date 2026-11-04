@@ -6,3 +6,4 @@
 {"ts": "2026-11-04T11:19:29Z", "seat": "operator", "kind": "intervention", "body": "builder returned handoff:null; turn=None deadlocked the bus (supervisor _check_stall ignores falsy turn; seed only fires while forming). Operator re-issued the turn to the coordinator - supervisor's missing function done by hand, NOT model content repair. Launcher gap recorded as experiment finding."}
 {"ts": "2026-11-04T11:19:30Z", "seat": "supervisor", "kind": "stall", "body": "turn stalled on coordinator; restarting seat"}
 {"ts": "2026-11-04T11:19:35Z", "seat": "supervisor", "kind": "restart", "body": "seat coordinator exited -15; restart 1"}
+{"ts": "2026-11-04T11:19:52Z", "seat": "coordinator", "kind": "handoff", "body": "Assigning implementation verification to QC", "turn_seq": 3}

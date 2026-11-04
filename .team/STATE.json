@@ -1,13 +1,13 @@
 {
-  "turn": "coordinator",
-  "turn_seq": 2,
-  "turn_since": "2026-11-04T11:19:29Z",
+  "turn": "qc",
+  "turn_seq": 3,
+  "turn_since": "2026-11-04T11:19:52Z",
   "status": "running",
-  "status_line": "operator re-issued turn to coordinator after null-handoff deadlock",
+  "status_line": "Moving to QC to verify implementation and test results",
   "leases": {
     "coordinator": {
       "holder": "coordinator-32a14394",
-      "claimed_at": 1793790764.6772697
+      "claimed_at": 1793791175.2809389
     },
     "builder": {
       "holder": "builder-d21f29f3",
