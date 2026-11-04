@@ -161,8 +161,8 @@ text(CER[0], CER[1]+CER[2]+66, "key + tool calls verified 2026-11-04", 12.5)
 text(CER[0], CER[1]+CER[2]+90, "hold: account credit/ledger unverified", 12.5)
 text(RQY[0], RQY[1]+RQY[2]+12, "Requesty (qualifying)", 16, INK, "bold")
 text(RQY[0], RQY[1]+RQY[2]+40, "google/gemma-4-31b-it, zero-price verified", 13.5, GRAY, style="italic")
-text(RQY[0], RQY[1]+RQY[2]+66, "bounded 5-seat local experiment running:", 12.5)
-text(RQY[0], RQY[1]+RQY[2]+90, "20-request cap, separate local repo", 12.5)
+text(RQY[0], RQY[1]+RQY[2]+66, "bounded 5-seat experiment DONE 2026-11-04:", 12.5)
+text(RQY[0], RQY[1]+RQY[2]+90, "7/20 calls, all cost 0, separate repo", 12.5)
 # one dashed link to the pool: the Coordinator manages every delivery seat and
 # activates a pool model for a seat by assigning scoped work within verified
 # free budgets - no separate owner gate per routine task

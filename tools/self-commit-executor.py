@@ -44,6 +44,13 @@ API_URL = os.environ.get("PROVIDER_API_URL", "https://api.groq.com/openai/v1/cha
 MAX_ROUNDS = 6
 MAX_CALLS = int(os.environ.get("MAX_CALLS", "6"))  # coordinator passes the loop's REMAINING global budget; every attempted provider request counts, including failed/error responses; the executor never retries
 CALLS = {"n": 0}
+# Zero-price routes only (owner rule for the Requesty gemma batch): when
+# REQUIRE_ZERO_COST=1 and a response reports a NONZERO usage.cost, the run
+# stops fail-closed BEFORE any further provider request - a pricing surprise
+# must halt the batch, never silently spend. Missing cost field passes (the
+# zero-price listing is verified separately before GO). Same semantics as the
+# launcher HttpAdapter require_zero_cost guard (launcher/adapters.py).
+REQUIRE_ZERO_COST = os.environ.get("REQUIRE_ZERO_COST", "").lower() in ("1", "true", "yes")
 MAX_BYTES = 20000
 # Fixed HARNESS-controlled author identity for every model-issued commit: the
 # owner-approved shared project machine account (coolkowkank-bot), per-model credit
@@ -173,6 +180,13 @@ def api(messages):
     if "error" in r:
         record({"api_error": {"kind": "api", "status": status.strip(), "detail": r["error"]}})
         raise RuntimeError(f"API error: {r['error']}")
+    if REQUIRE_ZERO_COST:
+        cost = (r.get("usage") or {}).get("cost")
+        if cost not in (None, 0, 0.0, "0", "0.0"):
+            record({"cost_stop": {"cost": cost, "model": MODEL, "call": CALLS["n"]}})
+            raise RuntimeError(
+                f"require_zero_cost: provider reported nonzero cost {cost!r} on {MODEL}; "
+                "refusing further provider requests")
     return r
 
 def safe_path(path):

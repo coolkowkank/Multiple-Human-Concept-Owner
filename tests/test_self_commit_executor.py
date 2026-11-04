@@ -184,6 +184,43 @@ class ExecutorCase(unittest.TestCase):
         self.assertEqual(rec[0]["status"], "403")
         self.assertIn("1010", rec[0]["body_head"])
 
+    # 6b. REQUIRE_ZERO_COST=1: a nonzero reported cost stops the run fail-closed
+    def test_zero_cost_guard_stops_on_nonzero_cost(self):
+        os.environ["REQUIRE_ZERO_COST"] = "1"
+        ns = self.load()
+        body = json.dumps({"choices": [{"message": {"role": "assistant", "content": "x"}}],
+                           "usage": {"cost": 0.01, "total_tokens": 10}}) + "\n200"
+        class FP:
+            returncode = 0
+            stderr = ""
+            stdout = body
+        ns["subprocess"] = type("S", (), {"run": staticmethod(lambda *a, **k: FP())})
+        with self.assertRaises(RuntimeError) as ctx:
+            ns["api"]([])
+        self.assertIn("require_zero_cost", str(ctx.exception))
+        rec = [e["cost_stop"] for e in ns["transcript"] if isinstance(e, dict) and "cost_stop" in e]
+        self.assertEqual(rec[0]["cost"], 0.01)
+
+    # 6c. REQUIRE_ZERO_COST=1: a zero reported cost passes; guard off by default
+    def test_zero_cost_guard_passes_zero_and_defaults_off(self):
+        os.environ["REQUIRE_ZERO_COST"] = "1"
+        ns = self.load()
+        def mk(cost):
+            body = json.dumps({"choices": [{"message": {"role": "assistant", "content": "x"}}],
+                               "usage": {"cost": cost, "total_tokens": 10}}) + "\n200"
+            class FP:
+                returncode = 0
+                stderr = ""
+                stdout = body
+            return FP
+        ns["subprocess"] = type("S", (), {"run": staticmethod(lambda *a, **k: mk(0)())})
+        self.assertEqual(ns["api"]([])["usage"]["cost"], 0)  # zero passes
+        # default (env unset): nonzero cost does NOT stop (guard is opt-in)
+        del os.environ["REQUIRE_ZERO_COST"]
+        ns2 = self.load()
+        ns2["subprocess"] = type("S", (), {"run": staticmethod(lambda *a, **k: mk(0.5)())})
+        self.assertEqual(ns2["api"]([])["usage"]["cost"], 0.5)
+
     # 7. every event checkpointed exactly once; no duplicate clean-exit checkpoint
     def test_checkpoint_per_event_no_dup(self):
         ns = self.load()
