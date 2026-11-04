@@ -1,12 +1,18 @@
 # Autonomous AI-Human Teamwork - Work in Progress and Intended Operating Model
 
-## Project progress
+## Project Team
 
-*As of 2026-11-04 14:50 EET. Weighted milestone progress is **40.0%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
+*Latest update: 2026-11-04 14:55 EET.*
 
-![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/0aab96efd7d89371c3fb75e3bfe4eb26e8e1a12e/docs/progress/gantt.png)
+![Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/70cf09f9d5718a88386e59e034f8a2c8eee17b80/docs/progress/team.png)
 
-![Progress S-curve](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/0aab96efd7d89371c3fb75e3bfe4eb26e8e1a12e/docs/progress/s-curve.png)
+### Project progress
+
+*As of 2026-11-04 14:55 EET. Weighted milestone progress is **40.0%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
+
+![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/70cf09f9d5718a88386e59e034f8a2c8eee17b80/docs/progress/gantt.png)
+
+![Progress S-curve](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/70cf09f9d5718a88386e59e034f8a2c8eee17b80/docs/progress/s-curve.png)
 
 The large icon on each Gantt row is the accountable current owner (a role assignment, not authorship). Small icons are contributors. A legend under the chart gives names and roles. The Researcher has no GitHub account, so it uses a role icon.
 

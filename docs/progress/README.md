@@ -32,6 +32,10 @@ The large icon is the accountable current owner by role assignment, not by who a
 
 GitHub caches branch-path image URLs (query strings are ignored), so the main README links the charts pinned to a commit. After regenerating: commit and push the charts, then set the two image URLs in the main README to `https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/<that commit sha>/docs/progress/<chart>.png`, and push again.
 
+## Project Team chart
+
+`team_chart.py` draws docs/progress/team.png (called by render_progress.py). Its facts come from docs/developers.md and the team roster chart on the team-launcher branch. Edit the labels there when the team changes, and pin all three images to the commit as described above.
+
 ## Updating
 
 Edit `progress.json` (status, `credit_at`, `forecast_end`, evidence), then run `python3 docs/progress/render_progress.py` (needs matplotlib) and commit the regenerated files. Do not mark a package done without linking the passing test run or review.
