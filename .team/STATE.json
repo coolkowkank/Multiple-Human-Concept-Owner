@@ -1,9 +1,9 @@
 {
-  "turn": "qc",
-  "turn_seq": 2,
-  "turn_since": "2026-11-04T05:24:27Z",
+  "turn": "coordinator",
+  "turn_seq": 3,
+  "turn_since": "2026-11-04T05:31:22Z",
   "status": "running",
-  "status_line": "live-1: batch 1 review filed (1 major remaining-work, 2 minor), qc turn next",
+  "status_line": "live-1: qc verdict PASS on batch 1 review (3 findings verified, limits accepted, must-fix recorded); coordinator close next",
   "leases": {
     "coordinator": {
       "holder": "coordinator-645dc117",
@@ -12,6 +12,10 @@
     "reviewer": {
       "holder": "reviewer-44ffafd1",
       "claimed_at": 1793769831.8938437
+    },
+    "qc": {
+      "holder": "qc-03a80470",
+      "claimed_at": 1793770282.8003027
     }
   }
 }
