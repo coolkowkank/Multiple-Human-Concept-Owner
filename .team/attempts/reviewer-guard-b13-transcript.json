@@ -241,5 +241,11 @@
       "ok": false,
       "error": "old_string not found (exact byte match required); no change made"
     }
+  },
+  {
+    "pacing_wait": {
+      "seconds": 46.2,
+      "min_interval": 65.0
+    }
   }
 ]
