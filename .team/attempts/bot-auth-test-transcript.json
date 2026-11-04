@@ -62,5 +62,53 @@
       "path": "docs/proposed-vs-tested.md",
       "bytes": 637
     }
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-fe53c953-30f4-4ff1-8ca3-2b083e010682",
+      "object": "chat.completion",
+      "created": 1793779332,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "Now commit.",
+            "tool_calls": [
+              {
+                "id": "fc_a44a72d4-c85a-40ee-b9dc-5409da0da2da",
+                "type": "function",
+                "function": {
+                  "name": "git_commit",
+                  "arguments": "{\"message\":\"Update docs/proposed-vs-tested.md with new LIVE-VERIFIED capability entry\\n\\nTURN: builder\"}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.112940186,
+        "prompt_tokens": 815,
+        "prompt_time": 0.041710286,
+        "completion_tokens": 46,
+        "completion_time": 0.096937358,
+        "total_tokens": 861,
+        "total_time": 0.138647644,
+        "completion_tokens_details": {
+          "reasoning_tokens": 4
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_c868cf1eaa",
+      "x_groq": {
+        "id": "req_01m6js8wzbesk8qcbv99hezvpw",
+        "seed": 674466518
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
