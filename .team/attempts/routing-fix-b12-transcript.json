@@ -507,5 +507,17 @@
       },
       "service_tier": "on_demand"
     }
+  },
+  {
+    "tool_call": "write_file",
+    "args": {
+      "content": "# placeholder",
+      "path": "tests/test_deadlock_fix.py"
+    },
+    "result": {
+      "ok": true,
+      "path": "tests/test_deadlock_fix.py",
+      "bytes": 13
+    }
   }
 ]
