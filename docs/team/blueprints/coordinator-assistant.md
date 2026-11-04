@@ -40,6 +40,28 @@
   role actually does. First candidate nvidia/nemotron-3-super-120b-a12b
   was listed free but uncallable (404). Same-day org usage floor 26
   requests, daily reset boundary unknown.
+
+## Handoff contract: status maintenance (project-level, portable)
+
+- **Cadence:** hourly, changes-only; day-end archive preserved.
+- **Input (small, structured; no chat transcripts):** (a) git log since
+  the last published source pin for each watched ref (main,
+  team-launcher, Research_lab, live/*, records); (b) the current team
+  registry SHA; (c) coordinator-supplied project status facts.
+- **Output (fixed template):** proposed status/evidence deltas, each
+  citing its source SHA. Baselines, acceptance criteria, partial scores
+  and autonomy credit stay unchanged unless the coordinator explicitly
+  supplies the change.
+- **Regeneration rules:** the team visual regenerates only on a
+  team/registry change; timeline and Legacy changes come only from
+  source refs; otherwise only evidence text and the as-of marker move.
+- **Publication:** the coordinator reviews each delta; publication runs
+  through the existing authorized operator flow. The status role never
+  touches credentials, tokens, provider configuration, or merges.
+- **Role separation:** STATUS-DRAFT (small fixed-template drafting; a
+  project model may hold it after its own bounded trial) is separate
+  from the publish operator (the existing authorized maintenance flow).
+
 - **Open issues:** external-model activation for short status-delta
   drafting needs its own bounded trial on that small job (structured
   input under ~2KB, fixed-template output, per-task coordinator
