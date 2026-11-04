@@ -110,5 +110,15 @@
       },
       "service_tier": "on_demand"
     }
+  },
+  {
+    "tool_call": "git_commit",
+    "args": {
+      "message": "Restore full proposed-vs-tested.md and add live-verified token push section\n\nTURN: builder"
+    },
+    "result": {
+      "ok": true,
+      "head": "ac295a95381dc8dbeb2687385192b71ea5e0b0fb"
+    }
   }
 ]
