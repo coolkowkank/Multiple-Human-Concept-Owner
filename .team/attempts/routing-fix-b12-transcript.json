@@ -73,5 +73,11 @@
       "ok": false,
       "error": "old_string matches 2 locations; add surrounding context until it is unique; no change made"
     }
+  },
+  {
+    "pacing_wait": {
+      "seconds": 60.8,
+      "min_interval": 65.0
+    }
   }
 ]
