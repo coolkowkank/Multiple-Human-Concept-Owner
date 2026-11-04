@@ -1,2 +1,3 @@
 {"ts": "2026-11-04T11:12:44Z", "seat": "supervisor", "kind": "seed", "body": "brief present; first turn issued to coordinator"}
 {"ts": "2026-11-04T11:12:55Z", "seat": "coordinator", "kind": "handoff", "body": "Assigning initial implementation of tinylib and tests to Builder", "turn_seq": 1}
+{"ts": "2026-11-04T11:12:59Z", "seat": "supervisor", "kind": "stall", "body": "turn stalled on builder; restarting seat"}
