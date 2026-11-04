@@ -2035,6 +2035,10 @@ class HttpAdapterBudgetTests(unittest.TestCase):
         from launcher.adapters import HttpAdapter
         os.environ["TEAM_TEST_BUDGET_KEY"] = "k"
         self.addCleanup(os.environ.pop, "TEAM_TEST_BUDGET_KEY", None)
+        if log is None:  # a budget requires a durable counter log
+            d = tempfile.mkdtemp()
+            self.addCleanup(shutil.rmtree, d, True)
+            log = os.path.join(d, "usage.jsonl")
         return HttpAdapter(
             f"http://127.0.0.1:{srv.server_address[1]}", "m",
             "TEAM_TEST_BUDGET_KEY", max_retries=5, backoff=0.01,
@@ -2081,6 +2085,106 @@ class HttpAdapterBudgetTests(unittest.TestCase):
                            "call_budget": 3, "usage_log": "/tmp/u.jsonl"})
         self.assertEqual(a.call_budget, 3)
         self.assertEqual(a.usage_log, "/tmp/u.jsonl")
+
+
+class HttpAdapterBudgetPersistenceTests(unittest.TestCase):
+    """The budget count survives process restarts: it is derived from the
+    usage log at startup, and a budget without a log is refused."""
+
+    def _server(self):
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        import threading
+        calls = {"n": 0}
+
+        class H(BaseHTTPRequestHandler):
+            def do_POST(self):
+                calls["n"] += 1
+                n = int(self.headers.get("content-length", 0))
+                self.rfile.read(n)
+                self.send_response(200)
+                payload = {"choices": [{"message": {"content":
+                    '{"summary": "ok", "handoff": null}'}}],
+                           "usage": {"total_tokens": 7}}
+                data = json.dumps(payload).encode()
+                self.send_header("content-type", "application/json")
+                self.send_header("content-length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def log_message(self, *a):
+                pass
+
+        srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+        self.addCleanup(srv.shutdown)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        return srv, calls
+
+    def _adapter(self, srv, log, budget=2):
+        from launcher.adapters import HttpAdapter
+        os.environ["TEAM_TEST_PERSIST_KEY"] = "k"
+        self.addCleanup(os.environ.pop, "TEAM_TEST_PERSIST_KEY", None)
+        return HttpAdapter(
+            f"http://127.0.0.1:{srv.server_address[1]}", "m",
+            "TEAM_TEST_PERSIST_KEY", call_budget=budget, usage_log=log)
+
+    def test_count_resumes_from_log_across_instances(self):
+        import tempfile, shutil
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        log = os.path.join(d, "seat.jsonl")
+        srv, calls = self._server()
+        self._adapter(srv, log).complete("s", "p")          # process 1: 1 call
+        a2 = self._adapter(srv, log)                        # process 2 (restart)
+        self.assertEqual(a2._calls, 1)                      # resumed count
+        a2.complete("s", "p")                               # 2nd call, at cap
+        from launcher.adapters import AdapterError
+        with self.assertRaises(AdapterError):
+            self._adapter(srv, log).complete("s", "p")      # process 3: still capped
+        self.assertEqual(calls["n"], 2)
+
+    def test_budget_without_usage_log_refused(self):
+        from launcher.adapters import HttpAdapter, AdapterError
+        with self.assertRaises(AdapterError) as ctx:
+            HttpAdapter("http://x", "m", "K", call_budget=3)
+        self.assertIn("requires usage_log", str(ctx.exception))
+
+
+class LaunchBudgetGuardTests(unittest.TestCase):
+    """The unattended entry point fails closed on unbounded http seats."""
+
+    def _repo_with_roster(self, adapter):
+        import tempfile, shutil
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        subprocess.run(["git", "init", d], check=True, capture_output=True)
+        subprocess.run(["git", "-C", d, "checkout", "-b", "team-work"],
+                       check=True, capture_output=True)
+        os.makedirs(os.path.join(d, ".team"), exist_ok=True)
+        with open(os.path.join(d, ".team", "roster.json"), "w") as fh:
+            json.dump({"seats": {"builder": {
+                "role": "builder", "allowed_paths": ["src/"],
+                "adapter": adapter}}}, fh)
+        return d
+
+    def test_unbounded_http_seat_reported(self):
+        from launcher.cli import unbounded_http_seats
+        repo = self._repo_with_roster(
+            {"type": "http", "base_url": "http://x", "model": "m",
+             "api_key_env": "K"})
+        self.assertEqual(unbounded_http_seats(repo, "team-work"), ["builder"])
+
+    def test_bounded_http_seat_passes(self):
+        from launcher.cli import unbounded_http_seats
+        repo = self._repo_with_roster(
+            {"type": "http", "base_url": "http://x", "model": "m",
+             "api_key_env": "K", "call_budget": 4,
+             "usage_log": ".team/usage/builder.jsonl"})
+        self.assertEqual(unbounded_http_seats(repo, "team-work"), [])
+
+    def test_non_http_seats_not_flagged(self):
+        from launcher.cli import unbounded_http_seats
+        repo = self._repo_with_roster({"type": "mock", "script": []})
+        self.assertEqual(unbounded_http_seats(repo, "team-work"), [])
 
 
 class HttpAdapterMaxTokensTests(unittest.TestCase):

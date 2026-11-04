@@ -433,3 +433,55 @@ class CrossCloneQueueBindingTests(unittest.TestCase):
         bus = Bus(path, "team-work")
         bus.pull()
         return bus
+
+
+class FreshCloneAdopterTests(unittest.TestCase):
+    """The owner's acceptance path, mechanically: an adopter clones this
+    blueprint repo, points its commands at their OWN fresh target repo,
+    initializes the team there, and the installed layout is complete.
+    Offline; scripted/queue seats only - a live adopter-AI cycle is the
+    separate bounded proposal in docs/proposals/."""
+
+    def test_clone_init_status_path(self):
+        import shutil, subprocess, tempfile
+        blueprint_src = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        clone = os.path.join(d, "blueprint-clone")
+        target = os.path.join(d, "adopter-target")
+        subprocess.run(["git", "clone", "--quiet", blueprint_src, clone],
+                       check=True, capture_output=True)
+        subprocess.run(["git", "init", "--quiet", target], check=True,
+                       capture_output=True)
+        subprocess.run(["git", "-C", target, "-c", "user.name=t",
+                        "-c", "user.email=t@t", "commit", "--quiet",
+                        "--allow-empty", "-m", "init"], check=True,
+                       capture_output=True)
+        brief = os.path.join(d, "brief.md")
+        with open(brief, "w") as fh:
+            fh.write("# Concept\n\nBuild a fizzbuzz CLI.\n")
+        env = dict(os.environ, PYTHONPATH=clone)
+        def launcher(*args):
+            return subprocess.run(
+                [sys.executable, "-m", "launcher"] + list(args),
+                cwd=clone, env=env, capture_output=True, text=True)
+        r = launcher("init", "--repo", target, "--branch", "team-work",
+                     "--default-roster", "--brief", brief)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        # installed in the TARGET repo, not the clone
+        for rel in (".team/STATE.json", ".team/roster.json",
+                    ".team/brief.md", ".team/LOG.jsonl"):
+            self.assertTrue(os.path.exists(os.path.join(target, rel)), rel)
+        self.assertTrue(os.access(
+            os.path.join(target, ".git", "hooks", "commit-msg"), os.X_OK))
+        self.assertIn("fizzbuzz", open(os.path.join(target, ".team", "brief.md")).read())
+        roster = json.load(open(os.path.join(target, ".team", "roster.json")))
+        self.assertIn("coordinator", roster["seats"])
+        # no .team leaked into the blueprint clone
+        self.assertFalse(os.path.exists(os.path.join(clone, ".team")))
+        r = launcher("status", "--repo", target, "--branch", "team-work")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        # the unattended entry point guards budgets (mock roster here is
+        # not flagged; http seats without call_budget would be)
+        from launcher.cli import unbounded_http_seats
+        self.assertEqual(unbounded_http_seats(target, "team-work"), [])

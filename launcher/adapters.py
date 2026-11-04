@@ -189,20 +189,6 @@ class HttpAdapter(Adapter):
                  max_retries=3, backoff=2.0, sleeper=time.sleep,
                  max_tokens=None, reasoning_effort=None,
                  call_budget=None, usage_log=None):
-        # call_budget: maximum provider requests this adapter will
-        # ATTEMPT. Every try counts - successes, HTTP errors, 429
-        # retries and unreachable transport - and the check runs BEFORE
-        # the request is issued, so an unattended seat can never exceed
-        # it (the D11 lesson from the self-commit executor: attempts
-        # count, fail closed). None keeps legacy unbounded behavior;
-        # unattended autonomous runs SHOULD set a budget per seat.
-        self.call_budget = call_budget
-        self._calls = 0
-        # usage_log: optional path; one JSON line appended per attempt
-        # ({ts, model, attempt, outcome, usage}) so autonomous runs are
-        # auditable and token spend is measurable from the record, not
-        # estimated. Parent directory must exist or be creatable.
-        self.usage_log = usage_log
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.api_key_env = api_key_env
@@ -227,9 +213,43 @@ class HttpAdapter(Adapter):
         # sends one. Other HTTP errors are not retried (a 4xx will not
         # heal by waiting; a 5xx storm should not be hammered either -
         # only 429 carries an explicit "come back later" meaning).
+        # Every retry consumes the call budget below.
         self.max_retries = max_retries
         self.backoff = backoff
         self.sleeper = sleeper
+        # call_budget: maximum provider REQUESTS this adapter will
+        # ATTEMPT (a request count, NOT a token or money cap - usage
+        # varies per request; token spend is only measurable from the
+        # usage record). Every try counts - successes, HTTP errors, 429
+        # retries and unreachable transport - and the check runs BEFORE
+        # the request is issued (the D11 lesson: attempts count, fail
+        # closed). None keeps legacy unbounded behavior; `launcher
+        # launch` refuses unbounded http seats unless the operator
+        # explicitly overrides.
+        self.call_budget = call_budget
+        # usage_log: one JSON line appended per attempt ({ts, model,
+        # attempt, outcome, usage}) so runs are auditable. When a budget
+        # is set the log is REQUIRED and the count is DERIVED FROM THE
+        # LOG at startup: a restarted (or resumed) seat process resumes
+        # its count instead of resetting it, and the single-session
+        # lease keeps one writer per seat so the file is the counter.
+        # Refuse the contradictory configuration (budget without a
+        # durable counter) rather than silently resetting.
+        if call_budget is not None and not usage_log:
+            raise AdapterError(
+                "call_budget requires usage_log: the attempt count is "
+                "derived from the log so it survives restarts")
+        self.usage_log = usage_log
+        self._calls = self._prior_attempts()
+
+    def _prior_attempts(self):
+        if not self.usage_log or not os.path.exists(self.usage_log):
+            return 0
+        try:
+            with open(self.usage_log) as fh:
+                return sum(1 for line in fh if line.strip())
+        except OSError:
+            return 0
 
     def complete(self, system, prompt):
         key = os.environ.get(self.api_key_env)

@@ -208,11 +208,21 @@ optional per-seat provider call budget (`call_budget`) and usage record
 successes, HTTP errors, 429 retries, unreachable transport - checked
 before the request is issued; at the cap the seat fails closed with
 AdapterError, which the supervisor treats as a seat failure (restart
-limit, then escalation), never as done work. Each attempt appends one
+limit, then escalation), never as done work. The count is derived from
+the usage log at adapter startup, so supervisor restarts and resumes do
+not reset it (single-session lease keeps one writer per seat), and a
+budget without a usage log is refused as misconfiguration. `launcher
+launch` refuses http seats without a budget unless the operator
+explicitly passes --allow-unbounded; legacy rosters still run everywhere
+else but are UNSUITABLE for unattended runs. Each attempt appends one
 JSON line (ts, model, attempt, outcome, provider usage) so token spend
 is measured from the record. Fixture-tested offline
 (HttpAdapterBudgetTests, 4 tests): refusal beyond the cap issues no
 request, 429 retries consume budget, usage lines record every attempt,
 roster spec wiring. Not yet exercised: a live unattended run under a
-budget. Legacy behavior is unchanged when the keys are absent - existing
+budget. The fresh-clone adopter command path (clone -> init into a
+separate target repo -> layout/guard/brief installed -> status) is
+covered offline by FreshCloneAdopterTests; a scripted/offline fixture is
+NOT a real adopter-AI test. The bounded free-only live proposal is
+docs/proposals/live-cerebras-cycle.md (not run; owner review first). Legacy behavior is unchanged when the keys are absent - existing
 rosters keep working, but unattended autonomous runs should set budgets.

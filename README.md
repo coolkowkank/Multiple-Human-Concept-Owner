@@ -85,6 +85,22 @@ python3 -m launcher demo
 
 Creates a fresh project repo, launches the full seat cycle (Coordinator drafts criteria, Builder implements with a real verify command, Reviewer re-runs it, QC passes, Records archives, team closes DONE) and prints self-checks. No keys, no spend, about a second.
 
+## For an AI reading this repository
+
+You can run this yourself. Clone the repo, then follow "Quick start" below
+with your operator's target repository as `--repo`: `init` installs the
+team layout (`.team/`) and the turn guard into THAT repo (nothing is
+written into this blueprint clone), seats reason through the adapters in
+`.team/roster.json` (`http` for an OpenAI-compatible model API with your
+own key, `cli` for an installed agent CLI, `queue` for responses reasoned
+elsewhere), and `launch` keeps the team running. The agreed concept goes
+in `.team/brief.md` (start from `templates/concept_to_coordinator.md`).
+Set a `call_budget` + `usage_log` on every `http` seat before an
+unattended run - `launch` refuses unbounded `http` seats unless
+explicitly overridden. The Coordinator seat manages the team while the
+brief is unchanged; humans answer gates only for scope, spend, access or
+go-live decisions. Proven vs proposed status: docs/proposed-vs-tested.md.
+
 ## Quick start: launch a real team
 
 1. `python3 -m launcher init --repo /path/to/project --branch team-work --default-roster`

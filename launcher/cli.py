@@ -71,7 +71,26 @@ def cmd_seat(args):
     seat.run()
 
 
+def unbounded_http_seats(repo, branch):
+    """Seat names whose http adapter has no provider call budget.
+
+    An unattended (supervised) http seat without a budget can make
+    unbounded provider requests; launch fails closed on these unless the
+    operator explicitly passes --allow-unbounded."""
+    roster = Bus(repo, branch).roster().get("seats", {})
+    return sorted(name for name, spec in roster.items()
+                  if spec.get("adapter", {}).get("type") == "http"
+                  and spec["adapter"].get("call_budget") is None)
+
+
 def cmd_launch(args):
+    unbounded = unbounded_http_seats(args.repo, args.branch)
+    if unbounded and not args.allow_unbounded:
+        raise SystemExit(
+            "refusing unattended launch: http seat(s) "
+            f"{', '.join(unbounded)} have no call_budget in .team/roster.json; "
+            "set a per-seat request budget (+usage_log) or pass "
+            "--allow-unbounded to accept unbounded provider requests")
     sup = Supervisor(
         args.repo, args.branch, stall_timeout=args.stall_timeout,
         poll=args.poll)
@@ -314,6 +333,8 @@ def main(argv=None):
     p = sub.add_parser("launch", help="supervise all automated seats")
     base(p)
     p.add_argument("--stall-timeout", type=int, default=900)
+    p.add_argument("--allow-unbounded", action="store_true",
+                   help="permit http seats without a call_budget (unbounded provider requests)")
     p.add_argument("--poll", type=int, default=5)
     p.add_argument("--max-seconds", type=int)
     p.set_defaults(fn=cmd_launch)
