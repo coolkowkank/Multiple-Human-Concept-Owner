@@ -246,12 +246,43 @@ class Seat:
             batch=self.spec.get("batch"))
         return system, task
 
+    # AdapterError message prefixes that mean "the model's reply did
+    # not follow the response contract" - the only failures a
+    # format-correction round can heal. Provider/HTTP/key errors are
+    # never re-asked here (429 backoff lives in the adapter).
+    _FORMAT_ERROR_PREFIXES = ("model output is not JSON",
+                              "no parseable JSON fence")
+
     def _call_adapter(self, state):
         system, task = self.build_prompt(state)
+        corrections = []
         try:
             response = self.adapter.complete(system, task)
         except AdapterError as exc:
-            raise SeatError(f"adapter failed for {self.name}: {exc}") from exc
+            if not str(exc).startswith(self._FORMAT_ERROR_PREFIXES):
+                raise SeatError(
+                    f"adapter failed for {self.name}: {exc}") from exc
+            # One bounded format-correction round (observed live:
+            # gpt-oss-120b appended prose after a valid object,
+            # live/groq-dev-2 2026-11-04). The model re-answers and the
+            # reply is revalidated STRICTLY - no prose salvage, which
+            # review rejected because text outside the object can carry
+            # intent. A second format failure ends the turn honestly.
+            correction = (
+                f"{task}\n\nCORRECTION REQUIRED: your previous reply "
+                f"was not a single JSON object per the response "
+                f"contract ({exc}). Reply with EXACTLY ONE JSON object "
+                "matching the contract and nothing else - no prose, "
+                "no fences, no tool calls.")
+            try:
+                response = self.adapter.complete(system, correction)
+            except AdapterError as exc2:
+                raise SeatError(
+                    f"adapter failed for {self.name} on the "
+                    f"format-correction round: {exc2}") from exc2
+            corrections.append(
+                "format-correction round used; first reply was not "
+                f"contract JSON ({exc})")
         if not isinstance(response, dict):
             raise SeatError(f"{self.name} returned a non-object response")
         if response.get("_queue") is not None:
@@ -264,6 +295,8 @@ class Seat:
         bad = [p for p in (response.get("writes") or {})
                if not self._path_allowed(p)]
         if not bad:
+            if corrections:
+                response["_corrections"] = corrections
             return response
         # One bounded correction round (observed need: Groq gpt-oss
         # models repeatedly wrote outside allowed paths and wasted
@@ -295,7 +328,10 @@ class Seat:
                 f"{self.name} still tried to write {still_bad} outside "
                 f"allowed paths {self.allowed_paths} after one "
                 "correction round - turn failed without mutation")
-        retry["_corrected"] = bad
+        corrections.append(
+            "path-guard correction round used; first reply wrote "
+            f"outside allowed paths: {bad}")
+        retry["_corrections"] = corrections
         return retry
 
     def _head_binding_clean(self, stamped):
@@ -367,16 +403,9 @@ class Seat:
                 recommendation=gate.get("recommendation"))
 
         summary = response.get("summary", "(no summary)")
-        corrected = response.pop("_corrected", None)
         body = summary
-        if response.pop("_nonstrict", None):
-            body = ("[model output needed tolerant JSON extraction; "
-                    "prose outside the single response object was "
-                    "dropped] " + body)
-        if corrected:
-            body = (f"[path-guard correction round used; first reply "
-                    f" wrote outside allowed paths: {corrected}] "
-                    + body)
+        for note in response.pop("_corrections", []):
+            body = f"[{note}] " + body
         if verify_cmd:
             body += (f" | verify: `{verify_cmd}` exit={exit_code}"
                      + (f" | tail: {' / '.join(tail)}" if tail else ""))

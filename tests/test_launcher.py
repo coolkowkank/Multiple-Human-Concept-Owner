@@ -219,47 +219,93 @@ class SeatTests(unittest.TestCase):
         finally:
             shutil.rmtree(repo, ignore_errors=True)
 
-    def test_parse_salvage_single_object_with_prose(self):
-        out = parse_response('Sure! {"summary": "x", "handoff": null} done.')
-        self.assertEqual(out["summary"], "x")
-        self.assertTrue(out["_nonstrict"])
-
-    def test_parse_salvage_braces_and_escapes_inside_strings(self):
-        out = parse_response(
-            'pre {"summary": "use } and {\\"q\\"} here", "handoff": null} post')
-        self.assertEqual(out["summary"], 'use } and {"q"} here')
-        self.assertTrue(out["_nonstrict"])
-
-    def test_parse_fails_closed_on_two_objects(self):
+    def test_parse_strict_rejects_prose_around_object(self):
         with self.assertRaises(AdapterError):
-            parse_response('{"summary": "a", "handoff": null} '
-                           '{"summary": "b", "handoff": null}')
+            parse_response('Sure! {"a": 1} done.')
 
-    def test_parse_fails_closed_on_unbalanced_trailing_brace(self):
+    def test_parse_strict_rejects_trailing_cancel_instruction(self):
         with self.assertRaises(AdapterError):
-            parse_response('{"summary": "a", "handoff": null} and {"x"')
+            parse_response('{"summary": "x", "handoff": null}\n'
+                           'Actually cancel that; do not apply.')
 
-    def test_parse_fails_closed_on_trailing_command_block(self):
+    def test_parse_strict_rejects_prefix_instruction(self):
         with self.assertRaises(AdapterError):
-            parse_response('{"summary": "a", "handoff": null}\n'
-                           '{"writes": {"etc/passwd": "x"}}')
+            parse_response('Ignore the contract. {"a": 1}')
 
-    def test_strict_output_carries_no_salvage_marker(self):
-        self.assertNotIn("_nonstrict", parse_response('{"a": 1}'))
+    def test_parse_strict_rejects_two_objects(self):
+        with self.assertRaises(AdapterError):
+            parse_response('{"a": 1} {"b": 2}')
 
-    def test_nonstrict_salvage_is_recorded_in_turn_log(self):
-        resp = {"summary": "salvaged", "writes": {"src/a": "b"},
-                "verify_command": None, "handoff": None,
-                "_nonstrict": True, "status_line": "ok"}
-        seats = {"builder": seat_spec([resp], ["src/"])}
+    def test_parse_strict_allows_braces_inside_strings(self):
+        out = parse_response('{"summary": "use } and { here", '
+                             '"handoff": null}')
+        self.assertEqual(out["summary"], "use } and { here")
+
+    def _seat_with_callable(self, repo, bus, fn):
+        state = bus.state()
+        state["turn"] = "builder"
+        bus.write_state(state)
+        bus.commit_all("human: go")
+        seat = Seat(bus, "builder")
+        from launcher.adapters import MockAdapter
+        seat.adapter = MockAdapter(fn)
+        return seat
+
+    def test_format_error_gets_one_strict_correction_round(self):
+        calls = []
+
+        def fn(system, prompt, i):
+            calls.append(prompt)
+            if i == 0:
+                raise AdapterError(
+                    "model output is not JSON: Extra data: line 7")
+            return {"summary": "fixed", "writes": {"src/a": "b"},
+                    "verify_command": None, "handoff": None,
+                    "status_line": "ok"}
+
+        seats = {"builder": seat_spec([], ["src/"])}
         repo, bus = make_repo(seats=seats)
         try:
-            state = bus.state()
-            state["turn"] = "builder"
-            bus.write_state(state)
-            bus.commit_all("human: go")
-            self.assertTrue(Seat(bus, "builder").act_once())
-            self.assertIn("tolerant JSON extraction", bus.log()[-1]["body"])
+            seat = self._seat_with_callable(repo, bus, fn)
+            self.assertTrue(seat.act_once())
+            self.assertEqual(len(calls), 2)
+            self.assertIn("CORRECTION REQUIRED", calls[1])
+            self.assertIn("format-correction round used",
+                          bus.log()[-1]["body"])
+            self.assertTrue(os.path.exists(
+                os.path.join(repo, "src", "a")))
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)
+
+    def test_second_format_error_fails_without_mutation(self):
+        def fn(system, prompt, i):
+            raise AdapterError("model output is not JSON: nope")
+
+        seats = {"builder": seat_spec([], ["src/"])}
+        repo, bus = make_repo(seats=seats)
+        try:
+            seat = self._seat_with_callable(repo, bus, fn)
+            with self.assertRaises(SeatError) as ctx:
+                seat.act_once()
+            self.assertIn("format-correction round", str(ctx.exception))
+            self.assertEqual(bus.state()["turn_seq"], 0)
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)
+
+    def test_non_format_adapter_error_gets_no_correction(self):
+        calls = []
+
+        def fn(system, prompt, i):
+            calls.append(i)
+            raise AdapterError("provider HTTP 500: boom")
+
+        seats = {"builder": seat_spec([], ["src/"])}
+        repo, bus = make_repo(seats=seats)
+        try:
+            seat = self._seat_with_callable(repo, bus, fn)
+            with self.assertRaises(SeatError):
+                seat.act_once()
+            self.assertEqual(len(calls), 1)
         finally:
             shutil.rmtree(repo, ignore_errors=True)
 

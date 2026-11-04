@@ -88,7 +88,10 @@ push to this repo).
 
 Not proven: unattended/parallel operation, live models closing cycles
 (no DONE status line observed), multi-day runs, heterogeneous
-autonomy.
+autonomy. The format-correction round (strict revalidation after one
+re-ask, replacing a prose-salvage heuristic that review rejected as
+intent-unsafe) and the path-guard correction round are fixture-tested
+only - NOT live-verified, NOT peer-reviewed.
 
 ## Next actions
 

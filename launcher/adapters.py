@@ -249,62 +249,17 @@ class HttpAdapter(Adapter):
         raise AdapterError("unreachable")  # pragma: no cover
 
 
-def _balanced_objects(text):
-    """All top-level balanced {...} regions, string-aware.
-
-    Returns a list of (start, end) spans. Stops being trustworthy at
-    the first unbalanced opener, which is reported as span None so the
-    caller fails closed instead of guessing.
-    """
-    spans = []
-    i = 0
-    n = len(text)
-    while i < n:
-        if text[i] != "{":
-            i += 1
-            continue
-        depth = 0
-        in_str = False
-        esc = False
-        start = i
-        closed = False
-        while i < n:
-            ch = text[i]
-            if in_str:
-                if esc:
-                    esc = False
-                elif ch == "\\":
-                    esc = True
-                elif ch == '"':
-                    in_str = False
-            else:
-                if ch == '"':
-                    in_str = True
-                elif ch == "{":
-                    depth += 1
-                elif ch == "}":
-                    depth -= 1
-                    if depth == 0:
-                        spans.append((start, i + 1))
-                        closed = True
-                        break
-            i += 1
-        if not closed:
-            spans.append(None)
-            break
-        i += 1
-    return spans
-
-
 def parse_response(text):
     """Extract the seat's JSON response from model output.
 
-    Strict first: a bare JSON object or one inside a ```json fence.
-    If the bare parse fails, one bounded salvage: exactly ONE
-    balanced {...} object in the whole output, marked "_nonstrict" so
-    the runtime records that prose was dropped. Multiple objects,
-    unbalanced braces, or anything unreadable fail closed - a
-    protocol error the runtime records instead of guessing.
+    STRICT ONLY: a bare JSON object or one inside a ```json fence.
+    Anything else is a protocol error the runtime records instead of
+    guessing - free-prose salvage was rejected on review (2026-11-04):
+    text outside the object can carry intent ("cancel that", a second
+    instruction), so dropping it silently is unsafe even with exactly
+    one balanced object. Recovery lives in the seat's explicit
+    format-correction round, where the model re-answers and the reply
+    is revalidated strictly.
     """
     text = text.strip()
     if "```" in text:
@@ -320,24 +275,6 @@ def parse_response(text):
     try:
         return json.loads(text)
     except json.JSONDecodeError as exc:
-        # Bounded salvage, fail closed on ANY ambiguity: exactly one
-        # balanced top-level object in the whole output, or nothing.
-        # Two objects could be two intents - picking one would silently
-        # drop model actions; an unbalanced trailing opener is
-        # unreadable intent. Both raise. Trailing prose around ONE
-        # object can carry no effect: only the parsed object's contract
-        # keys drive the runtime, and its use is recorded via
-        # "_nonstrict" (observed live: gpt-oss-120b appends prose after
-        # a valid object, live/groq-dev-2 2026-11-04).
-        spans = _balanced_objects(text)
-        if len(spans) == 1 and spans[0] is not None:
-            try:
-                obj = json.loads(text[spans[0][0]:spans[0][1]])
-            except json.JSONDecodeError:
-                obj = None
-            if isinstance(obj, dict):
-                obj["_nonstrict"] = True
-                return obj
         raise AdapterError(f"model output is not JSON: {exc}") from exc
 
 
