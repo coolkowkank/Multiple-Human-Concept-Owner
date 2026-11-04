@@ -14,6 +14,7 @@ stalled interactive seat becomes a gate for the humans instead.
 from __future__ import annotations
 
 import calendar
+import json
 import os
 import subprocess
 import sys
@@ -111,9 +112,12 @@ class Supervisor:
                 continue
             count = self.restarts.get(name, 0)
             if count >= self.restart_limit:
-                self._escalate(
-                    f"seat {name} crashed {count + 1} times; not restarting")
-                del self.procs[name]
+                # Only drop the seat once its incident is durably pending;
+                # otherwise the next poll retries instead of losing it.
+                if self._escalate(
+                        f"seat {name} crashed {count + 1} times; "
+                        "not restarting"):
+                    del self.procs[name]
                 continue
             self.restarts[name] = count + 1
             self.bus.append_log("supervisor", "restart",
@@ -162,22 +166,50 @@ class Supervisor:
             return
         if turn in self._stalled_seats:
             return
-        self._stalled_seats.add(turn)
         if turn in self.procs:
+            self._stalled_seats.add(turn)
             self.bus.append_log("supervisor", "stall",
                                 f"turn stalled on {turn}; restarting seat")
             self.bus.commit_all(f"supervisor: stall on {turn}")
             self.procs[turn].terminate()
         else:
-            self._escalate(
-                f"turn stalled on interactive seat {turn}; "
-                "a human must nudge or re-open that session")
+            # Mark stalled only once the incident is durably pending,
+            # so a deferred escalation is retried, not forgotten.
+            if self._escalate(
+                    f"turn stalled on interactive seat {turn}; "
+                    "a human must nudge or re-open that session"):
+                self._stalled_seats.add(turn)
 
     def _escalate(self, text):
+        """Open a human gate for an incident, deduping only the SAME
+        incident (an unanswered supervisor gate with the identical
+        question). Distinct incidents always get their own gate, even
+        while another supervisor gate is pending.
+
+        Returns True when the incident is durably pending (gate opened,
+        or an identical one is already unanswered). When the pending
+        state cannot be read, opens NOTHING and returns False so the
+        caller keeps its own state and the next poll retries the
+        incident - a read failure must neither spam gates nor silently
+        drop an incident. The diagnostic is a transient print, never a
+        bus write, so repeated failures cannot grow the repo."""
+        try:
+            pending = self.bus.pending_gates()
+        except (OSError, AttributeError, json.JSONDecodeError) as exc:
+            print(f"supervisor: pending gates unreadable ({exc!r}); "
+                  f"deferring escalation: {text}", flush=True)
+            return False
+        for gate in pending:
+            if (gate.get("seat") == "supervisor"
+                    and gate.get("question") == text):
+                print(f"supervisor: incident already pending: {text}",
+                      flush=True)
+                return True
         self.bus.open_gate("supervisor", text,
                            options=["restart the seat", "stop the team"],
                            recommendation="restart the seat")
         self.bus.commit_all("supervisor: escalation")
+        return True
 
     def _report_gates(self):
         for gate in self.bus.pending_gates():

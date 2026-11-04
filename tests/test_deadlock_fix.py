@@ -19,6 +19,8 @@ class DummyBus:
         return {"seats":{"coordinator":{}}}
     def open_gate(self, *a, **kw):
         self.opened_gates.append((a, kw))
+    def pending_gates(self):
+        return []
 
 class TestDeadlockFix(unittest.TestCase):
     def setUp(self):
