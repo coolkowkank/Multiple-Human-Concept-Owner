@@ -44,7 +44,11 @@ Round 2: edit_file launcher/supervisor.py - old_string = the ENTIRE current
   _check_stall method copied VERBATIM from the embedded source below; new
   string = your fixed method (UTC parse + routing-failure branch before the
   stall logic; keep the existing stall/escalate behavior otherwise).
-Round 3: write_file tests/test_deadlock_fix.py (NEW, compact, <150 lines):
+Round 3: write_file tests/test_deadlock_fix.py (NEW, TINY: <= 2000 bytes,
+  3 short test methods, no comments needed). The write_file arguments object
+  has EXACTLY two keys, "path" and "content" - NEVER add a third key (no
+  "timeout", nothing else). End the content string with its closing quote
+  followed immediately by the closing brace of the arguments object.
   unittest tests for A and B: stub the bus/state; a 5-second-old UTC
   turn_since must NOT be stalled under a non-UTC local TZ (set
   os.environ["TZ"]+time.tzset(), restore after); running+turn=None =>
