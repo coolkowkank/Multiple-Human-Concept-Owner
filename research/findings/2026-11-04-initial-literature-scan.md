@@ -15,9 +15,9 @@ Observed project gaps: G1 manual null-handoff recovery; G2 premature stall flag;
 - Experiment E1 [H]: Reviewer receives spec + diff + test output only. Compare findings and tokens vs history-fed review.
 
 ## F2 - Self-verdict gates degrade (G3)
-- Source [R2]: When Do Agent Loops Mistake Stagnation for Progress?, [PP, preliminary draft] https://arxiv.org/abs/2607.25152 (read: abstract, intro, draft note, sec 3.16; the 56%/44% figures are from the abstract only, abstract-only claim)
+- Source [R2]: When Do Agent Loops Mistake Stagnation for Progress?, [PP] https://arxiv.org/abs/2607.25152 (read: abstract, intro, draft note, sec 3.16 via the PDF https://arxiv.org/pdf/2607.25152; 56%/44% figures confirmed in the abstract; the 56% intro mention is author-reported, not independently re-verified (Eva X1))
 - Finding: in a 54-cycle pilot, 56% of agent-claimed improvements had zero/negative measured delta; an in-band judge accepted 44% regressions. Gap closed when success was verifiable from the artifact.
-- Limits [R2 draft note, sec 3.16]: single agent, pilot; authors defer multi-model generalization.
+- Limits [R2 draft note, sec 3.16]: UNVERIFIED by Eva review 1 (C5): full text was not retrievable by the coordinator at the HTML URL on 2026-11-04. The Researcher read it in the PDF copy https://arxiv.org/pdf/2607.25152 ("Draft note. This manuscript is a preliminary draft ... single-deployment field observation ... Generalization to multiple models and tasks ... deferred"); pending Eva recheck against that retrievable copy. Until then, do not treat "preliminary, single-agent pilot, generalization deferred" as verified.
 - Use: supports pushes gated on pinned HEAD + real test output, not model self-report.
 
 ## F3 - Structured handoff state (G1, G4)
@@ -29,3 +29,4 @@ Observed project gaps: G1 manual null-handoff recovery; G2 premature stall flag;
 ## Open / not supported
 - G2 stall detection: no verified source. [R4] "When Agents Do Not Stop" https://arxiv.org/html/2607.01641 (read: intro, sec III) addresses unbounded loops, not premature stalls. [H] judge stall on state change + owner liveness, not elapsed time. Untested. Experiment E3: replay premature-stall case.
 - Provisional, abstract only [R6, R5, R7]: https://arxiv.org/abs/2609.04270 ; https://arxiv.org/abs/2603.04582 ; MAST https://proceedings.neurips.cc/paper_files/paper/2025/hash/b1041e52d3be19f0a9bc491657488e4a-Abstract-Datasets_and_Benchmarks_Track.html
+

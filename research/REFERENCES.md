@@ -5,7 +5,7 @@ Cite as [R#] with section/commit. "Read" = what the Researcher actually read on 
 | ID | Source | Class | Version/date | Read | Used for |
 |---|---|---|---|---|---|
 | R1 | Rethinking Verification in Agent Harnesses, https://arxiv.org/abs/2610.34577 (html https://arxiv.org/html/2610.34577) | PP | arXiv 2026-10-25, checked 2026-11-04 | Abstract, sec 3 (L3 definition), sec 5.3-5.4 | P2, P3: critic gains/cost (sec 5.4), critic input task+changes vs trajectory (sec 5.4), review depth/width (sec 5.4, Fig 4) |
-| R2 | When Do Agent Loops Mistake Stagnation for Progress?, https://arxiv.org/abs/2607.25152 | PP, preliminary draft | arXiv 2026-07-27, checked 2026-11-04 | Abstract, intro, draft note, sec 3.16 (pilot scope). Results numbers (56%, 44%) read in the abstract only | P2: self-verdict gate weakness; scope limit: single agent pilot, generalization deferred |
+| R2 | When Do Agent Loops Mistake Stagnation for Progress?, https://arxiv.org/abs/2607.25152 | PP, preliminary draft | arXiv 2026-07-27, checked 2026-11-04 | Abstract, intro, draft note, sec 3.16 (pilot scope). 56%/44% in abstract; 56% intro mention author-reported, not independently re-verified (Eva X1); draft-note scope text read in PDF copy https://arxiv.org/pdf/2607.25152 (HTML full text not retrievable on 2026-11-04; Eva C5 UNVERIFIED pending recheck) | P2: self-verdict gate weakness; scope limit: single agent pilot, generalization deferred |
 | R3 | Benchmarking Task Takeover Across Agent Handoffs (HSC-Bench), https://arxiv.org/abs/2610.36523 (html https://arxiv.org/html/2610.36523) | PP, WWW 2027 listing | arXiv 2026-10-27, checked 2026-11-04 | Abstract, sec 1, 3, 4.1, 5.2 (structured state gains; line-F1 gain stated in sec 5.2) | P1, P3: structured handoff state |
 | R4 | When Agents Do Not Stop (IAL-Scan), https://arxiv.org/html/2607.01641 | PP | arXiv 2026-07-02, checked 2026-11-04 | Intro, sec III (definition, threat model) | P4: NOT applicable to premature stalls (static detection of unbounded loops) |
 | R5 | Why Do Multi-Agent LLM Systems Fail? (MAST), https://proceedings.neurips.cc/paper_files/paper/2025/hash/b1041e52d3be19f0a9bc491657488e4a-Abstract-Datasets_and_Benchmarks_Track.html ; code/data https://github.com/multi-agent-systems-failure-taxonomy/MAST | PR | NeurIPS 2025 D&B | Abstract only | Candidate incident taxonomy |
@@ -27,7 +27,7 @@ Rules: each claim in findings/experiments carries [R#]/[S#] plus section or comm
 
 ## Audit of research/findings/2026-11-04-initial-literature-scan.md (published b42f670)
 - F1 numbers: matches R1 sec 5.4; add "[R1 sec 5.4, Fig 4]".
-- F2 numbers (56%, 44%): abstract only [R2]; scope limit is in the draft note/sec 3.16. Mark "abstract only".
+- F2 numbers (56%, 44%): abstract only [R2]; scope limit is in the draft note/sec 3.16. Superseded: see Eva review 1 (C5 UNVERIFIED pending recheck on the PDF copy).
 - F3: add "[R3 sec 5.2]"; state-builder model caveat is from R3 sec 3/4.1.
 - Note has URLs but no section pointers or IDs: fix in the next bundle by adding [R#] tags.
 
@@ -41,3 +41,9 @@ Notes: findings/2026-11-04-rw5-prior-art-stall-and-gates.md
 - R9 Agent Status Protocol (ASP) https://arxiv.org/html/2610.21538 [PP, proposal, not a standard], arXiv 2026-10-15, read 2026-11-04: abstract, status note, sec 1.1, 5.1-5.3, 6.2-6.3, 7.2.1 start. Used for RW4.
 - S7 Akka phi accrual docs https://doc.akka.io/libraries/akka-core/current/typed/failure-detector.html (level 1, read 2026-11-04). Used for RW4.
 - S8 Kubernetes Leases https://kubernetes.io/docs/concepts/architecture/leases/ (candidate, not read).
+
+
+## Corrections after Eva review 1 (research/reviews/2026-11-04-eva-review-1.md)
+- C5 (R2 scope): marked UNVERIFIED beside the claim; retrievable copy: https://arxiv.org/pdf/2607.25152 for Eva recheck.
+- C14 (S2 code): unpinned main limitation stated beside the claim in findings/2026-11-04-rw5-prior-art-stall-and-gates.md.
+- C3: no text change (Eva review: coordinator-resolved).
