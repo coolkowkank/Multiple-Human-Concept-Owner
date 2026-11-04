@@ -283,3 +283,121 @@ class TestMetadata(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestStartTransport(unittest.TestCase):
+    def setUp(self):
+        self.d = _tmp()
+        self.p = os.path.join(self.d, "s.json")
+        L.init_ledger(self.p, 10)
+
+    def test_marks_started_when_pacing_satisfied(self):
+        rid, _ = L.reserve(self.p, "r")
+        self.assertEqual(L.start_transport(self.p, rid), 0.0)
+        st = {e["id"]: e["state"] for e in json.load(open(self.p))["entries"]}
+        self.assertEqual(st[rid], "transport_started")
+
+    def test_per_reservation_slots_from_shared_cursor(self):
+        r1, w1 = L.reserve(self.p, "r", min_interval=60.0, now=1000.0)
+        r2, w2 = L.reserve(self.p, "r", min_interval=60.0, now=1030.0)
+        self.assertEqual(w1, 0.0)          # first slot: now
+        self.assertAlmostEqual(w2, 30.0)   # second slot: cursor 1060
+        self.assertAlmostEqual(L.start_transport(self.p, r2, now=1030.0), 30.0)
+        st = {e["id"]: e["state"] for e in json.load(open(self.p))["entries"]}
+        self.assertEqual(st[r2], "reserved")   # no state change while waiting
+        self.assertEqual(L.start_transport(self.p, r2, now=1060.0), 0.0)
+
+    def test_new_shared_reset_gates_after_sleep(self):
+        rid, w = L.reserve(self.p, "r", min_interval=60.0, now=1000.0)
+        self.assertEqual(w, 0.0)           # slot was immediate...
+        L.note_rate_limit(self.p, 2000.0)  # ...but a newer shared reset lands
+        self.assertAlmostEqual(L.start_transport(self.p, rid, now=1060.0), 940.0)
+        st = {e["id"]: e["state"] for e in json.load(open(self.p))["entries"]}
+        self.assertEqual(st[rid], "reserved")
+
+    def test_rejects_non_reserved(self):
+        rid, _ = L.reserve(self.p, "r")
+        L.start_transport(self.p, rid)
+        with self.assertRaises(L.LedgerError):
+            L.start_transport(self.p, rid)
+
+    def test_unknown_reservation_id(self):
+        with self.assertRaises(L.LedgerError):
+            L.start_transport(self.p, "not-a-real-id")
+
+
+class TestHardening(unittest.TestCase):
+    def setUp(self):
+        self.d = _tmp()
+        self.p = os.path.join(self.d, "h.json")
+
+    def test_symlink_rejected(self):
+        real = os.path.join(self.d, "real.json")
+        L.init_ledger(real, 5)
+        os.symlink(real, self.p)
+        with self.assertRaises(L.LedgerError):
+            L.reserve(self.p, "r")
+
+    def test_hardlink_rejected(self):
+        L.init_ledger(self.p, 5)
+        os.link(self.p, os.path.join(self.d, "second.json"))
+        with self.assertRaises(L.LedgerError):
+            L.reserve(self.p, "r")
+
+    def test_bad_timestamps_fail_closed(self):
+        L.init_ledger(self.p, 5)
+        j = json.load(open(self.p))
+        j["entries"] = [{"id": "12345678-1234-1234-1234-123456789012",
+                         "run": "r", "state": "reserved", "pid": 1,
+                         "reserved_utc": "not-a-timestamp"}]
+        j["counts"] = L._counts(j["entries"])
+        with open(self.p, "w") as f:
+            json.dump(j, f)
+        with self.assertRaises(L.LedgerError):
+            L.reserve(self.p, "r")
+
+    def test_missing_pid_transport_started_swept_unknown_not_rejected(self):
+        L.init_ledger(self.p, 5)
+        j = json.load(open(self.p))
+        j["entries"] = [{"id": "12345678-1234-1234-1234-123456789012",
+                         "run": "r", "state": "transport_started",
+                         "reserved_utc": "2026-11-04T00:00:00Z",
+                         "started_utc": "2026-11-04T00:00:01Z"}]
+        j["counts"] = L._counts(j["entries"])
+        with open(self.p, "w") as f:
+            json.dump(j, f)
+        L.reserve(self.p, "r")   # load OK, sweep fires
+        c = L.summary(self.p)["global"]
+        self.assertEqual(c["unknown"], 1)
+        self.assertEqual(c["spent"], 2)      # still counted, no refund
+
+    def test_orphan_cleanup_only_dead_writers(self):
+        L.init_ledger(self.p, 10)
+        L.reserve(self.p, "r")
+        dead_tmp = self.p + ".tmp.999999"     # no such pid
+        live_tmp = self.p + f".tmp.{os.getppid()}"
+        weird_tmp = self.p + ".tmp.notapid"
+        for f in (dead_tmp, live_tmp, weird_tmp):
+            open(f, "w").write("{}")
+        L.reserve(self.p, "r")
+        self.assertFalse(os.path.exists(dead_tmp))
+        self.assertTrue(os.path.exists(live_tmp))
+        self.assertTrue(os.path.exists(weird_tmp))
+
+    def test_reconcile_sweeps_and_reports(self):
+        L.init_ledger(self.p, 10)
+        pid = os.fork()
+        if pid == 0:
+            rid, _ = L.reserve(self.p, "r")
+            L.start_transport(self.p, rid)
+            os._exit(0)
+        os.waitpid(pid, 0)
+        c = L.reconcile(self.p)["global"]
+        self.assertEqual(c["unknown"], 1)
+        self.assertEqual(c["transport_started"], 0)
+
+    def test_note_rate_limit_persists(self):
+        L.init_ledger(self.p, 10)
+        L.note_rate_limit(self.p, 12345.0)
+        j = json.load(open(self.p))
+        self.assertEqual(j["rate_reset_until_epoch"], 12345.0)

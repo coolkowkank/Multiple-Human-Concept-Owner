@@ -43,6 +43,12 @@ Usage: GROQ_KEY_FILE=... RECORDS_DIR=... groq-harness.py REPO_PATH BRANCH ATTEMP
 import hashlib
 import json, os, re, subprocess, sys, atexit, time, fcntl
 
+for _d in (os.path.dirname(os.path.abspath(globals().get("__file__", "x"))),
+           os.path.join(os.getcwd(), "tools")):
+    if _d and _d not in sys.path:
+        sys.path.insert(0, _d)
+import durable_ledger as dledger
+
 WRITE_GATE_MODE = sys.argv[1:2] == ["--write-gate"]
 if WRITE_GATE_MODE:
     # Operator approval-writer mode: no provider key, task or committer
@@ -299,30 +305,18 @@ def _rate_headers(header_text):
 BUDGET_LEDGER = os.environ.get("BUDGET_LEDGER")
 MIN_CALL_INTERVAL_S = float(os.environ.get("MIN_CALL_INTERVAL_S", "0"))
 
-def _ledger_read(f):
-    f.seek(0)
-    raw = f.read()
-    if not raw.strip():
-        return {"used": 0, "history": []}
-    try:
-        return json.loads(raw)
-    except Exception:
-        # Independent review 2026-11-04 (F6): a malformed existing ledger must
-        # HALT, never silently reset the budget to zero.
-        raise RuntimeError(f"malformed budget ledger {BUDGET_LEDGER}; failing closed (no budget reset)")
-
-def _pacing_wait_s(data, now, min_interval):
-    """Seconds to wait before the next request: the configured floor AND
-    any provider-supplied reset hint stored by an earlier rejection. A
-    floor only reduces self-collision; it cannot guarantee quota."""
-    wait = 0.0
-    last = data.get("last_call_epoch")
-    if last and min_interval > 0:
-        wait = max(wait, min_interval - (now - last))
-    hint_until = data.get("rate_reset_until_epoch")
-    if hint_until:
-        wait = max(wait, hint_until - now)
-    return max(0.0, wait)
+# Durable cross-launch request accounting (2026-11-04 batch lesson: a launch-
+# derived counter overspent 16-of-12). When BUDGET_LEDGER is set it must be a
+# durable_ledger v1 file created explicitly by the operator
+# (`python3 tools/durable_ledger.py init PATH GLOBAL_CAP [run=cap ...]`); a
+# missing, corrupt or legacy-format file fails CLOSED - no implicit fresh
+# start, no budget reset, and legacy b5+ ledgers enter only by an explicit
+# operator import (not provided here). Every network attempt is reserved
+# BEFORE transport; pacing sleeps and then re-checks shared state under the
+# ledger lock immediately before the transport starts. Ledger or I/O failure
+# at any point halts the run with no send and no reset.
+BUDGET_LEDGER = os.environ.get("BUDGET_LEDGER")
+MIN_CALL_INTERVAL_S = float(os.environ.get("MIN_CALL_INTERVAL_S", "0"))
 
 _RETRY_HINT_RE = re.compile(r"try again in ([0-9.]+)s", re.I)
 
@@ -335,71 +329,62 @@ def _retry_hint_s(error_detail):
     return None
 
 def _reserve_call():
-    """Reserve one provider request. Raises (hard stop) when the budget is
-    exhausted. Applies pacing (sleeps) before returning."""
+    """Reserve one provider request durably BEFORE any transport and return
+    the reservation id (None on the in-memory path). Sleeps for pacing, then
+    re-checks shared pacing under the ledger lock immediately before marking
+    transport_started. Raises (hard stop) on exhaustion or any ledger/IO
+    failure; a raise always means NO request is sent and nothing is reset."""
     if not BUDGET_LEDGER:
         if CALLS["n"] >= MAX_CALLS:
             record({"budget_stop": {"used": CALLS["n"], "budget": MAX_CALLS}})
             raise RuntimeError(f"API call budget exhausted ({CALLS['n']}/{MAX_CALLS}); refusing further provider requests")
         CALLS["n"] += 1
-        return
-    with open(BUDGET_LEDGER, "a+") as f:
-        fcntl.flock(f, fcntl.LOCK_EX)
-        try:
-            data = _ledger_read(f)
-            if data["used"] >= MAX_CALLS:
-                record({"budget_stop": {"used": data["used"], "budget": MAX_CALLS,
-                                        "ledger": BUDGET_LEDGER, "durable": True}})
-                raise RuntimeError(f"durable budget exhausted ({data['used']}/{MAX_CALLS} across all launches); refusing further provider requests")
-            wait = _pacing_wait_s(data, time.time(), MIN_CALL_INTERVAL_S)
-            data["used"] += 1
-            data["last_call_epoch"] = time.time() + wait
-            data["history"].append({"attempt": ATTEMPT, "seq": data["used"],
-                                    "reserved_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())})
-            f.seek(0); f.truncate(); json.dump(data, f); f.flush(); os.fsync(f.fileno())
-            CALLS["n"] = data["used"]
-        finally:
-            fcntl.flock(f, fcntl.LOCK_UN)
-    if wait > 0:
-        record({"pacing_wait": {"seconds": round(wait, 1), "min_interval": MIN_CALL_INTERVAL_S}})
-        time.sleep(wait)
+        return None
+    try:
+        rid, wait = dledger.reserve(BUDGET_LEDGER, ATTEMPT, MIN_CALL_INTERVAL_S)
+        while True:
+            if wait > 0:
+                record({"pacing_wait": {"seconds": round(wait, 1), "min_interval": MIN_CALL_INTERVAL_S}})
+                time.sleep(wait)
+            wait = dledger.start_transport(BUDGET_LEDGER, rid)
+            if wait <= 0:
+                break
+        CALLS["n"] = dledger.summary(BUDGET_LEDGER)["global"]["spent"]
+        return rid
+    except dledger.LedgerError as e:
+        if "exhausted" in str(e):
+            record({"budget_stop": {"ledger": BUDGET_LEDGER, "durable": True, "detail": str(e)}})
+        raise RuntimeError(f"durable ledger: {e}") from e
+    except OSError as e:
+        raise RuntimeError(f"durable ledger I/O failure (halt, no send, no reset): {e}") from e
 
 SENDS = {"n": 0}  # transports that completed (any HTTP status); <= reservations
 
-def _confirm_send():
-    """Mark the newest unconfirmed reservation for this attempt as actually
-    sent. Reservations happen before transport (conservative accounting);
-    confirmed sends are the real-request count. Independent review F6:
-    report the two separately."""
+def _confirm_send(rid, status=""):
+    """Mark this exact reservation's transport completed (any HTTP status).
+    If the completion cannot be stored AFTER a response arrived, the outcome
+    is ambiguous: the reservation stays consumed (transport_started, swept
+    to unknown on the next reserve/reconcile) and the run halts."""
     SENDS["n"] += 1
-    if not BUDGET_LEDGER:
+    if not BUDGET_LEDGER or rid is None:
         return
-    with open(BUDGET_LEDGER, "a+") as f:
-        fcntl.flock(f, fcntl.LOCK_EX)
-        try:
-            data = _ledger_read(f)
-            for h in reversed(data.get("history", [])):
-                if h.get("attempt") == ATTEMPT and "sent_utc" not in h:
-                    h["sent_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-                    break
-            f.seek(0); f.truncate(); json.dump(data, f); f.flush(); os.fsync(f.fileno())
-        finally:
-            fcntl.flock(f, fcntl.LOCK_UN)
+    try:
+        dledger.transition(BUDGET_LEDGER, rid, "completed", {"http": str(status).strip()})
+    except (dledger.LedgerError, OSError) as e:
+        raise RuntimeError(
+            f"durable ledger completion store failed after transport arrived "
+            f"(outcome ambiguous, reservation stays consumed): {e}") from e
 
 def _store_reset_hint(seconds):
     if not BUDGET_LEDGER or seconds is None:
         return
-    with open(BUDGET_LEDGER, "a+") as f:
-        fcntl.flock(f, fcntl.LOCK_EX)
-        try:
-            data = _ledger_read(f)
-            data["rate_reset_until_epoch"] = time.time() + seconds
-            f.seek(0); f.truncate(); json.dump(data, f); f.flush(); os.fsync(f.fileno())
-        finally:
-            fcntl.flock(f, fcntl.LOCK_UN)
+    try:
+        dledger.note_rate_limit(BUDGET_LEDGER, time.time() + seconds)
+    except (dledger.LedgerError, OSError) as e:
+        raise RuntimeError(f"durable ledger reset-hint store failed: {e}") from e
 
 def api(messages):
-    _reserve_call()
+    rid = _reserve_call()
     payload = {"model": MODEL, "messages": messages, "tools": TOOLS,
                "reasoning_effort": "low",
                "max_completion_tokens": int(os.environ.get("MAX_COMPLETION_TOKENS", "4096"))}
@@ -420,10 +405,15 @@ def api(messages):
         except OSError:
             pass
     if p.returncode != 0:
+        if rid is not None:
+            try:
+                dledger.transition(BUDGET_LEDGER, rid, "unknown")
+            except Exception:
+                pass  # already halting on the transport failure below
         record({"api_error": {"kind": "transport", "detail": p.stderr[:300]}})
         raise RuntimeError(f"curl failed: {p.stderr[:300]}")
-    _confirm_send()  # transport completed; HTTP status handled below
     body, _, status = p.stdout.rpartition("\n")
+    _confirm_send(rid, status)  # transport completed; HTTP status handled below
     try:
         r = json.loads(body)
     except json.JSONDecodeError:

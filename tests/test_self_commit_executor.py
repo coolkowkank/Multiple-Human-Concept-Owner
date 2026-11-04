@@ -353,15 +353,15 @@ class ExecutorCase(ExecutorFixture):
         os.environ["BUDGET_LEDGER"] = ledger
         try:
             ns1 = self.load(max_calls=2)
+            ns1["dledger"].init_ledger(ledger, 2)
             ns1["_reserve_call"](); ns1["_reserve_call"]()
             self.assertEqual(ns1["CALLS"]["n"], 2)
             # a SECOND launch (fresh namespace) shares the same counter
             ns2 = self.load(max_calls=2)
             with self.assertRaises(RuntimeError):
                 ns2["_reserve_call"]()
-            data = json.load(open(ledger))
-            self.assertEqual(data["used"], 2)
-            self.assertEqual(len(data["history"]), 2)
+            self.assertEqual(ns2["dledger"].summary(ledger)["global"]["spent"], 2)
+            self.assertEqual(len(json.load(open(ledger))["entries"]), 2)
         finally:
             del os.environ["BUDGET_LEDGER"]
 
@@ -373,6 +373,7 @@ class ExecutorCase(ExecutorFixture):
         os.environ["BUDGET_LEDGER"] = ledger
         try:
             ns = self.load(max_calls=1)
+            ns["dledger"].init_ledger(ledger, 1)
             ns["_reserve_call"]()
             with self.assertRaises(RuntimeError):
                 ns["_reserve_call"]()
@@ -381,12 +382,15 @@ class ExecutorCase(ExecutorFixture):
 
     def test_pacing_wait_honors_floor_and_reset_hint(self):
         ns = self.load()
-        now = 1000.0
-        data = {"last_call_epoch": 990.0}
-        self.assertEqual(ns["_pacing_wait_s"](data, now, 65.0), 55.0)
-        data = {"last_call_epoch": 990.0, "rate_reset_until_epoch": 1200.0}
-        self.assertEqual(ns["_pacing_wait_s"](data, now, 65.0), 200.0)
-        self.assertEqual(ns["_pacing_wait_s"]({}, now, 65.0), 0.0)
+        dl = ns["dledger"]
+        ledger = os.path.join(self.tmp, "pace.json")
+        dl.init_ledger(ledger, 10)
+        rid, w = dl.reserve(ledger, "r", 65.0, now=1000.0)
+        self.assertEqual(w, 0.0)                      # first slot: now
+        _, w2 = dl.reserve(ledger, "r", 65.0, now=1030.0)
+        self.assertEqual(w2, 35.0)                    # cursor advanced to 1065
+        dl.note_rate_limit(ledger, 1200.0)
+        self.assertEqual(dl.start_transport(ledger, rid, now=1000.0), 200.0)
         self.assertEqual(ns["_retry_hint_s"]({"message": "... Please try again in 9.03s. ..."}), 9.03)
         self.assertIsNone(ns["_retry_hint_s"]({"message": "other"}))
 
@@ -983,7 +987,7 @@ class ExecutorHardeningV3Case(ExecutorFixture):
         ns = self.load(max_calls=5)
         with self.assertRaises(RuntimeError) as cm:
             ns["_reserve_call"]()
-        self.assertIn("malformed", str(cm.exception))
+        self.assertIn("corrupt", str(cm.exception))
         self.assertEqual(open(os.environ["BUDGET_LEDGER"]).read(), "{corrupt")
 
     def test_reservation_vs_confirmed_send_accounting(self):
@@ -991,7 +995,8 @@ class ExecutorHardeningV3Case(ExecutorFixture):
         os.environ["BUDGET_LEDGER"] = ledger
         self.addCleanup(lambda: os.environ.pop("BUDGET_LEDGER", None))
         ns = self.load(max_calls=5)
-        # transport failure: reserved but NOT confirmed
+        ns["dledger"].init_ledger(ledger, 5)
+        # transport failure: reserved, then marked unknown (ambiguous)
         class FT:
             returncode = 1
             stderr = "conn refused"
@@ -1000,8 +1005,8 @@ class ExecutorHardeningV3Case(ExecutorFixture):
         with self.assertRaises(RuntimeError):
             ns["api"]([])
         data = json.load(open(ledger))
-        self.assertEqual(data["used"], 1)
-        self.assertNotIn("sent_utc", data["history"][0])
+        self.assertEqual(len(data["entries"]), 1)
+        self.assertEqual(data["entries"][0]["state"], "unknown")
         self.assertEqual(ns["SENDS"]["n"], 0)
 
 
