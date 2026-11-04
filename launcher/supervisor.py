@@ -174,6 +174,17 @@ class Supervisor:
                 "a human must nudge or re-open that session")
 
     def _escalate(self, text):
+        # Escalate-once latch: while a supervisor-opened gate is still
+        # pending, do not open another one for the same unanswered
+        # condition; log the suppressed duplicate and skip the commit.
+        try:
+            pending = self.bus.pending_gates()
+        except (AttributeError, OSError):
+            pending = []
+        if any(g.get("seat") == "supervisor" for g in pending):
+            self.bus.append_log("supervisor", "escalation-suppressed",
+                                f"gate already pending; suppressed: {text}")
+            return
         self.bus.open_gate("supervisor", text,
                            options=["restart the seat", "stop the team"],
                            recommendation="restart the seat")

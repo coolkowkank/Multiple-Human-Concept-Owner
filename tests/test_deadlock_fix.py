@@ -6,6 +6,7 @@ class DummyBus:
         self.state_data = {"status":"running","turn":None,"turn_since":None}
         self.logs=[]
         self.opened_gates=[]
+        self.commits=[]
     def state(self):
         return self.state_data.copy()
     def write_state(self, state):
@@ -13,12 +14,15 @@ class DummyBus:
     def append_log(self, seat, kind, msg):
         self.logs.append((seat, kind, msg))
     def commit_all(self, msg):
-        pass
+        self.commits.append(msg)
     def roster(self):
         # default roster includes a coordinator seat for reissue-path tests
         return {"seats":{"coordinator":{}}}
     def open_gate(self, *a, **kw):
         self.opened_gates.append((a, kw))
+    def pending_gates(self):
+        return [{"id": f"gate-{i}", "seat": a[0] if a else "?"}
+                for i, (a, kw) in enumerate(self.opened_gates)]
 
 class TestDeadlockFix(unittest.TestCase):
     def setUp(self):
@@ -112,6 +116,23 @@ class TestDeadlockFix(unittest.TestCase):
         self.assertIn(('supervisor','routing-failure'), [(s,k) for s,k,_ in bus.logs])
         self.assertIsNone(bus.state_data.get('turn'))
         self.assertGreaterEqual(len(bus.opened_gates), 1)
+        # second identical poll: no additional gate, suppressed
+        sup._check_stall(bus.state())
+        self.assertEqual(len(bus.opened_gates), 1)
+        self.assertTrue(any(k=='escalation-suppressed' for _,k,_ in bus.logs))
+    def test_escalate_once_latch(self):
+        # two consecutive polls both reaching escalation -> exactly one gate
+        self.bus.state_data.update({'status':'running','turn':None})
+        self.sup._check_stall(self.bus.state())  # count 1, reissue
+        self.bus.state_data['turn']=None
+        self.sup._check_stall(self.bus.state())  # count 2, escalate (gate 1)
+        self.assertEqual(len(self.bus.opened_gates), 1)
+        self.bus.state_data['turn']=None
+        self.sup._check_stall(self.bus.state())  # still escalating condition
+        self.assertEqual(len(self.bus.opened_gates), 1)  # no second gate
+        self.assertTrue(any(k=='escalation-suppressed' for _,k,_ in self.bus.logs))
+        # the suppressed path did not add a commit
+        self.assertEqual(len(self.bus.commits), 2)  # reissue + first escalation
 
 if __name__=='__main__':
     unittest.main()
