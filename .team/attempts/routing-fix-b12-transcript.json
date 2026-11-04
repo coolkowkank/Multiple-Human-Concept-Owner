@@ -218,5 +218,17 @@
       },
       "service_tier": "on_demand"
     }
+  },
+  {
+    "tool_call": "write_file",
+    "args": {
+      "content": "# placeholder",
+      "path": "launcher/supervisor.py"
+    },
+    "result": {
+      "ok": true,
+      "path": "launcher/supervisor.py",
+      "bytes": 13
+    }
   }
 ]
