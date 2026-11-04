@@ -49,23 +49,54 @@ def node(cx, cy, r, img=None, icon=None, icon_bg=PURPLE):
         ax.text(cx, cy+12, icon, fontsize=34, color="white", fontweight="bold", ha="center", va="center")
 
 def arrow(p1, p2, rad=0.0, style="-", color=ARROW, shrink=72):
-    ax.add_patch(FancyArrowPatch(p1, p2, connectionstyle=f"arc3,rad={rad}", arrowstyle="-|>",
-                                 mutation_scale=22, lw=1.6, ls=style, color=color,
-                                 shrinkA=shrink, shrinkB=shrink))
+    # Deterministic hand-drawn arc + triangle head. (FancyArrowPatch/annotate rendered
+    # heads at the wrong end under this figure's inverted y-axis; verified by pixel
+    # inspection. Head is ALWAYS at p2 here.)
+    import math
+    dx, dy = p2[0]-p1[0], p2[1]-p1[1]
+    d = math.hypot(dx, dy) or 1
+    nx, ny = -dy/d, dx/d
+    mx, my = (p1[0]+p2[0])/2, (p1[1]+p2[1])/2
+    cx, cy = mx + nx*rad*d, my + ny*rad*d
+    n = 60
+    pts = [((1-t)**2*p1[0] + 2*(1-t)*t*cx + t*t*p2[0],
+            (1-t)**2*p1[1] + 2*(1-t)*t*cy + t*t*p2[1]) for t in (i/n for i in range(n+1))]
+    # cumulative-length trim of `shrink` px at both ends
+    seg = [math.hypot(pts[i+1][0]-pts[i][0], pts[i+1][1]-pts[i][1]) for i in range(n)]
+    cum = [0.0]
+    for L in seg: cum.append(cum[-1] + L)
+    total = cum[-1]
+    def at(dist):  # point at arc-length dist from p1
+        for i in range(n):
+            if cum[i+1] >= dist:
+                f = 0 if seg[i] == 0 else (dist - cum[i]) / seg[i]
+                return (pts[i][0] + f*(pts[i+1][0]-pts[i][0]), pts[i][1] + f*(pts[i+1][1]-pts[i][1]))
+        return pts[-1]
+    lo, hi = shrink, total - shrink
+    sub = [at(lo + (hi-lo)*i/40) for i in range(41)]
+    xs, ys = [p[0] for p in sub], [p[1] for p in sub]
+    ax.plot(xs, ys, color=color, lw=1.6, ls=style, solid_capstyle="round", zorder=2)
+    # head triangle at the p2 end, tangent along the last segment
+    tx, ty = sub[-1][0]-sub[-3][0], sub[-1][1]-sub[-3][1]
+    tl = math.hypot(tx, ty) or 1; tx, ty = tx/tl, ty/tl
+    tipx, tipy = sub[-1]
+    bx, by = tipx - 16*tx, tipy - 16*ty
+    px, py = -ty*7, tx*7
+    ax.add_patch(plt.Polygon([(tipx, tipy), (tipx - 16*tx + px, tipy - 16*ty + py),
+                              (tipx - 16*tx - px, tipy - 16*ty - py)], closed=True,
+                             fc=color, ec="none", zorder=2))
 
 # Title
 text(W/2, 22, "Multiple-Human-Concept-Owner - current team (2026-11-04)", 27, INK, "bold")
 
 # Legend (top-left)
-lb = FancyBboxPatch((22, 62), 356, 116, boxstyle="round,pad=6,rounding_size=12",
+lb = FancyBboxPatch((22, 62), 356, 78, boxstyle="round,pad=6,rounding_size=12",
                     fc="white", ec="#c9ccd4", lw=1.4)
 ax.add_patch(lb)
 text(44, 78, "Legend", 17, INK, "bold", ha="left")
-ax.plot([44, 100], [130, 130], color=ARROW, lw=1.6, solid_capstyle="round")
-ax.add_patch(FancyArrowPatch((100, 130), (120, 130), arrowstyle="-|>", mutation_scale=18, lw=1.6, color=ARROW))
-text(140, 118, "labeled hand-off between roles", 13.5, GRAY, ha="left")
-ax.plot([44, 120], [162, 162], color=ARROW, lw=1.6, ls=(0, (4, 3)))
-text(140, 150, "model work product", 13.5, GRAY, ha="left")
+ax.plot([44, 100], [118, 118], color=ARROW, lw=1.6, solid_capstyle="round")
+ax.add_patch(FancyArrowPatch((100, 118), (120, 118), arrowstyle="-|>", mutation_scale=18, lw=1.6, color=ARROW))
+text(140, 106, "labeled hand-off between roles", 13.5, GRAY, ha="left")
 
 # Nodes: owner top-center, coordinator left, reviewer right, builder bottom-center
 OWN, COR, REV, BLD = (717, 282, 74), (310, 715, 74), (1124, 715, 74), (717, 1130, 66)
@@ -85,7 +116,7 @@ text(COR[0], COR[1]+COR[2]+82, "Coordination + implementation oversight", 15)
 # Reviewer labels
 text(REV[0], REV[1]+REV[2]+18, "Independent reviewer", 21, INK, "bold")
 text(REV[0], REV[1]+REV[2]+50, "@instinct-christina", 16.5, GRAY, style="italic")
-text(REV[0], REV[1]+REV[2]+82, "Peer verification (F/P/R/N)", 15)
+text(REV[0], REV[1]+REV[2]+82, "Peer-verifies pinned commits", 15)
 # Builder labels
 text(BLD[0], BLD[1]+BLD[2]+18, "Builder", 21, INK, "bold")
 text(BLD[0], BLD[1]+BLD[2]+50, "Groq gpt-oss-120b (free plan)", 16.5, GRAY, style="italic")
@@ -98,16 +129,16 @@ text(330, 556, "direction + GO gates", 14.5, ARROW)
 arrow((OWN[0]+60, OWN[1]+40), (REV[0]-30, REV[1]-60), rad=-0.25, shrink=78)
 text(1090, 556, "direction + gates", 14.5, ARROW)
 arrow((COR[0]+80, COR[1]-10), (REV[0]-80, REV[1]-10), rad=0.22, shrink=80)
-text(717, 648, "review requests (pinned commit)", 14.5, ARROW)
+text(717, 620, "review requests (pinned commit)", 14.5, ARROW)
 arrow((REV[0]-80, REV[1]+30), (COR[0]+80, COR[1]+30), rad=0.22, shrink=80)
-text(717, 810, "verdicts: verified / new findings", 14.5, ARROW)
-arrow((COR[0]+40, COR[1]+66), (BLD[0]-60, BLD[1]-40), rad=0.2, style=(0, (4, 3)), shrink=76)
+text(717, 835, "verdicts: verified / new findings", 14.5, ARROW)
+arrow((COR[0]+40, COR[1]+66), (BLD[0]-60, BLD[1]-40), rad=0.2, shrink=76)
 text(560, 905, "scoped tasks", 14.5, ARROW)
 text(560, 932, "<-> reviewed output", 14.5, ARROW)
 
 # Footer: shared machine account is infrastructure, not a team member
-text(W-40, H-58, "Shared machine account @coolkowkank-bot authenticates model pushes and is", 13, GRAY, ha="right")
-text(W-40, H-34, "the committer identity on model commits - infrastructure, not a team member.", 13, GRAY, ha="right")
+text(40, H-64, "Shared machine account @coolkowkank-bot: authenticates model pushes,", 13, GRAY, ha="left")
+text(40, H-38, "committer identity on model commits. Infrastructure, not a team member.", 13, GRAY, ha="left")
 
 out = os.path.join(ROOT, "docs", "team-roster.png")
 fig.savefig(out, dpi=100)
