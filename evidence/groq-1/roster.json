@@ -1,0 +1,18 @@
+{
+  "seats": {
+    "builder": {
+      "role": "builder",
+      "allowed_paths": [
+        "src/",
+        "tests/"
+      ],
+      "adapter": {
+        "type": "http",
+        "base_url": "https://api.groq.com/openai/v1",
+        "model": "openai/gpt-oss-20b",
+        "api_key_env": "GROQ_API_KEY",
+        "timeout": 300
+      }
+    }
+  }
+}

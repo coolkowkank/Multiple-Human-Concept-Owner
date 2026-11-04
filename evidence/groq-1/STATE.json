@@ -1,0 +1,13 @@
+{
+  "turn": null,
+  "turn_seq": 2,
+  "turn_since": "2026-11-04T05:10:30Z",
+  "status": "running",
+  "status_line": "Builder: Roman conversion and tests ready for verification",
+  "leases": {
+    "builder": {
+      "holder": "builder-f0797006",
+      "claimed_at": 1793769029.250786
+    }
+  }
+}

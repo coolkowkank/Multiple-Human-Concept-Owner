@@ -1,0 +1,5 @@
+d245a83 TURN: builder acting
+a7732f3 operator: return turn to builder for self-repair after recorded verify failure
+66403a2 TURN: builder acting
+c452512 operator: bounded groq live test config
+ce84f06 operator: init coordination layout
