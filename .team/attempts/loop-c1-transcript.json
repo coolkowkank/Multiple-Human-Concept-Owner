@@ -122,5 +122,53 @@
       "path": "docs/self-commit-protocol.md",
       "bytes": 2355
     }
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-e2da5653-b1c7-40f0-9235-30f0d486b8f4",
+      "object": "chat.completion",
+      "created": 1793778534,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "Now commit.",
+            "tool_calls": [
+              {
+                "id": "fc_084f8d15-0e59-4a6c-99e3-dbfaf62a71cc",
+                "type": "function",
+                "function": {
+                  "name": "git_commit",
+                  "arguments": "{\"message\":\"Fix documentation inaccuracies per independent review:\\n- Clarify that the TURN: builder hook lives in local .git/hooks and is not part of the repo tree.\\n- State that execution guards are runtime harness features, not repository files.\\n- Correct the description of human oversight to occur after push via review loop.\\n- Add explicit provenance note in commit messages.\\n\\nTURN: builder\"}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.047185053,
+        "prompt_tokens": 1629,
+        "prompt_time": 0.07554835,
+        "completion_tokens": 107,
+        "completion_time": 0.224393016,
+        "total_tokens": 1736,
+        "total_time": 0.299941366,
+        "completion_tokens_details": {
+          "reasoning_tokens": 4
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_47082602e2",
+      "x_groq": {
+        "id": "req_01m6jrghp8enwaz0pt8qdqxc4g",
+        "seed": 1325542032
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
