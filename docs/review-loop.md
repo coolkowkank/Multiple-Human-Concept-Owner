@@ -1,4 +1,4 @@
-# Groq <-> Independent Reviewer Loop (v2, peer-agreed route)
+# Groq <-> Independent Reviewer Loop (v3, peer-agreed route)
 
 Bounded review/fix loop with no per-round mediation. Coordinator checks
 only the finished result or an escalation.
@@ -33,6 +33,12 @@ only the finished result or an escalation.
    via its own tool calls; state=FIX_COMMITTED.
 4. Reviewer re-reviews the new pinned SHA: VERIFIED (loop ends) or
    FIX_NEEDED (next cycle) or ESCALATE.
+5. Terminal condition: when the budget or cycle cap is reached, the LAST
+   fix still receives independent review WITHOUT any extra provider call
+   (no fourth cycle). The reviewer publishes an immutable terminal
+   .team/review/RESULT.md on review/groq-dev-3 (final scoped verdict or
+   ESCALATE reason). An unresolved FIX_NEEDED at the cap is ESCALATE,
+   never silently closed.
 
 ## Bounds
 - GLOBAL BUDGET: 6 provider/API rounds TOTAL across the ENTIRE loop
@@ -46,3 +52,6 @@ only the finished result or an escalation.
 - Free plan only. No main merge, no access changes, no paid routes, no
   history rewrite.
 - Fail-closed: any capture failure halts the run before the next API call.
+- Provenance labels per commit: model-authored + harness-executed vs
+  operator record-keeping are always distinguished; an author label alone
+  is not proof of model execution (the transcript is the evidence).
