@@ -1,0 +1,8 @@
+{
+  "attempt": "deadlock-fix-b5",
+  "operator_note": true,
+  "ended_utc": "2026-11-04T11:43:23Z",
+  "outcome": "provider tool_use_failed - malformed tool-call JSON (stray ']' closing the write_file content string)",
+  "calls": 1,
+  "note": "Operator summary. The full per-event executor transcript for this attempt lives in deadlock-fix-b5-transcript.json (restored at HEAD after an operator summary commit 0b46c6d briefly replaced it - no history rewrite, restoration commit only). gpt-oss-120b emitted invalid JSON in write_file arguments despite v4 escaped-JSON rules; same failure class as b3."
+}
