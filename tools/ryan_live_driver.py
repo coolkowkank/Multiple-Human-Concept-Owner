@@ -33,6 +33,17 @@ try:
             e = next((m for m in L["data"] if m["id"] == mid), None)
             print(mid, e and (e.get("input_price"), e.get("output_price"), e.get("cached_price"), e.get("model_lab")))
         print("price_zero:", {m: rc.mr.price_zero(L, m) for m in ("nvidia/nemotron-3-ultra-550b-a55b", "novita/ling-3.1-flash")})
+    elif cmd == "assign":
+        L = listing()
+        R = "novita/ling-3.1-flash"
+        N = "nvidia/nemotron-3-ultra-550b-a55b"
+        print(json.dumps(rc.assign_manual(
+            ROOT, {"researcher": N, "verifier": R, "ryan": R},
+            {"researcher": "public source-packet synthesis; listed 1M context and 64k output, reasoning-capable; provisional task fit, not qualified",
+             "verifier": "separate model lab (inclusionai vs nvidia) for reference checks; no-training listing flag; provisional, not qualified",
+             "ryan": "reviews verified findings; separate execution from the verifier, no independence claim between them; provisional, not qualified"},
+            L, RECORD, now,
+            "operator (main) decision 2026-11-04 19:54 EET for current task research-model-vs-harness, after owner steering at 19:44 and 19:45 EET"), indent=1))
     elif cmd == "alloc":
         print(json.dumps(rc.allocate(ROOT, post, listing, RECORD, now), indent=1))
     elif cmd == "step":

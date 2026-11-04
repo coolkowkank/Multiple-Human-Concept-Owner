@@ -1,0 +1,15 @@
+{
+  "models": {
+    "researcher": "nvidia/nemotron-3-ultra-550b-a55b",
+    "verifier": "novita/ling-3.1-flash",
+    "ryan": "novita/ling-3.1-flash"
+  },
+  "why": {
+    "researcher": "public source-packet synthesis; listed 1M context and 64k output, reasoning-capable; provisional task fit, not qualified",
+    "verifier": "separate model lab (inclusionai vs nvidia) for reference checks; no-training listing flag; provisional, not qualified",
+    "ryan": "reviews verified findings; separate execution from the verifier, no independence claim between them; provisional, not qualified"
+  },
+  "decided_by": "main",
+  "source_ref": "operator (main) decision 2026-11-04 19:54 EET for current task research-model-vs-harness, after owner steering at 19:44 and 19:45 EET",
+  "decided_at": "2026-11-04T17:54:41Z"
+}

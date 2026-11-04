@@ -4,6 +4,13 @@ Status: PAUSED after the first live attempt (see incident-1.md): one
 allocation request ended with an unknown outcome. No assignment exists and
 nothing is running. Earlier text below describes the design.
 
+Update 2026-11-04 19:54 EET: the operator assigned provisional models
+(researcher nvidia/nemotron-3-ultra-550b-a55b, verifier and Ryan review
+novita/ling-3.1-flash) with `assign_manual()`, no model call. See
+`assignments.json`. They are NOT qualified or benchmarked, the pipeline is
+still PAUSED and nothing is running. Verifier and Ryan review share a model
+in separate executions, with no independence claim between them.
+
 Original status: runner built and mock-tested only. Live
 use waits for independent review, a fresh price-0 check on exact model ids,
 and reconciliation of the shared free-request pool. Nothing here shows a
