@@ -38,3 +38,6 @@ RW1 handoffs: R3. RW2 review: R1, R2, R6, R7. RW3 tokens: R1, R3, R8. RW4 stall:
 - S1 LangGraph: docs https://docs.langchain.com/oss/python/langgraph/interrupts and /checkpointers read 2026-11-04 (level 1, code not read).
 - S2 OpenHands: https://github.com/OpenHands/software-agent-sdk (stuck_detector.py read 2026-11-04, commit SHA not captured; level 2 partial). Docs https://docs.openhands.dev/sdk/guides/agent-stuck-detector .
 Notes: findings/2026-11-04-rw5-prior-art-stall-and-gates.md
+- R9 Agent Status Protocol (ASP) https://arxiv.org/html/2610.21538 [PP, proposal, not a standard], arXiv 2026-10-15, read 2026-11-04: abstract, status note, sec 1.1, 5.1-5.3, 6.2-6.3, 7.2.1 start. Used for RW4.
+- S7 Akka phi accrual docs https://doc.akka.io/libraries/akka-core/current/typed/failure-detector.html (level 1, read 2026-11-04). Used for RW4.
+- S8 Kubernetes Leases https://kubernetes.io/docs/concepts/architecture/leases/ (candidate, not read).
