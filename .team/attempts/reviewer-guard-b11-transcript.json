@@ -81,5 +81,11 @@
       "path": "launcher/runtime.py",
       "tool": "edit_file"
     }
+  },
+  {
+    "pacing_wait": {
+      "seconds": 59.0,
+      "min_interval": 65.0
+    }
   }
 ]
