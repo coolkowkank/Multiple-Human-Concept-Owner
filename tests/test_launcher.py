@@ -677,7 +677,9 @@ class QueueAdapterSeatPathTests(unittest.TestCase):
         repo, bus = self._queue_repo()
         self._set_turn(bus, "builder")
         from launcher.cli import main as cli_main
-        with open(os.path.join(repo, "resp.json"), "w") as fh:
+        scratch = tempfile.mkdtemp(prefix="launcher-scratch-")
+        self.addCleanup(shutil.rmtree, scratch, True)
+        with open(os.path.join(scratch, "resp.json"), "w") as fh:
             json.dump({"summary": "built the thing",
                        "writes": {"src/app.txt": "real content"},
                        "verify_command": "test -f src/app.txt",
@@ -685,7 +687,7 @@ class QueueAdapterSeatPathTests(unittest.TestCase):
                        "status_line": "builder done"}, fh)
         cli_main(["respond", "builder", "--repo", repo,
                   "--branch", "team-work", "--file",
-                  os.path.join(repo, "resp.json")])
+                  os.path.join(scratch, "resp.json")])
         acted = Seat(bus, "builder").act_once()
         self.assertTrue(acted)
         state = bus.state()
@@ -860,7 +862,11 @@ class QueueBindingRegressionTests(unittest.TestCase):
         payload = payload or {"summary": "work", "writes": {},
                               "verify_command": None, "handoff": "reviewer",
                               "status_line": "done"}
-        path = os.path.join(repo, "resp.json")
+        # scratch belongs outside the seat's repo: the seat preflight
+        # refuses outside-domain dirt (R4)
+        scratch = tempfile.mkdtemp(prefix="launcher-scratch-")
+        self.addCleanup(shutil.rmtree, scratch, True)
+        path = os.path.join(scratch, "resp.json")
         with open(path, "w") as fh:
             json.dump(payload, fh)
         cli_main(["respond", name, "--repo", repo, "--branch", "team-work",
@@ -960,11 +966,13 @@ class PatchReviewRegressionTests(unittest.TestCase):
 
     def _respond_args(self, repo, extra=None, summary="work"):
         from launcher.cli import main as cli_main
-        with open(os.path.join(repo, "resp.json"), "w") as fh:
+        scratch = tempfile.mkdtemp(prefix="launcher-scratch-")
+        self.addCleanup(shutil.rmtree, scratch, True)
+        with open(os.path.join(scratch, "resp.json"), "w") as fh:
             json.dump({"summary": summary, "writes": {}, "handoff":
                        "reviewer", "status_line": "s"}, fh)
         args = ["respond", "builder", "--repo", repo, "--branch",
-                "team-work", "--file", os.path.join(repo, "resp.json")]
+                "team-work", "--file", os.path.join(scratch, "resp.json")]
         cli_main(args + (extra or []))
 
     def _make_stale(self, repo, bus):
@@ -979,13 +987,15 @@ class PatchReviewRegressionTests(unittest.TestCase):
         repo, bus = self._queue_repo()
         self._make_stale(repo, bus)
         from launcher.cli import main as cli_main
-        with open(os.path.join(repo, "resp.json"), "w") as fh:
+        scratch = tempfile.mkdtemp(prefix="launcher-scratch-")
+        self.addCleanup(shutil.rmtree, scratch, True)
+        with open(os.path.join(scratch, "resp.json"), "w") as fh:
             json.dump({"summary": "fresh", "writes": {}, "handoff":
                        "reviewer", "status_line": "s"}, fh)
         with self.assertRaises(SystemExit):
             cli_main(["respond", "builder", "--repo", repo, "--branch",
                       "team-work", "--file",
-                      os.path.join(repo, "resp.json")])
+                      os.path.join(scratch, "resp.json")])
         with open(os.path.join(repo, ".team/queues/builder.jsonl")) as fh:
             self.assertEqual(len(fh.read().strip().splitlines()), 1)
 
@@ -1023,13 +1033,15 @@ class PatchReviewRegressionTests(unittest.TestCase):
             fh.write("pre-staged")
         git(repo, "add", "staged.txt")
         from launcher.cli import main as cli_main
-        with open(os.path.join(repo, "resp.json"), "w") as fh:
+        scratch = tempfile.mkdtemp(prefix="launcher-scratch-")
+        self.addCleanup(shutil.rmtree, scratch, True)
+        with open(os.path.join(scratch, "resp.json"), "w") as fh:
             json.dump({"summary": "work", "writes": {}, "handoff":
                        "reviewer", "status_line": "s"}, fh)
         with self.assertRaises(BusError) as ctx:
             cli_main(["respond", "builder", "--repo", repo, "--branch",
                       "team-work", "--file",
-                      os.path.join(repo, "resp.json")])
+                      os.path.join(scratch, "resp.json")])
         self.assertIn("staged changes", str(ctx.exception))
         # nothing committed: staged file still staged, queue not written
         self.assertIn("A  staged.txt", git(repo, "status",
@@ -1139,3 +1151,132 @@ class HttpAdapterBackoffTests(unittest.TestCase):
         self.assertIn("400", str(ctx.exception))
         self.assertEqual(calls["n"], 1)
         self.assertEqual(sleeps, [])
+
+
+class SecondRoundRegressionTests(unittest.TestCase):
+    """R1-R4 from the independent second-round review of dbeb842."""
+
+    def _queue_repo(self, install_hook=False):
+        seats = {
+            "builder": {"role": "builder", "allowed_paths": ["src/"],
+                        "adapter": {"type": "queue",
+                                    "path": ".team/queues/builder.jsonl"}},
+            "reviewer": {"role": "reviewer", "allowed_paths": ["review/"],
+                         "adapter": {"type": "mock", "script": []}},
+        }
+        repo, bus = make_repo(seats=seats)
+        self.addCleanup(shutil.rmtree, repo, True)
+        if install_hook:
+            from launcher.cli import _hook_text
+            hook = os.path.join(repo, ".git", "hooks", "commit-msg")
+            with open(hook, "w") as fh:
+                fh.write(_hook_text())
+            os.chmod(hook, 0o755)
+        return repo, bus
+
+    def _turn_to_builder(self, bus):
+        state = bus.state()
+        state["turn"] = "builder"
+        state["status"] = "running"
+        bus.write_state(state)
+        bus.commit_all("operator: turn to builder")
+
+    def _respond(self, repo, summary="work", extra=None):
+        from launcher.cli import main as cli_main
+        scratch = tempfile.mkdtemp(prefix="launcher-scratch-")
+        self.addCleanup(shutil.rmtree, scratch, True)
+        with open(os.path.join(scratch, "r.json"), "w") as fh:
+            json.dump({"summary": summary, "writes": {}, "handoff":
+                       "reviewer", "status_line": "s"}, fh)
+        cli_main(["respond", "builder", "--repo", repo, "--branch",
+                  "team-work", "--file",
+                  os.path.join(scratch, "r.json")] + (extra or []))
+
+    def test_r1_head_stale_line_is_discardable_and_recovers(self):
+        repo, bus = self._queue_repo()
+        self._turn_to_builder(bus)
+        self._respond(repo, summary="old")
+        # non-queue operator commit, turn/seq unchanged -> head-stale
+        with open(os.path.join(repo, ".team", "notes.md"), "w") as fh:
+            fh.write("operator note")
+        bus.commit_paths("operator: note", [".team/notes.md"])
+        # seat refuses the head-stale line
+        with self.assertRaises(SeatError) as ctx:
+            Seat(bus, "builder").act_once()
+        self.assertIn("stale", str(ctx.exception))
+        # and --discard-stale must recognize head staleness, not just
+        # turn/seq: the old line is dropped, the fresh one applies
+        self._respond(repo, summary="fresh", extra=["--discard-stale"])
+        with open(os.path.join(repo, ".team/queues/builder.jsonl")) as fh:
+            lines = fh.read().strip().splitlines()
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(json.loads(lines[0])["summary"], "fresh")
+        self.assertTrue(Seat(bus, "builder").act_once())
+        self.assertEqual(bus.state()["turn"], "reviewer")
+
+    def test_r2_gate_answer_passes_installed_hook(self):
+        repo, bus = self._queue_repo(install_hook=True)
+        from launcher.cli import main as cli_main
+        cli_main(["answer", "g1", "yes", "--repo", repo,
+                  "--branch", "team-work"])
+        show = git(repo, "show", "--name-only", "--format=", "HEAD").stdout
+        self.assertEqual(show.strip(), ".team/gates/ANSWERS.jsonl")
+        # nothing staged, nothing left behind
+        self.assertEqual(git(repo, "status", "--porcelain").stdout, "")
+
+    def test_r2_failed_commit_leaves_no_staged_residue(self):
+        repo, bus = self._queue_repo(install_hook=True)
+        # sabotage: make the hook reject everything
+        hook = os.path.join(repo, ".git", "hooks", "commit-msg")
+        with open(hook, "w") as fh:
+            fh.write("#!/bin/sh\nexit 1\n")
+        os.chmod(hook, 0o755)
+        with self.assertRaises(BusError):
+            self._respond(repo)
+        # queue file rolled back: no line, nothing staged
+        q = os.path.join(repo, ".team/queues/builder.jsonl")
+        self.assertTrue(not os.path.exists(q)
+                        or open(q).read().strip() == "")
+        self.assertNotIn(".team/queues",
+                         git(repo, "diff", "--cached",
+                             "--name-only").stdout)
+
+    def test_r3_prestaged_refusal_leaves_queue_untouched(self):
+        repo, bus = self._queue_repo()
+        self._turn_to_builder(bus)
+        with open(os.path.join(repo, "staged.txt"), "w") as fh:
+            fh.write("pre-staged")
+        git(repo, "add", "staged.txt")
+        with self.assertRaises(BusError):
+            self._respond(repo)
+        q = os.path.join(repo, ".team/queues/builder.jsonl")
+        self.assertTrue(not os.path.exists(q)
+                        or open(q).read().strip() == "")
+        # unstage, retry: exactly one line, appended once
+        git(repo, "reset", "-q", "--", "staged.txt")
+        self._respond(repo)
+        with open(q) as fh:
+            self.assertEqual(len(fh.read().strip().splitlines()), 1)
+
+    def test_r4_outside_domain_dirt_refused_before_mutation(self):
+        repo, bus = self._queue_repo()
+        self._turn_to_builder(bus)
+        self._respond(repo)
+        with open(os.path.join(repo, "stray.py"), "w") as fh:
+            fh.write("outside any allowed path")
+        seq_before = bus.state()["turn_seq"]
+        with self.assertRaises(SeatError) as ctx:
+            Seat(bus, "builder").act_once()
+        self.assertIn("refuses to start", str(ctx.exception))
+        state = bus.state()
+        self.assertEqual(state["turn_seq"], seq_before)
+        self.assertEqual(state["turn"], "builder")
+
+    def test_r4_in_domain_dirt_is_the_seats_own_business(self):
+        repo, bus = self._queue_repo()
+        self._turn_to_builder(bus)
+        self._respond(repo)
+        os.makedirs(os.path.join(repo, "src"), exist_ok=True)
+        with open(os.path.join(repo, "src", "wip.txt"), "w") as fh:
+            fh.write("in-domain scratch")
+        self.assertTrue(Seat(bus, "builder").act_once())

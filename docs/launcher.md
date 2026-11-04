@@ -75,6 +75,16 @@ gate queue. Stdlib-only Python 3.10+: nothing to install.
   re-queue. The marker is removed before the response is applied, so
   it never persists into STATE.
 
+## Operator hygiene (enforced, not advisory)
+
+- Keep response scratch files OUTSIDE the seat's repo (or under
+  `.team/`). A seat refuses to start its turn while the worktree
+  carries changes outside its allowed paths and `.team/` - the turn
+  commit stages the whole mutation set, and the commit guard would
+  otherwise reject the swept paths after the mutation ran.
+- `respond` and gate answers are atomic: a failed commit rolls the
+  appended line back, so a retry cannot duplicate it.
+
 ## Commands
 
 ```sh

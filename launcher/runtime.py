@@ -28,6 +28,24 @@ class SeatError(Exception):
     pass
 
 
+def head_binding_clean(repo, stamped):
+    """True when the stamped head is an ancestor of HEAD and every
+    change since touches only queue files. Shared by the seat runtime
+    (apply-time refusal) and `launcher respond` (stale-line scan), so
+    both use ONE definition of staleness (live-1 patch review R1)."""
+    if not stamped:
+        return False
+    ancestor = subprocess.run(
+        ["git", "-C", repo, "merge-base", "--is-ancestor",
+         stamped, "HEAD"], capture_output=True)
+    if ancestor.returncode != 0:
+        return False
+    changed = subprocess.run(
+        ["git", "-C", repo, "diff", "--name-only", stamped, "HEAD"],
+        capture_output=True, text=True).stdout.split()
+    return all(p.startswith(".team/queues/") for p in changed)
+
+
 def _now():
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
@@ -115,6 +133,7 @@ class Seat:
             state = self.bus.state()
             if state.get("turn") != self.name:
                 return False
+            self._preflight_dirt_check()
             self.claim_lease(state)
             response = self._call_adapter(state)
             binding = response.pop("_queue", None)
@@ -226,21 +245,36 @@ class Seat:
         return response
 
     def _head_binding_clean(self, stamped):
-        """True when the stamped head is an ancestor of HEAD and every
-        change since touches only queue files. A missing/unknown head
-        or any non-queue change is staleness."""
-        if not stamped:
-            return False
-        ancestor = subprocess.run(
-            ["git", "-C", self.bus.repo, "merge-base", "--is-ancestor",
-             stamped, "HEAD"], capture_output=True)
-        if ancestor.returncode != 0:
-            return False
-        changed = subprocess.run(
-            ["git", "-C", self.bus.repo, "diff", "--name-only",
-             stamped, "HEAD"], capture_output=True, text=True
-        ).stdout.split()
-        return all(p.startswith(".team/queues/") for p in changed)
+        return head_binding_clean(self.bus.repo, stamped)
+
+    def _preflight_dirt_check(self):
+        """Refuse to START a turn when the worktree carries changes the
+        turn commit could not legally contain (R4): the turn commit
+        stages the whole mutation set by design, and the commit guard
+        would reject outside-domain paths only AFTER the mutation ran,
+        leaving an advanced uncommitted state. Better to refuse before
+        touching anything. In-domain dirt (the seat's own
+        allowed_paths and .team/) is the seat's business."""
+        out = subprocess.run(
+            ["git", "-C", self.bus.repo, "status", "--porcelain"],
+            capture_output=True, text=True).stdout
+        allowed = [a.rstrip("/") for a in self.allowed_paths]
+        bad = []
+        for line in out.splitlines():
+            path = line[3:].split(" -> ")[-1]
+            if path.startswith(".team/"):
+                continue
+            if any(path == a or path.startswith(a + "/")
+                   for a in allowed):
+                continue
+            bad.append(path)
+        if bad:
+            raise SeatError(
+                f"{self.name} refuses to start: worktree has changes "
+                f"outside its allowed paths {allowed} and .team/: "
+                f"{bad} - the turn commit would sweep them in and the "
+                "commit guard would reject them after the mutation. "
+                "Move scratch outside the repo (or under .team/) first.")
 
     def _apply(self, state, response):
         writes = response.get("writes") or {}

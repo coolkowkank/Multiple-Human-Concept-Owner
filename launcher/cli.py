@@ -96,9 +96,21 @@ def cmd_status(args):
 
 def cmd_answer(args):
     bus = Bus(args.repo, args.branch)
-    bus.transact_paths(f"gate {args.gate_id} answered",
-                       [".team/gates/ANSWERS.jsonl"],
-                       lambda: bus.answer_gate(args.gate_id, args.answer))
+    # Message needs the operational prefix or the installed commit
+    # guard rejects it (R2). Roll back the append if the commit fails,
+    # so a retry cannot duplicate the answer line (R3 pattern).
+    answers = os.path.join(bus.repo, ".team/gates/ANSWERS.jsonl")
+    snapshot = open(answers).read() if os.path.exists(answers) else None
+    try:
+        bus.transact_paths(f"operator: gate {args.gate_id} answered",
+                           [".team/gates/ANSWERS.jsonl"],
+                           lambda: bus.answer_gate(args.gate_id,
+                                                   args.answer))
+    except Exception:
+        if snapshot is not None:
+            with open(answers, "w") as fh:
+                fh.write(snapshot)
+        raise
 
 
 def cmd_prompt(args):
@@ -151,13 +163,20 @@ def cmd_respond(args):
     # (live-1 major finding: an unbound queued response could be
     # applied silently after the bus moved). The runtime refuses the
     # apply when turn/turn_seq/head have moved on.
+    # A pre-staged index would fail the commit AFTER the queue line is
+    # appended, leaving uncommitted residue and duplicate lines on
+    # retry (R3) - check before touching the file.
+    bus.assert_index_clean(f"queue a response for {args.name}")
     state = bus.state()
     head = subprocess.run(["git", "-C", bus.repo, "rev-parse", "HEAD"],
                           capture_output=True, text=True).stdout.strip()
     # Stale lines already in the queue would be refused by the runtime
     # forever (the seat always reads the first line), so appending
     # behind one strands the fresh response. Refuse unless the operator
-    # explicitly discards the stale lines (live-1 patch review).
+    # explicitly discards the stale lines (live-1 patch review). The
+    # staleness test is the SAME one the seat applies: turn/seq AND
+    # head binding (R1) - a head-stale line must be discardable too.
+    from launcher.runtime import head_binding_clean
     stale = []
     if os.path.exists(path):
         with open(path) as fh:
@@ -166,7 +185,9 @@ def cmd_respond(args):
             bound = line.get("_queue")
             if (bound is None
                     or bound.get("turn") != state.get("turn")
-                    or bound.get("turn_seq") != state.get("turn_seq")):
+                    or bound.get("turn_seq") != state.get("turn_seq")
+                    or not head_binding_clean(
+                        bus.repo, bound.get("head"))):
                 stale.append(line)
     if stale:
         if not args.discard_stale:
@@ -187,10 +208,22 @@ def cmd_respond(args):
                           "turn_seq": state.get("turn_seq"),
                           "head": head}
     os.makedirs(os.path.dirname(path) or bus.repo, exist_ok=True)
+    # Snapshot so a failed commit (e.g. guard rejection) rolls the
+    # append back: no uncommitted line, no duplicate on retry (R3).
+    snapshot = open(path).read() if os.path.exists(path) else None
     with open(path, "a") as fh:
         fh.write(json.dumps(response) + "\n")
     rel = os.path.relpath(path, bus.repo)
-    bus.commit_paths(f"operator: response queued for {args.name}", [rel])
+    try:
+        bus.commit_paths(f"operator: response queued for {args.name}",
+                         [rel])
+    except Exception:
+        if snapshot is None:
+            os.unlink(path)
+        else:
+            with open(path, "w") as fh:
+                fh.write(snapshot)
+        raise
     current = subprocess.run(
         ["git", "-C", bus.repo, "branch", "--show-current"],
         capture_output=True, text=True).stdout.strip()

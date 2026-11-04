@@ -380,7 +380,9 @@ class CrossCloneQueueBindingTests(unittest.TestCase):
     def _respond(self, repo, summary):
         cli = os.path.join(os.path.dirname(os.path.dirname(
             os.path.abspath(__file__))), "launcher", "cli.py")
-        payload = os.path.join(repo, "resp.json")
+        scratch = tempfile.mkdtemp(prefix="launcher-scratch-")
+        self.addCleanup(shutil.rmtree, scratch, True)
+        payload = os.path.join(scratch, "resp.json")
         with open(payload, "w") as fh:
             json.dump({"summary": summary, "writes": {}, "handoff":
                        "reviewer", "status_line": "s"}, fh)
