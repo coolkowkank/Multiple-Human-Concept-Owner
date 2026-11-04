@@ -191,7 +191,8 @@
           ],
           "status": "SUPPORTED_BY_PACKET"
         }
-      ]
+      ],
+      "lineage": "research-model-vs-harness"
     },
     {
       "id": "research-model-vs-harness-v2",
@@ -326,7 +327,8 @@
           ],
           "status": "SUPPORTED_BY_PACKET"
         }
-      ]
+      ],
+      "lineage": "research-model-vs-harness"
     }
   ]
 }

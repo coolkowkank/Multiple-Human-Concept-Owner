@@ -62,6 +62,8 @@ EFFORT = {"researcher": "low", "verifier": "none", "ryan": "low"}
 EFFORT_VALUES = ("none", "min", "low", "medium", "high")
 ROLE_CAP = {"researcher": 2, "verifier": 2, "ryan": 2}  # per question
 QUESTION_BUDGET = 5  # <= 5 requests per question; clean path = 3
+ENVELOPE_TOTAL = 6   # first-qualification envelope: ALL reserves ever (incl.
+                     # the allocation attempt); raising it is an operator edit
 DAILY_CAP = 24      # 4 cycles x 6 requests, all three roles combined
 CYCLES_PER_DAY = 4
 SPACING_S = 10
@@ -182,6 +184,9 @@ def ledger_gate(store, now, qid=None):
         raise Halt("PAUSED: " + halts[-1]["reason"])
     reserves = [e for e in led if e["phase"] == "reserved"]
     results = {e["rid"]: e for e in led if e["phase"] == "result"}
+    if len(reserves) >= ENVELOPE_TOTAL:
+        return "wait", ("qualification envelope of %d requests used"
+                        % ENVELOPE_TOTAL)
     for r in reserves:
         if r["rid"] not in results and (
                 not cleared or led.index(r) > led.index(cleared[-1])):
@@ -193,7 +198,13 @@ def ledger_gate(store, now, qid=None):
     window = [r for r in reserves if now - parse_iso(r["ts"]) < 86400]
     if len(window) >= DAILY_CAP:
         return "wait", "daily cap %d reached (rolling 24h)" % DAILY_CAP
-    started = {r["qid"] for r in window}
+    try:
+        lm = {x["id"]: lineage_of(x) for x in store.queue()["questions"]}
+    except Exception:
+        lm = {}
+    started = {lm.get(r["qid"], r["qid"]) for r in window}
+    if qid is not None:
+        qid = lm.get(qid, qid)
     if qid is not None and qid not in started and \
             len(started) >= CYCLES_PER_DAY:
         return "wait", "%d cycles already started in 24h" % CYCLES_PER_DAY
@@ -530,6 +541,25 @@ def next_action(q):
     return None
 
 
+def lineage_of(q):
+    return q.get("lineage") or q["id"]
+
+
+def lineage_counts(store, queue, q):
+    """Reserved requests per role across every queue item of the same
+    lineage (a packet version cannot reset attempts); max with the
+    item's own counters."""
+    ids = {x["id"] for x in queue["questions"]
+           if lineage_of(x) == lineage_of(q)}
+    n = {}
+    for e in store.ledger():
+        if e["phase"] == "reserved" and e.get("qid") in ids:
+            n[e["role"]] = n.get(e["role"], 0) + 1
+    for k, v in q.get("attempts", {}).items():
+        n[k] = max(n.get(k, 0), v)
+    return n
+
+
 def pick(queue):
     for q in queue["questions"]:
         if next_action(q):
@@ -558,12 +588,13 @@ def step(root, post, list_models, now, record):
             return {"action": "needs-allocation", "calls": 0,
                     "reason": "assignments.json not made by the operator"}
         model = assign["models"][role]
-        if sum(q["attempts"].values()) >= QUESTION_BUDGET:
+        used = lineage_counts(store, queue, q)
+        if sum(used.values()) >= QUESTION_BUDGET:
             q["status"] = "needs-human"
             q["reason"] = "question budget %d requests used" % QUESTION_BUDGET
             store.save_queue(queue)
             return {"action": "needs-human", "qid": qid, "calls": 0}
-        if q["attempts"].get(role, 0) >= ROLE_CAP[role]:
+        if used.get(role, 0) >= ROLE_CAP[role]:
             q["status"] = "needs-human"
             q["reason"] = role + " attempts exhausted"
             store.save_queue(queue)

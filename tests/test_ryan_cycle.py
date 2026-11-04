@@ -50,6 +50,9 @@ class Base(unittest.TestCase):
         self.d = tempfile.mkdtemp()
         self.calls = []
         self.efforts = []
+        self._env = rc.ENVELOPE_TOTAL
+        rc.ENVELOPE_TOTAL = 10 ** 6      # envelope has its own tests
+        self.addCleanup(setattr, rc, "ENVELOPE_TOTAL", self._env)
         self.t = T0
         self.store = rc.Store(self.d)
 
@@ -73,6 +76,64 @@ class Base(unittest.TestCase):
 
 
 class Pipeline(Base):
+    def test_envelope_total_and_lineage_budget(self):
+        self.assertEqual(self._env, 6)
+        # envelope: 6 reserves ever -> wait, no call
+        self.seed()
+        for i in range(6):
+            self.store.append({"phase": "reserved", "rid": "e%d" % i,
+                               "ts": rc.iso(self.t - 5000 + i), "qid": "z",
+                               "role": "researcher", "model": "m"})
+            self.store.append({"phase": "result", "rid": "e%d" % i,
+                               "ts": rc.iso(self.t - 5000 + i), "qid": "z",
+                               "role": "researcher", "model": "m",
+                               "outcome": "ok"})
+        rc.ENVELOPE_TOTAL = 6
+        out = self.run_step([ok(R_OK)])
+        self.assertEqual((out["action"], out["calls"]), ("wait", 0))
+        self.assertEqual(self.calls, [])
+
+    def test_lineage_blocks_reset_by_new_qid(self):
+        self.seed()
+        q = self.store.queue()
+        q["questions"][0]["lineage"] = "L"
+        q["questions"].append(dict(q["questions"][0], id="q1-v2",
+                                   status="open", attempts={}))
+        self.store.save_queue(q)
+        for i in range(2):   # two researcher requests already on q1
+            self.store.append({"phase": "reserved", "rid": "r%d" % i,
+                               "ts": rc.iso(self.t - 9000 + i), "qid": "q1",
+                               "role": "researcher", "model": "m"})
+            self.store.append({"phase": "result", "rid": "r%d" % i,
+                               "ts": rc.iso(self.t - 9000 + i), "qid": "q1",
+                               "role": "researcher", "model": "m",
+                               "outcome": "ok"})
+        q = self.store.queue()
+        q["questions"][0]["status"] = "superseded"
+        self.store.save_queue(q)
+        out = self.run_step([ok(R_OK)])     # q1-v2 open: role cap 2 reached
+        self.assertEqual(out["action"], "needs-human")
+        self.assertEqual(self.calls, [])
+
+    def test_lineage_is_one_cycle(self):
+        self.seed(qid="a")
+        q = self.store.queue()
+        q["questions"][0]["lineage"] = "L"
+        q["questions"].append(dict(q["questions"][0], id="a2",
+                                   status="held", attempts={}))
+        self.store.save_queue(q)
+        for i in range(4):
+            self.store.append({"phase": "reserved", "rid": "c%d" % i,
+                               "ts": rc.iso(self.t - 9000 + i),
+                               "qid": "a2" if i % 2 else "o%d" % i,
+                               "role": "ryan", "model": "m"})
+            self.store.append({"phase": "result", "rid": "c%d" % i,
+                               "ts": rc.iso(self.t - 9000 + i),
+                               "outcome": "ok"})
+        st = rc.Store(self.d)
+        # a2 and a share lineage L: 'a' is not a NEW cycle if a2 started
+        self.assertEqual(rc.ledger_gate(st, self.t, "a")[0], "ok")
+
     def test_per_role_effort_and_ceilings(self):
         self.assertEqual(rc.EFFORT, {"researcher": "low", "verifier": "none",
                                      "ryan": "low"})
@@ -243,7 +304,7 @@ class Safety(Base):
         self.seed()
         for i in range(rc.DAILY_CAP):
             self.store.append({"phase": "reserved", "rid": "x%d" % i,
-                               "ts": rc.iso(T0 - 100), "qid": "q%d" % (i % 4),
+                               "ts": rc.iso(T0 - 100), "qid": "w%d" % (i % 4),
                                "role": "researcher", "model": "m"})
             self.store.append({"phase": "result", "rid": "x%d" % i,
                                "ts": rc.iso(T0 - 100), "outcome": "ok"})

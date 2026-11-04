@@ -4,6 +4,12 @@ Status: PAUSED after the first live attempt (see incident-1.md): one
 allocation request ended with an unknown outcome. No assignment exists and
 nothing is running. Earlier text below describes the design.
 
+Update 2026-11-04 20:19 EET: budgets are now per LINEAGE, not per queue id. A packet
+version (lineage field) cannot reset role caps, the 5-request question budget
+or the daily cycle count, and ENVELOPE_TOTAL=6 caps ALL reserves ever (3 used:
+the allocation attempt, one Researcher, one Verifier). Raising it is an
+operator edit.
+
 Update 2026-11-04 20:15 EET: queue item research-model-vs-harness-v2 holds packet
 version 2 for the same unchanged Researcher draft (P3 extended with the
 paper's own Appendix F text, https://arxiv.org/pdf/2610.04433 PDF p17).
