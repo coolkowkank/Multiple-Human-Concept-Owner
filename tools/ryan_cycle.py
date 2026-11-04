@@ -202,7 +202,8 @@ def ledger_gate(store, now, qid=None):
         lm = {x["id"]: lineage_of(x) for x in store.queue()["questions"]}
     except Exception:
         lm = {}
-    started = {lm.get(r["qid"], r["qid"]) for r in window}
+    started = {r.get("lineage") or lm.get(r["qid"], r["qid"])
+               for r in window}
     if qid is not None:
         qid = lm.get(qid, qid)
     if qid is not None and qid not in started and \
@@ -534,8 +535,80 @@ def compute_overall(q, obj):
     return ("PASS" if not bad else "FAIL"), verified, bad
 
 
+def verify_gate(q):
+    """'' or reason: fail closed on unsupported or partial sources."""
+    pk, fs = q.get("packet"), q.get("findings")
+    if not isinstance(pk, list) or not pk or not isinstance(fs, list) \
+            or not fs:
+        return "verify item needs a packet and findings"
+    ids = {p.get("id") for p in pk}
+    for p in pk:
+        t = str(p.get("passage", ""))
+        if not t.strip() or "[truncated" in t:
+            return "packet passage %s empty or truncated" % p.get("id")
+    for f in fs:
+        src = f.get("sources")
+        if not isinstance(src, list) or not src or any(
+                x not in ids for x in src):
+            return "finding %s has no source or cites outside the packet" \
+                % f.get("id")
+    if not isinstance(q.get("author_model"), str) or \
+            not q["author_model"].strip():
+        return "author_model missing (verifier independence unverifiable)"
+    return ""
+
+
+def compute_verify(q, obj):
+    """Dedicated verdict contract for publication claims: PASS only if
+    EVERY claim got SUPPORTED with a verified quote. UNVERIFIED or
+    NOT_SUPPORTED never passes; findings' own status is irrelevant
+    (publication claims carry no Researcher SUPPORTED prerequisite)."""
+    bad = [v["id"] for v in obj["verdicts"] if v["verdict"] != "SUPPORTED"]
+    return ("PASS" if not bad else "FAIL"), bad
+
+
+def load_eva_assignment(root):
+    p = os.path.join(root, "eva-assignment.json")
+    if not os.path.exists(p):
+        return None
+    with open(p) as f:
+        return json.load(f)
+
+
+def assign_eva_manual(root, model, why, listing, record, now, source_ref):
+    """Operator-made Eva (publication verifier) assignment under the SAME
+    gates as assign_manual: exact price 0 in a fresh listing, recorded
+    non-blocked route, justification. No model request, no ledger line,
+    no pause cleared, and it does not promote any held queue item."""
+    if not isinstance(source_ref, str) or len(source_ref.strip()) < 10:
+        return {"action": "rejected", "reason": "source_ref required"}
+    if not isinstance(why, str) or len(why.strip()) < 10:
+        return {"action": "rejected", "reason": "justification required"}
+    if not isinstance(model, str) or not listing_fresh(listing, now):
+        return {"action": "rejected", "reason": "no fresh listing or model"}
+    if not mr.price_zero(listing, model):
+        return {"action": "rejected", "reason": "not price-0"}
+    bad = route_gate(record, model)
+    if bad:
+        return {"action": "rejected", "reason": bad}
+    obj = {"models": {"eva": model}, "why": {"eva": why.strip()},
+           "decided_by": OPERATOR, "source_ref": source_ref.strip(),
+           "decided_at": iso(now)}
+    store = Store(root)
+    with store.lock():
+        ap = os.path.join(root, "eva-assignment.json")
+        with open(ap + ".tmp", "w") as f:
+            json.dump(obj, f, indent=2)
+        os.replace(ap + ".tmp", ap)
+    return {"action": "assigned", "calls": 0, "models": {"eva": model}}
+
+
 def next_action(q):
     s = q["status"]
+    if q.get("kind") == "verify":
+        # publication verification: only an operator-set ready-verify runs
+        # (held, drafted or anything else never does); no Ryan step.
+        return "verifier" if s == "ready-verify" else None
     if s == "open":
         return "researcher"
     if s == "drafted":
@@ -593,13 +666,29 @@ def step(root, post, list_models, now, record):
             return {"action": "idle", "calls": 0}
         qid = q["id"]
         role = next_action(q)
-        assign = load_assignments(root)
-        if assign is None:
-            return {"action": "needs-allocation", "calls": 0}
-        if assign.get("decided_by") != OPERATOR:
-            return {"action": "needs-allocation", "calls": 0,
-                    "reason": "assignments.json not made by the operator"}
-        model = assign["models"][role]
+        is_verify = q.get("kind") == "verify"
+        if is_verify:
+            why_not = verify_gate(q)
+            if why_not:
+                q["status"] = "needs-human"
+                q["reason"] = why_not
+                store.save_queue(queue)
+                return {"action": "needs-human", "qid": qid, "calls": 0,
+                        "reason": why_not}
+            assign = load_eva_assignment(root)
+            if assign is None or assign.get("decided_by") != OPERATOR:
+                return {"action": "needs-allocation", "calls": 0,
+                        "reason": "no operator Eva assignment"}
+            model = assign["models"]["eva"]
+        else:
+            assign = load_assignments(root)
+            if assign is None:
+                return {"action": "needs-allocation", "calls": 0}
+            if assign.get("decided_by") != OPERATOR:
+                return {"action": "needs-allocation", "calls": 0,
+                        "reason": "assignments.json not made by the "
+                        "operator"}
+            model = assign["models"][role]
         used = lineage_counts(store, queue, q)
         if sum(used.values()) >= QUESTION_BUDGET:
             q["status"] = "needs-human"
@@ -628,8 +717,9 @@ def step(root, post, list_models, now, record):
         listing = list_models()
         free_gate(listing, model, now)
         if role == "verifier":
-            why_not = independent(listing, assign["models"]["researcher"],
-                                  model)
+            why_not = independent(
+                listing, q["author_model"] if is_verify
+                else assign["models"]["researcher"], model)
             if why_not:
                 raise Halt("verifier not independent: " + why_not)
         rid = "%s-%s-%d" % (qid, role, len(store.ledger()))
@@ -662,7 +752,8 @@ def step(root, post, list_models, now, record):
                 q["feedback"] = "format/consistency problem: " + bad
             else:
                 q["fb_" + role] = bad
-            if q["attempts"][role] >= ROLE_CAP[role]:
+            if q["attempts"][role] >= ROLE_CAP[role] or \
+                    q.get("kind") == "verify":
                 q["status"] = "needs-human"
                 q["reason"] = bad
             store.save_queue(queue)
@@ -673,6 +764,16 @@ def step(root, post, list_models, now, record):
             q["findings"] = obj["findings"]
             q["status"] = "drafted"
             q.pop("feedback", None)
+        elif role == "verifier" and q.get("kind") == "verify":
+            overall, bad_ids = compute_verify(q, obj)
+            q["verifier_verdict"] = {"overall": overall, "bad": bad_ids}
+            q["verified_ids"] = [v["id"] for v in obj["verdicts"]
+                                 if v["verdict"] == "SUPPORTED"]
+            if overall == "PASS":
+                q["status"] = "verify-complete"
+            else:
+                q["status"] = "needs-human"
+                q["reason"] = "claims not SUPPORTED: " + ",".join(bad_ids)
         elif role == "verifier":
             overall, verified, bad_ids = compute_overall(q, obj)
             q["verifier_verdict"] = {"overall": overall, "bad": bad_ids}

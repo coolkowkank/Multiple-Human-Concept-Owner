@@ -39,6 +39,30 @@ class T(unittest.TestCase):
         self.assertEqual(rows["M2.1"]["quotes"][0]["status"], "IN_OTHER_SOURCE")
         self.assertTrue(rows["M2.1"]["review"])
 
+    def test_exact_numeric_token(self):
+        self.assertFalse(ev.num_in("13%", "flips 13.7% of tasks"))
+        self.assertFalse(ev.num_in("13", "flips 13.7 tasks"))
+        self.assertFalse(ev.num_in("13%", "flips 113% of tasks"))
+        self.assertFalse(ev.num_in("13", "flips 13% of tasks"))
+        self.assertTrue(ev.num_in("13%", "median 13% for reruns"))
+        self.assertTrue(ev.num_in("2.67", "from 6 to 2.67 pp"))
+        self.assertFalse(ev.num_in("2.67", "from 12.67 pp"))
+
+    def test_intake_fails_closed_on_partial_source(self):
+        with self.assertRaises(ValueError):
+            ev.intake(PUB, [], "x")
+        with self.assertRaises(ValueError):
+            ev.intake(PUB, PACK[:1], "x")       # M2 has no passage
+        with self.assertRaises(ValueError):
+            ev.intake(PUB, [dict(PACK[0], passage="a [truncated: 5 of 9]"),
+                            PACK[1]], "x")
+        with self.assertRaises(ValueError):
+            ev.intake("# no evidence", PACK, "x")
+
+    def test_report_says_review_false_is_not_a_pass(self):
+        self.assertIn("NOT a publication pass",
+                      ev.report(PUB, PACK)["review_false_means"])
+
     def test_label_is_not_a_verdict(self):
         r = ev.report(PUB, PACK)
         self.assertIn("not-a-verdict", r["kind"])

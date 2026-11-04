@@ -1,7 +1,8 @@
 {
  "kind": "mechanical-text-match-not-a-verdict-not-Eva",
+ "review_false_means": "no flagged quote or number by this mechanical match only; NOT a publication pass, NOT fact validation (units, denominators, context, paraphrase, unquoted claims and non-straight quotes are unchecked)",
  "claims": 13,
- "needs_human_or_model_review": 8,
+ "needs_human_or_model_review": 9,
  "rows": [
   {
    "id": "M1.1",
@@ -51,11 +52,10 @@
     "P2"
    ],
    "quotes": [],
-   "numbers_present": [
-    "4"
-   ],
+   "numbers_present": [],
    "numbers_absent": [
     "3",
+    "4",
     "5"
    ],
    "review": true
@@ -90,14 +90,15 @@
    "numbers_present": [
     "13%",
     "16%",
-    "22",
     "22%",
     "5",
     "56%",
     "7"
    ],
-   "numbers_absent": [],
-   "review": false
+   "numbers_absent": [
+    "22"
+   ],
+   "review": true
   },
   {
    "id": "M3.2",

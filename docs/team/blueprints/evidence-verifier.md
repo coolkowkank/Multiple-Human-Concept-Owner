@@ -1,6 +1,8 @@
 # Blueprint: Evidence verifier
 
-- **Status:** active (instance verifier-1 "Eva")
+- **Status:** assigned, BLOCKED and not running (instance verifier-1
+  "Eva"): Gemma route on cooldown, no qualified verifier model, not wired.
+  The completed work below is historical.
 - **Purpose:** independently verifies that Researcher output faithfully
   reflects its cited sources before publication; separate model family
   from the Researcher so verification is not the same weights grading

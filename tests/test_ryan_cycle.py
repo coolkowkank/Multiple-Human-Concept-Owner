@@ -932,5 +932,112 @@ class Diag(Base):
         self.assertNotIn("shortsecret12", json.dumps(self.store.ledger()))
 
 
+class VerifyKind(Base):
+    GEMMA = "google/gemma-4-31b-it"
+
+    def seed_v(self, status="ready-verify", author="nvidia/nemotron-3-ultra-550b-a55b",
+               eva=True, packet=None, findings=None):
+        item = {"id": "v1", "kind": "verify", "status": status,
+                "lineage": "v1", "attempts": {}, "question": "?",
+                "packet": packet or PACKET,
+                "findings": findings or [{"id": "M1.1", "claim": "a",
+                                          "sources": ["P1"],
+                                          "status": "UNVERIFIED"}]}
+        if author:
+            item["author_model"] = author
+        self.store.save_queue({"questions": [item]})
+        if eva:
+            self.assertEqual(rc.assign_eva_manual(
+                self.d, self.GEMMA, "publication verifier, provisional",
+                FRESH(), RECORD, T0, "operator decision for test")["action"],
+                "assigned")
+
+    V = {"verdicts": [{"id": "M1.1", "verdict": "SUPPORTED", "source": "P1",
+                       "quote": "alpha passage text", "evidence": "e"}]}
+
+    def test_pass_only_when_all_supported_no_ryan(self):
+        self.seed_v()
+        out = self.run_step([ok(self.V)])
+        self.assertEqual(out["action"], "done-verifier")
+        q = self.store.queue()["questions"][0]
+        self.assertEqual(q["status"], "verify-complete")
+        self.assertEqual(self.run_step([])["action"], "idle")   # no Ryan
+        self.assertEqual(self.efforts, ["none"])
+
+    def test_unverified_or_not_supported_never_passes(self):
+        for vd in ("UNVERIFIED", "NOT_SUPPORTED"):
+            self.setUp()
+            self.seed_v()
+            v = {"verdicts": [{"id": "M1.1", "verdict": vd, "source": "P1",
+                               "quote": "", "evidence": "e"}]}
+            self.run_step([ok(v)])
+            q = self.store.queue()["questions"][0]
+            self.assertEqual(q["status"], "needs-human")
+            self.assertEqual(q["verifier_verdict"]["overall"], "FAIL")
+
+    def test_held_and_drafted_never_run(self):
+        for st in ("held", "drafted", "open", "verified"):
+            self.setUp()
+            self.seed_v(status=st)
+            self.assertEqual(self.run_step([ok(self.V)])["action"], "idle")
+            self.assertEqual(self.calls, [])
+
+    def test_fail_closed_without_eva_assignment_or_author_or_source(self):
+        self.seed_v(eva=False)
+        out = self.run_step([ok(self.V)])
+        self.assertEqual((out["action"], out["calls"]), ("needs-allocation", 0))
+        self.setUp()
+        self.seed_v(author=None)
+        out = self.run_step([ok(self.V)])
+        self.assertEqual((out["action"], out["calls"]), ("needs-human", 0))
+        self.setUp()
+        self.seed_v(findings=[{"id": "M1.1", "claim": "a", "sources": [],
+                               "status": "UNVERIFIED"}])
+        self.assertEqual(self.run_step([ok(self.V)])["action"], "needs-human")
+        self.setUp()
+        self.seed_v(packet=[{"id": "P1", "title": "t",
+                             "passage": "x [truncated: 10 of 99 chars shown]"}])
+        self.assertEqual(self.run_step([ok(self.V)])["action"], "needs-human")
+        self.assertEqual(self.calls, [])
+
+    def test_independence_and_gates_still_apply(self):
+        self.seed_v(author="deepinfra/google/gemma-4-31B-it")   # same lab
+        with self.assertRaises(rc.Halt):
+            self.run_step([ok(self.V)])
+        self.assertEqual(self.calls, [])
+        self.setUp()
+        self.seed_v()
+        with self.assertRaises(rc.Halt):
+            self.run_step([ok(self.V, usage={"cost": 0.01})])
+
+    def test_eva_assignment_gates(self):
+        self.d = tempfile.mkdtemp()
+        for model, rec in (("paid/model", RECORD), ("nolab/model", RECORD)):
+            self.assertEqual(rc.assign_eva_manual(
+                self.d, model, "publication verifier", FRESH(), rec, T0,
+                "operator decision for test")["action"], "rejected")
+        self.assertIsNone(rc.load_eva_assignment(self.d))
+
+    def test_precheck_failure_never_auto_retries(self):
+        self.seed_v()
+        self.run_step([{"kind": "ok", "content": "not json",
+                        "usage": {"total_tokens": 1}}])
+        q = self.store.queue()["questions"][0]
+        self.assertEqual(q["status"], "needs-human")
+        self.assertEqual(self.run_step([]) ["action"], "idle")
+
+    def test_cycle_count_uses_persisted_reserve_lineage(self):
+        self.seed(qid="n1")
+        for i in range(4):
+            self.store.append({"phase": "reserved", "rid": "c%d" % i,
+                               "ts": rc.iso(T0 - 100), "qid": "unaliased%d" % i,
+                               "role": "ryan", "model": "m",
+                               "lineage": "same" if i < 4 else "x"})
+            self.store.append({"phase": "result", "rid": "c%d" % i,
+                               "ts": rc.iso(T0 - 100), "outcome": "ok"})
+        # four reserves, ONE persisted lineage -> one cycle started
+        self.assertEqual(rc.ledger_gate(self.store, T0, "n1")[0], "ok")
+
+
 if __name__ == "__main__":
     unittest.main()

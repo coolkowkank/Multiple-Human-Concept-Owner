@@ -1,7 +1,10 @@
-# Eva - Evidence verifier role (planned, trial-qualified)
+# Eva - Evidence verifier role (assigned, BLOCKED, not wired)
 
-Status 2026-11-04: role defined and model trial-qualified; NOT yet wired
-into the launcher roster and NOT an enforced gate. This document is
+Status 2026-11-04 (current): assigned but BLOCKED and not running. The
+Gemma route is on cooldown (never cleared), no verifier model is qualified,
+and Eva is not wired into the launcher roster. The "trial-qualified" text below
+is HISTORICAL: one small trial earlier on 2026-11-04, not current readiness.
+Not an enforced gate. This document is
 workflow policy. "Eva checked it" is only claimable once the loop below is
 actually run and logged for a given publication.
 
@@ -57,9 +60,15 @@ intake for publications. It marks each claim's quoted strings FOUND /
 IN_OTHER_SOURCE / NOT_FOUND and lists numbers PRESENT / ABSENT in the cited
 passages. It is NOT a verdict: absent numbers can be computed or taken from
 elsewhere, present numbers are not checked for units, denominators or context.
-`intake` builds a HELD queue item (status held, attempts {}, kind verify) in
-the shape the runner's Verifier role reads; it cannot run until an operator
-changes its status and a verifier model is assigned and qualified. Eva remains
+`intake` builds a HELD queue item (status held, attempts {}, kind verify) and
+fails closed on partial or unsupported sources. The runner has a dedicated
+verify path: only status ready-verify runs, the model comes from an
+operator-made eva-assignment.json (assign_eva_manual, same price-0, route and
+ledger gates), the item must name its author_model (independence), and the
+result is PASS only if EVERY claim is SUPPORTED with a verbatim quote
+(UNVERIFIED or NOT_SUPPORTED never passes). No Ryan step follows, and a
+format failure goes to needs-human with no automatic retry. Held items never
+run, and no assignment exists today. Eva remains
 assigned but blocked and not wired (route cooldown, no qualified model).
 `docs/team/eva-precheck-rw6-v2packet.json` is the mechanical report for the
 published RW6 note against the 9-passage packet (13 claims, how many need
