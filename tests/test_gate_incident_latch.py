@@ -37,6 +37,27 @@ class RealBusCase(unittest.TestCase):
         return int(git(self.repo, "rev-list", "--count", "HEAD")
                    .stdout.strip())
 
+    def install_rejecting_hook(self):
+        hook = os.path.join(self.repo, ".git", "hooks", "pre-commit")
+        with open(hook, "w") as fh:
+            fh.write("#!/bin/sh\nexit 1\n")
+        os.chmod(hook, 0o755)
+
+    def remove_rejecting_hook(self):
+        os.remove(os.path.join(self.repo, ".git", "hooks",
+                               "pre-commit"))
+
+    def pending_rows(self):
+        with open(os.path.join(self.repo, GATES_PENDING)) as fh:
+            return [json.loads(l) for l in fh if l.strip()]
+
+    def head_pending_contains(self, gate_id):
+        p = subprocess.run(
+            ["git", "-C", self.repo, "show", f"HEAD:{GATES_PENDING}"],
+            capture_output=True, text=True)
+        return p.returncode == 0 and gate_id in p.stdout
+
+
     def test_same_incident_deduped(self):
         self.assertTrue(self.sup._escalate("consecutive routing failures"))
         self.assertTrue(self.sup._escalate("consecutive routing failures"))
@@ -143,22 +164,6 @@ class ReviewReproCase(RealBusCase):
     """The two confirmed v2 REQUEST-CHANGES repros, as integrated
     regressions."""
 
-    def install_rejecting_hook(self):
-        hook = os.path.join(self.repo, ".git", "hooks", "pre-commit")
-        with open(hook, "w") as fh:
-            fh.write("#!/bin/sh\nexit 1\n")
-        os.chmod(hook, 0o755)
-
-    def pending_rows(self):
-        with open(os.path.join(self.repo, GATES_PENDING)) as fh:
-            return [json.loads(l) for l in fh if l.strip()]
-
-    def head_pending_contains(self, gate_id):
-        p = subprocess.run(
-            ["git", "-C", self.repo, "show", f"HEAD:{GATES_PENDING}"],
-            capture_output=True, text=True)
-        return p.returncode == 0 and gate_id in p.stdout
-
     def test_failed_commit_rolls_back_and_preserves_crash(self):
         self.install_rejecting_hook()
         try:
@@ -216,6 +221,79 @@ class ReviewReproCase(RealBusCase):
         with open(os.path.join(self.repo, GATES_ANSWERS), "w") as fh:
             fh.write("")
         self.assertTrue(sup._escalate("incident after recovery"))
+
+
+class V3ReviewReproCase(RealBusCase):
+    """The two narrow v3 REQUEST-CHANGES repros."""
+
+    def staged_paths(self):
+        p = subprocess.run(
+            ["git", "-C", self.repo, "diff", "--cached", "--name-only"],
+            capture_output=True, text=True, check=True)
+        return [l for l in p.stdout.splitlines() if l]
+
+    def test_rollback_restores_index_and_preserves_preexisting(self):
+        # pre-existing staged change to ANOTHER file + a pre-existing
+        # STAGED PENDING row must both survive the rollback
+        with open(os.path.join(self.repo, "note.txt"), "w") as fh:
+            fh.write("keep me staged\n")
+        git(self.repo, "add", "note.txt")
+        r0 = {"id": "gate-staged-before", "ts": "2026-11-04T00:00:00Z",
+              "seat": "supervisor", "question": "older incident",
+              "options": [], "recommendation": None}
+        with open(os.path.join(self.repo, GATES_PENDING), "a") as fh:
+            fh.write(json.dumps(r0) + "\n")
+        git(self.repo, "add", GATES_PENDING)
+        self.install_rejecting_hook()
+        try:
+            self.assertFalse(self.sup._escalate("incident D"))
+        finally:
+            os.remove(os.path.join(self.repo, ".git", "hooks",
+                                   "pre-commit"))
+        # no staged PENDING delta left behind by the failed operation
+        staged = self.staged_paths()
+        self.assertIn("note.txt", staged)            # pre-existing kept
+        self.assertIn(GATES_PENDING, staged)         # only r0, staged BEFORE
+        p = subprocess.run(
+            ["git", "-C", self.repo, "show", f":{GATES_PENDING}"],
+            capture_output=True, text=True, check=True)
+        self.assertIn("gate-staged-before", p.stdout)
+        self.assertNotIn("incident D", p.stdout)     # own delta unstaged
+        # worktree also restored to the snapshot (r0 present, D absent)
+        with open(os.path.join(self.repo, GATES_PENDING)) as fh:
+            wt = fh.read()
+        self.assertIn("gate-staged-before", wt)
+        self.assertNotIn("incident D", wt)
+        # assert_index_clean contract: only the PRE-EXISTING staged
+        # changes remain; after committing them, answers are unblocked
+        git(self.repo, "commit", "-q", "-m", "pre-existing staged work")
+        self.bus.assert_index_clean("after rollback + normal commit")
+
+    def test_committed_check_exact_match_no_substring_false_positive(self):
+        # HEAD has a row whose QUESTION TEXT contains the string
+        # 'gate-residue'; the uncommitted supervisor row's id IS
+        # 'gate-residue'. Substring matching would falsely read it as
+        # committed.
+        row = {"id": "gate-111", "ts": "2026-11-04T00:00:00Z",
+               "seat": "builder",
+               "question": "crash reported near gate-residue seat",
+               "options": [], "recommendation": None}
+        with open(os.path.join(self.repo, GATES_PENDING), "a") as fh:
+            fh.write(json.dumps(row) + "\n")
+        git(self.repo, "add", GATES_PENDING)
+        git(self.repo, "commit", "-q", "-m", "commit builder row")
+        residue = {"id": "gate-residue", "ts": "2026-11-04T00:00:01Z",
+                   "seat": "supervisor", "question": "incident M",
+                   "options": [], "recommendation": None}
+        with open(os.path.join(self.repo, GATES_PENDING), "a") as fh:
+            fh.write(json.dumps(residue) + "\n")
+        before = self.commit_count()
+        self.assertTrue(self.sup._escalate("incident M"))
+        # it must have RECOMMITTED (not false-positive True), and the
+        # exact id is now in HEAD
+        self.assertEqual(self.commit_count(), before + 1)
+        self.assertTrue(self.head_pending_contains("gate-residue"))
+        self.assertTrue(self.head_pending_contains("gate-111"))
 
 
 if __name__ == "__main__":

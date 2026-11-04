@@ -180,27 +180,75 @@ class Supervisor:
                     "a human must nudge or re-open that session"):
                 self._stalled_seats.add(turn)
 
-    def _gate_committed(self, gate_id):
-        """True when the gate row is in HEAD's PENDING file, i.e. the
-        gate survives a crash or checkout. A matching WORKTREE row left
-        by a failed commit is not durable."""
+    def _gate_committed(self, gate):
+        """True when THIS gate is in HEAD's PENDING file, i.e. it
+        survives a crash or checkout. Exact parsed match on id (or
+        seat+question) - never a substring, which false-positives on
+        ids embedded in other rows. A matching WORKTREE row left by a
+        failed commit is not durable."""
         proc = subprocess.run(
             ["git", "-C", self.bus.repo, "show", f"HEAD:{GATES_PENDING}"],
             capture_output=True, text=True)
-        return proc.returncode == 0 and gate_id in proc.stdout
+        if proc.returncode != 0:
+            return False
+        for line in proc.stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if (row.get("id") == gate.get("id")
+                    or (row.get("seat") == gate.get("seat")
+                        and row.get("question") == gate.get("question"))):
+                return True
+        return False
 
-    def _rollback_gate(self, gate_id):
-        """Remove an appended gate row whose commit failed, so a later
-        retry cannot mistake the uncommitted row for a durable gate."""
+    def _snapshot_pending(self):
+        """Worktree bytes + staged blob of the PENDING file, so a
+        failed commit can be rolled back to EXACTLY the prior state,
+        preserving any pre-existing staged or worktree changes."""
+        if not hasattr(self.bus, "repo"):
+            return None  # non-git test double: nothing to snapshot
         path = os.path.join(self.bus.repo, GATES_PENDING)
         try:
-            with open(path) as fh:
-                rows = [l for l in fh
-                        if l.strip() and json.loads(l).get("id") != gate_id]
-            with open(path, "w") as fh:
-                fh.writelines(rows)
-        except (OSError, json.JSONDecodeError):
-            pass  # rollback is best-effort; the retry re-checks HEAD
+            with open(path, "rb") as fh:
+                worktree = fh.read()
+        except OSError:
+            worktree = None
+        proc = subprocess.run(
+            ["git", "-C", self.bus.repo, "ls-files", "-s", "--",
+             GATES_PENDING], capture_output=True, text=True)
+        parts = proc.stdout.split()
+        staged = parts[1] if proc.returncode == 0 and len(parts) >= 2             else None
+        return worktree, staged
+
+    def _restore_pending(self, snap):
+        """Undo only this operation's delta: worktree bytes and index
+        entry back to the snapshot."""
+        if snap is None:
+            return  # non-git test double: nothing to restore
+        worktree, staged = snap
+        path = os.path.join(self.bus.repo, GATES_PENDING)
+        if worktree is None:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+        else:
+            with open(path, "wb") as fh:
+                fh.write(worktree)
+        if staged is None:
+            subprocess.run(
+                ["git", "-C", self.bus.repo, "rm", "-q", "--cached",
+                 "--ignore-unmatch", "--", GATES_PENDING],
+                capture_output=True)
+        else:
+            subprocess.run(
+                ["git", "-C", self.bus.repo, "update-index",
+                 "--cacheinfo", f"100644,{staged},{GATES_PENDING}"],
+                capture_output=True)
 
     def _escalate(self, text):
         """Open a human gate for an incident, deduping only the SAME
@@ -226,7 +274,7 @@ class Supervisor:
         for gate in pending:
             if (gate.get("seat") == "supervisor"
                     and gate.get("question") == text):
-                if self._gate_committed(gate["id"]):
+                if self._gate_committed(gate):
                     print(f"supervisor: incident already pending: {text}",
                           flush=True)
                     return True
@@ -238,7 +286,8 @@ class Supervisor:
                     print(f"supervisor: gate commit failed ({exc}); "
                           f"deferring escalation: {text}", flush=True)
                     return False
-                return self._gate_committed(gate["id"])
+                return self._gate_committed(gate)
+        snap = self._snapshot_pending()
         gate_id = self.bus.open_gate(
             "supervisor", text,
             options=["restart the seat", "stop the team"],
@@ -246,9 +295,10 @@ class Supervisor:
         try:
             self.bus.commit_all("supervisor: escalation")
         except BusError as exc:
-            self._rollback_gate(gate_id)
+            self._restore_pending(snap)
             print(f"supervisor: gate commit failed ({exc}); "
-                  f"rolled back gate row, deferring: {text}", flush=True)
+                  f"restored prior PENDING state, deferring: {text}",
+                  flush=True)
             return False
         return True
 
