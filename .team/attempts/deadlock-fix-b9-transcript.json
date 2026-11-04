@@ -244,5 +244,53 @@
       "x-ratelimit-reset-tokens": "29.887s"
     },
     "call": 6
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-348d6c00-9bb6-4c5d-a23d-c25035d406ea",
+      "object": "chat.completion",
+      "created": 1793796783,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "Retry push.",
+            "tool_calls": [
+              {
+                "id": "fc_edbfbace-0bae-43d6-a515-998a01bfe121",
+                "type": "function",
+                "function": {
+                  "name": "git_push",
+                  "arguments": "{}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.02409496,
+        "prompt_tokens": 3966,
+        "prompt_time": 0.183477014,
+        "completion_tokens": 19,
+        "completion_time": 0.039775274,
+        "total_tokens": 3985,
+        "total_time": 0.223252288,
+        "completion_tokens_details": {
+          "reasoning_tokens": 4
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_df9620fe21",
+      "x_groq": {
+        "id": "req_01m6k9xf4pemz94aabwh7kj42r",
+        "seed": 159831528
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
