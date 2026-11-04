@@ -6,12 +6,13 @@
 - **Purpose:** owns status-evidence collection and status publication
   for the project Pages site, so the coordinator can focus on
   assignments, priorities and acceptance.
-- **Current model / provider:** not project-configured. The routine
-  status-maintenance workflow (hourly, changes-only, day-end archive)
-  is currently executed through the coordinator's maintenance process.
-  An external-model activation for short status-delta drafting is
-  proposed as its own bounded trial (see Open issues); it is NOT
-  assumed and NOT required for the current maintenance to continue.
+- **Current model / provider:** google/gemma-4-31b-it via the
+  Requesty price-0 route, for the narrow fixed-template STATUS-DRAFT
+  job only: one bounded attempt, one coordinator-reviewed usable
+  sample (2026-11-04, cost 0). This is NOT a general qualification:
+  every draft is coordinator-reviewed before use, and publication
+  stays with the coordination-run operator flow. The hourly
+  changes-only maintenance itself is unchanged by the draft role.
 - **Owns (scope):** project status evidence (scores, pins, timeline
   events) and its publication to GitHub Pages within existing grants;
   writes proposals, not decisions.
