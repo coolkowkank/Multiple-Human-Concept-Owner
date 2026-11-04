@@ -20,7 +20,7 @@ import subprocess
 import sys
 import time
 
-from .bus import Bus
+from .bus import Bus, BusError, GATES_PENDING
 
 
 class Supervisor:
@@ -180,19 +180,43 @@ class Supervisor:
                     "a human must nudge or re-open that session"):
                 self._stalled_seats.add(turn)
 
+    def _gate_committed(self, gate_id):
+        """True when the gate row is in HEAD's PENDING file, i.e. the
+        gate survives a crash or checkout. A matching WORKTREE row left
+        by a failed commit is not durable."""
+        proc = subprocess.run(
+            ["git", "-C", self.bus.repo, "show", f"HEAD:{GATES_PENDING}"],
+            capture_output=True, text=True)
+        return proc.returncode == 0 and gate_id in proc.stdout
+
+    def _rollback_gate(self, gate_id):
+        """Remove an appended gate row whose commit failed, so a later
+        retry cannot mistake the uncommitted row for a durable gate."""
+        path = os.path.join(self.bus.repo, GATES_PENDING)
+        try:
+            with open(path) as fh:
+                rows = [l for l in fh
+                        if l.strip() and json.loads(l).get("id") != gate_id]
+            with open(path, "w") as fh:
+                fh.writelines(rows)
+        except (OSError, json.JSONDecodeError):
+            pass  # rollback is best-effort; the retry re-checks HEAD
+
     def _escalate(self, text):
         """Open a human gate for an incident, deduping only the SAME
         incident (an unanswered supervisor gate with the identical
         question). Distinct incidents always get their own gate, even
         while another supervisor gate is pending.
 
-        Returns True when the incident is durably pending (gate opened,
-        or an identical one is already unanswered). When the pending
-        state cannot be read, opens NOTHING and returns False so the
-        caller keeps its own state and the next poll retries the
-        incident - a read failure must neither spam gates nor silently
-        drop an incident. The diagnostic is a transient print, never a
-        bus write, so repeated failures cannot grow the repo."""
+        Returns True only when the incident is DURABLY pending: the gate
+        row is committed in HEAD (written now, recommitted now after an
+        earlier commit failure, or already committed). Returns False -
+        caller keeps its own state and the next poll retries - when the
+        pending state cannot be read or the gate cannot be committed;
+        a failed commit rolls back its own append so the uncommitted
+        row is never mistaken for a durable gate. Diagnostics are
+        transient prints, never bus writes: repeated failures cannot
+        grow the repo."""
         try:
             pending = self.bus.pending_gates()
         except (OSError, AttributeError, json.JSONDecodeError) as exc:
@@ -202,17 +226,42 @@ class Supervisor:
         for gate in pending:
             if (gate.get("seat") == "supervisor"
                     and gate.get("question") == text):
-                print(f"supervisor: incident already pending: {text}",
-                      flush=True)
-                return True
-        self.bus.open_gate("supervisor", text,
-                           options=["restart the seat", "stop the team"],
-                           recommendation="restart the seat")
-        self.bus.commit_all("supervisor: escalation")
+                if self._gate_committed(gate["id"]):
+                    print(f"supervisor: incident already pending: {text}",
+                          flush=True)
+                    return True
+                # Matching worktree row from an earlier failed commit:
+                # persist it now instead of trusting it.
+                try:
+                    self.bus.commit_all("supervisor: escalation")
+                except BusError as exc:
+                    print(f"supervisor: gate commit failed ({exc}); "
+                          f"deferring escalation: {text}", flush=True)
+                    return False
+                return self._gate_committed(gate["id"])
+        gate_id = self.bus.open_gate(
+            "supervisor", text,
+            options=["restart the seat", "stop the team"],
+            recommendation="restart the seat")
+        try:
+            self.bus.commit_all("supervisor: escalation")
+        except BusError as exc:
+            self._rollback_gate(gate_id)
+            print(f"supervisor: gate commit failed ({exc}); "
+                  f"rolled back gate row, deferring: {text}", flush=True)
+            return False
         return True
 
     def _report_gates(self):
-        for gate in self.bus.pending_gates():
+        try:
+            gates = self.bus.pending_gates()
+        except (OSError, AttributeError, json.JSONDecodeError) as exc:
+            # The run loop must survive the same read failure that makes
+            # _escalate defer - otherwise there is no next poll to retry.
+            print(f"supervisor: pending gates unreadable ({exc!r}); "
+                  "skipping gate report this poll", flush=True)
+            return
+        for gate in gates:
             if gate["id"] in self._notified_gates:
                 continue
             self._notified_gates.add(gate["id"])

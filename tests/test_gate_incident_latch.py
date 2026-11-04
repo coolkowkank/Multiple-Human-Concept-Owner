@@ -139,5 +139,84 @@ class RealBusCase(unittest.TestCase):
         self.assertEqual(os.path.getsize(log_path), log_size)
 
 
+class ReviewReproCase(RealBusCase):
+    """The two confirmed v2 REQUEST-CHANGES repros, as integrated
+    regressions."""
+
+    def install_rejecting_hook(self):
+        hook = os.path.join(self.repo, ".git", "hooks", "pre-commit")
+        with open(hook, "w") as fh:
+            fh.write("#!/bin/sh\nexit 1\n")
+        os.chmod(hook, 0o755)
+
+    def pending_rows(self):
+        with open(os.path.join(self.repo, GATES_PENDING)) as fh:
+            return [json.loads(l) for l in fh if l.strip()]
+
+    def head_pending_contains(self, gate_id):
+        p = subprocess.run(
+            ["git", "-C", self.repo, "show", f"HEAD:{GATES_PENDING}"],
+            capture_output=True, text=True)
+        return p.returncode == 0 and gate_id in p.stdout
+
+    def test_failed_commit_rolls_back_and_preserves_crash(self):
+        self.install_rejecting_hook()
+        try:
+            before = self.commit_count()
+            self.assertFalse(self.sup._escalate("incident C"))
+            # rollback: no worktree row, no commit, nothing durable
+            self.assertEqual(self.pending_rows(), [])
+            self.assertEqual(self.commit_count(), before)
+            # caller keeps the crashed seat - the incident is not lost
+            self.sup.procs["builder"] = DeadProc()
+            self.sup.restarts["builder"] = 2
+            self.sup._reap_and_restart()
+            self.assertIn("builder", self.sup.procs)
+        finally:
+            os.remove(os.path.join(self.repo, ".git", "hooks",
+                                   "pre-commit"))
+        # after the blocker clears, the retry durably lands the gate
+        self.assertTrue(self.sup._escalate("incident C"))
+        rows = self.pending_rows()
+        self.assertEqual(len(rows), 1)
+        self.assertTrue(self.head_pending_contains(rows[0]["id"]))
+        self.sup._reap_and_restart()
+        self.assertNotIn("builder", self.sup.procs)
+
+    def test_uncommitted_matching_row_recommitted_on_retry(self):
+        # residue of an earlier failed commit: worktree row, empty HEAD
+        row = {"id": "gate-residue", "ts": "2026-11-04T00:00:00Z",
+               "seat": "supervisor", "question": "incident M",
+               "options": [], "recommendation": None}
+        with open(os.path.join(self.repo, GATES_PENDING), "a") as fh:
+            fh.write(json.dumps(row) + "\n")
+        self.assertFalse(self.head_pending_contains("gate-residue"))
+        # retry must recommit the matching row, not trust it
+        self.assertTrue(self.sup._escalate("incident M"))
+        self.assertTrue(self.head_pending_contains("gate-residue"))
+        self.assertEqual(len(self.pending_rows()), 1)  # deduped, no 2nd
+
+    def test_report_gates_read_error_survives(self):
+        with open(os.path.join(self.repo, GATES_ANSWERS), "a") as fh:
+            fh.write("{broken\n")
+        self.sup._report_gates()  # must not raise
+        self.assertEqual(self.pending_rows(), [])
+
+    def test_run_loop_survives_malformed_answers_no_spam(self):
+        with open(os.path.join(self.repo, GATES_ANSWERS), "a") as fh:
+            fh.write("{broken\n")
+        sup = Supervisor(repo=self.repo, stall_timeout=3600, poll=0.05)
+        before = self.commit_count()
+        # the whole run loop must ride out the read failure: no raise,
+        # no gates, no commits - so a later poll CAN retry
+        self.assertEqual(sup.run(max_seconds=0.3), "timeout")
+        self.assertEqual(self.commit_count(), before)
+        self.assertEqual(self.pending_rows(), [])
+        # and recovery works in the same repo
+        with open(os.path.join(self.repo, GATES_ANSWERS), "w") as fh:
+            fh.write("")
+        self.assertTrue(sup._escalate("incident after recovery"))
+
+
 if __name__ == "__main__":
     unittest.main()
