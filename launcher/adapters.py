@@ -187,7 +187,22 @@ class HttpAdapter(Adapter):
 
     def __init__(self, base_url, model, api_key_env, timeout=600,
                  max_retries=3, backoff=2.0, sleeper=time.sleep,
-                 max_tokens=None, reasoning_effort=None):
+                 max_tokens=None, reasoning_effort=None,
+                 call_budget=None, usage_log=None):
+        # call_budget: maximum provider requests this adapter will
+        # ATTEMPT. Every try counts - successes, HTTP errors, 429
+        # retries and unreachable transport - and the check runs BEFORE
+        # the request is issued, so an unattended seat can never exceed
+        # it (the D11 lesson from the self-commit executor: attempts
+        # count, fail closed). None keeps legacy unbounded behavior;
+        # unattended autonomous runs SHOULD set a budget per seat.
+        self.call_budget = call_budget
+        self._calls = 0
+        # usage_log: optional path; one JSON line appended per attempt
+        # ({ts, model, attempt, outcome, usage}) so autonomous runs are
+        # auditable and token spend is measurable from the record, not
+        # estimated. Parent directory must exist or be creatable.
+        self.usage_log = usage_log
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.api_key_env = api_key_env
@@ -245,13 +260,34 @@ class HttpAdapter(Adapter):
         text = data["choices"][0]["message"]["content"]
         return parse_response(text)
 
+    def _record(self, attempt, outcome, usage=None):
+        if not self.usage_log:
+            return
+        import datetime
+        line = {"ts": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "model": self.model, "attempt": attempt, "outcome": outcome,
+                "usage": usage}
+        os.makedirs(os.path.dirname(os.path.abspath(self.usage_log)),
+                    exist_ok=True)
+        with open(self.usage_log, "a") as fh:
+            fh.write(json.dumps(line) + "\n")
+
     def _post(self, req):
         delay = self.backoff
         for attempt in range(self.max_retries + 1):
+            if self.call_budget is not None and self._calls >= self.call_budget:
+                raise AdapterError(
+                    f"provider call budget exhausted "
+                    f"({self._calls}/{self.call_budget}); refusing further "
+                    f"requests (fail-closed)")
+            self._calls += 1  # counted BEFORE the request: errors and retries consume budget too
             try:
                 with urllib.request.urlopen(req, timeout=self.timeout)                         as resp:
-                    return json.loads(resp.read())
+                    data = json.loads(resp.read())
+                    self._record(attempt + 1, "ok", data.get("usage"))
+                    return data
             except urllib.error.HTTPError as exc:
+                self._record(attempt + 1, f"http_{exc.code}")
                 if exc.code != 429 or attempt == self.max_retries:
                     raise AdapterError(
                         f"provider HTTP {exc.code} after {attempt + 1} "
@@ -261,6 +297,7 @@ class HttpAdapter(Adapter):
                 self.sleeper(wait)
                 delay *= 2
             except urllib.error.URLError as exc:
+                self._record(attempt + 1, "unreachable")
                 if attempt == self.max_retries:
                     raise AdapterError(
                         f"provider unreachable after {attempt + 1} "
@@ -332,5 +369,7 @@ def build_adapter(spec):
             spec["base_url"], spec["model"], spec["api_key_env"],
             timeout=spec.get("timeout", 600),
             max_tokens=spec.get("max_tokens"),
-            reasoning_effort=spec.get("reasoning_effort"))
+            reasoning_effort=spec.get("reasoning_effort"),
+            call_budget=spec.get("call_budget"),
+            usage_log=spec.get("usage_log"))
     raise AdapterError(f"unknown adapter type {kind!r}")

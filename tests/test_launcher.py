@@ -1992,6 +1992,97 @@ class LoopErrorPathTests(unittest.TestCase):
                   "--discard-stale"])
 
 
+class HttpAdapterBudgetTests(unittest.TestCase):
+    """Unattended-autonomy guard: a per-adapter provider call budget,
+    counted BEFORE every request (errors and 429 retries consume it),
+    fail-closed at the cap, with one usage line recorded per attempt."""
+
+    def _server(self, script):
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        import threading
+        calls = {"n": 0}
+
+        class H(BaseHTTPRequestHandler):
+            def do_POST(self):
+                calls["n"] += 1
+                n = int(self.headers.get("content-length", 0))
+                self.rfile.read(n)
+                status = script[min(calls["n"], len(script)) - 1]
+                self.send_response(status)
+                if status == 200:
+                    payload = {"choices": [{"message": {"content":
+                        '{"summary": "ok", "handoff": null}'}}],
+                               "usage": {"prompt_tokens": 10,
+                                         "completion_tokens": 5,
+                                         "total_tokens": 15}}
+                    data = json.dumps(payload).encode()
+                    self.send_header("content-type", "application/json")
+                    self.send_header("content-length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                else:
+                    self.end_headers()
+
+            def log_message(self, *a):
+                pass
+
+        srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+        self.addCleanup(srv.shutdown)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        return srv, calls
+
+    def _adapter(self, srv, budget, log=None):
+        from launcher.adapters import HttpAdapter
+        os.environ["TEAM_TEST_BUDGET_KEY"] = "k"
+        self.addCleanup(os.environ.pop, "TEAM_TEST_BUDGET_KEY", None)
+        return HttpAdapter(
+            f"http://127.0.0.1:{srv.server_address[1]}", "m",
+            "TEAM_TEST_BUDGET_KEY", max_retries=5, backoff=0.01,
+            sleeper=lambda s: None, call_budget=budget, usage_log=log)
+
+    def test_budget_refuses_beyond_cap_fail_closed(self):
+        srv, calls = self._server([200, 200, 200])
+        a = self._adapter(srv, budget=2)
+        from launcher.adapters import AdapterError
+        a.complete("s", "p"); a.complete("s", "p")
+        with self.assertRaises(AdapterError) as ctx:
+            a.complete("s", "p")
+        self.assertIn("budget exhausted", str(ctx.exception))
+        self.assertEqual(calls["n"], 2)  # the refused call was never issued
+
+    def test_429_retries_consume_budget(self):
+        srv, calls = self._server([429, 429, 200])
+        from launcher.adapters import AdapterError
+        a = self._adapter(srv, budget=2)
+        with self.assertRaises(AdapterError) as ctx:
+            a.complete("s", "p")
+        self.assertIn("budget exhausted", str(ctx.exception))
+        self.assertEqual(calls["n"], 2)  # both attempts counted, third refused
+
+    def test_usage_log_records_every_attempt(self):
+        import tempfile
+        d = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, d, True)
+        log = os.path.join(d, "usage", "seat.jsonl")
+        srv, calls = self._server([429, 200])
+        self._adapter(srv, budget=5, log=log).complete("s", "p")
+        lines = [json.loads(l) for l in open(log)]
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(lines[0]["outcome"], "http_429")
+        self.assertIsNone(lines[0]["usage"])
+        self.assertEqual(lines[1]["outcome"], "ok")
+        self.assertEqual(lines[1]["usage"]["total_tokens"], 15)
+        self.assertEqual(lines[1]["model"], "m")
+
+    def test_roster_spec_wires_budget_and_usage_log(self):
+        from launcher.adapters import build_adapter
+        a = build_adapter({"type": "http", "base_url": "http://x",
+                           "model": "m", "api_key_env": "K",
+                           "call_budget": 3, "usage_log": "/tmp/u.jsonl"})
+        self.assertEqual(a.call_budget, 3)
+        self.assertEqual(a.usage_log, "/tmp/u.jsonl")
+
+
 class HttpAdapterMaxTokensTests(unittest.TestCase):
     """Reasoning models can exhaust the provider's default completion
     cap on reasoning and return empty content (observed live against

@@ -89,8 +89,9 @@ Creates a fresh project repo, launches the full seat cycle (Coordinator drafts c
 
 1. `python3 -m launcher init --repo /path/to/project --branch team-work --default-roster`
 2. Fill `.team/brief.md` (or start from `templates/concept_to_coordinator.md`) and `.team/roster.json`: name each seat's adapter - `mock` for rehearsal, `queue` for responses reasoned outside the process (assistant-mediated or pasted), `cli` for an installed agent CLI, `http` for a model API, `interactive` as the unmanaged-session marker.
-3. `python3 -m launcher launch --repo /path/to/project` - the supervisor starts every automated seat, restarts crashes, escalates stalls, and prints human gates as they open.
-4. Watch progress with `python3 -m launcher status --repo /path/to/project`; answer gates with `python3 -m launcher answer <gate-id> "<decision>"`.
+3. For unattended runs, give every `http` seat a budget in `.team/roster.json`: `"call_budget": <max provider requests>` (every attempt counts, including errors and 429 retries; the seat refuses beyond the cap, fail-closed) and `"usage_log": ".team/usage/<seat>.jsonl"` (one JSON line per attempt with the provider's usage, so token spend is measured from the record).
+4. `python3 -m launcher launch --repo /path/to/project` - the supervisor starts every automated seat, restarts crashes, escalates stalls, and prints human gates as they open.
+5. Watch progress with `python3 -m launcher status --repo /path/to/project`; answer gates with `python3 -m launcher answer <gate-id> "<decision>"`.
 
 Seats on any platform join the same bus. The git repository is the durable record and work platform - not the only channel: the loopback relay and outbound webhook wakes let cross-platform seats signal each other directly without human relaying. Network-exposed relays or server-side enforcement are owner security decisions, not defaults. Pasting a prompt grants no access: a seat's access is verified by observed action, not claimed (docs/evidence-interface.md §5).
 

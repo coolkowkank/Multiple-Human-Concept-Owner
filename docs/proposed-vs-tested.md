@@ -199,3 +199,20 @@ required per-round steering and are not evidence of that autonomy. The
 fresh-clone, concept-to-result test - a new adopter's own AI running one
 full batch cycle with no Instinct-specific help - remains the open test
 ("Next useful test" above). Nothing here claims it has passed.
+
+## Unattended-run call budgets (4 Nov 2026, branch team-launcher)
+
+Toward the acceptance target above: the `http` seat adapter now takes an
+optional per-seat provider call budget (`call_budget`) and usage record
+(`usage_log`) in the roster spec. Every attempted request counts -
+successes, HTTP errors, 429 retries, unreachable transport - checked
+before the request is issued; at the cap the seat fails closed with
+AdapterError, which the supervisor treats as a seat failure (restart
+limit, then escalation), never as done work. Each attempt appends one
+JSON line (ts, model, attempt, outcome, provider usage) so token spend
+is measured from the record. Fixture-tested offline
+(HttpAdapterBudgetTests, 4 tests): refusal beyond the cap issues no
+request, 429 retries consume budget, usage lines record every attempt,
+roster spec wiring. Not yet exercised: a live unattended run under a
+budget. Legacy behavior is unchanged when the keys are absent - existing
+rosters keep working, but unattended autonomous runs should set budgets.
