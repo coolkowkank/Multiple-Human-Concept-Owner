@@ -33,7 +33,7 @@ def avatar(login):
     im.putalpha(mask)
     return np.asarray(im)
 
-W, H = 1434, 1330
+W, H = 1434, 1460
 fig = plt.figure(figsize=(W/100, H/100), dpi=100)
 ax = fig.add_axes([0, 0, 1, 1]); ax.set_xlim(0, W); ax.set_ylim(H, 0); ax.axis("off")
 ax.add_patch(plt.Rectangle((0, 0), W, H, color="white"))
@@ -134,34 +134,49 @@ arrow((COR[0], BLD[1]-24), (BLD[0], BLD[1]-24), shrink=90)
 text(479, BLD[1]-62, "assigns scoped tasks", 14.5, ARROW)
 arrow((BLD[0], BLD[1]+24), (COR[0], BLD[1]+24), shrink=90)
 text(479, BLD[1]+34, "checks completed review loop", 14.5, ARROW)
+# Coordinator manages BOTH delivery roles: a high coordination arc to the
+# reviewer (assignment/coordination only - review requests and verdicts never
+# pass through the Coordinator; the review loop below stays Builder <-> reviewer)
+arrow((COR[0]+120, 650), (REV[0]-120, 650), rad=-0.11, shrink=60)
+text(717, 583, "coordinates both roles (never carries review)", 14, ARROW)
 # Review loop is directly between Builder and the independent reviewer
 arrow((BLD[0], BLD[1]-24), (REV[0], BLD[1]-24), shrink=90)
 text(955, BLD[1]-62, "review requests (pinned commit)", 14.5, ARROW)
 arrow((REV[0], BLD[1]+24), (BLD[0], BLD[1]+24), shrink=90)
 text(955, BLD[1]+34, "review verdicts", 14.5, ARROW)
 
-# Standby band: provider routes QUALIFIED (key + free tool-calling probe, 2026-11-04)
-# but not yet assigned active work. Dashed connectors = standby, never an active seat.
+# Available model pool: QUALIFIED providers (keys + probes verified 2026-11-04).
+# Providers are NOT team seats or roles - a model from this pool can be assigned
+# to a seat by the Coordinator within verified budgets and existing authority.
 band = FancyBboxPatch((200, 955), 1034, 288, boxstyle="round,pad=6,rounding_size=14",
                       fc="#fafafc", ec="#c9ccd4", lw=1.4, ls=(0, (5, 4)))
 ax.add_patch(band)
-text(717, 972, "Qualified backup routes - standby, not assigned active work", 16, INK, "bold")
+text(717, 972, "Available model pool - qualified providers, not team seats", 16, INK, "bold")
 CER, RQY = (455, 1084, 48), (979, 1084, 48)
 node(*CER, icon="Ce")
 node(*RQY, icon="Rq")
-text(CER[0], CER[1]+CER[2]+12, "Cerebras (standby)", 16, INK, "bold")
-text(CER[0], CER[1]+CER[2]+40, "Builder route: gpt-oss-120b", 13.5, GRAY, style="italic")
-text(CER[0], CER[1]+CER[2]+66, "free trial 5 RPM / 1M tokens-day", 12.5)
-text(CER[0], CER[1]+CER[2]+90, "tool calls verified 2026-11-04", 12.5)
-text(RQY[0], RQY[1]+RQY[2]+12, "Requesty (standby)", 16, INK, "bold")
-text(RQY[0], RQY[1]+RQY[2]+40, "Builder route via router: free models", 13.5, GRAY, style="italic")
-text(RQY[0], RQY[1]+RQY[2]+66, "200 requests-day; tool calls verified", 12.5)
-text(RQY[0], RQY[1]+RQY[2]+90, "on google/gemma-4-31b-it, 2026-11-04", 12.5)
-# one dashed standby link to the band: the Coordinator manages every delivery
-# seat, active or standby, and activates standby routes by assigning scoped
-# work within verified free budgets - no separate owner gate per routine task
+text(CER[0], CER[1]+CER[2]+12, "Cerebras (on hold)", 16, INK, "bold")
+text(CER[0], CER[1]+CER[2]+40, "models: gpt-oss-120b, qwen-3.8-27b", 13.5, GRAY, style="italic")
+text(CER[0], CER[1]+CER[2]+66, "key + tool calls verified 2026-11-04", 12.5)
+text(CER[0], CER[1]+CER[2]+90, "hold: account credit/ledger unverified", 12.5)
+text(RQY[0], RQY[1]+RQY[2]+12, "Requesty (qualifying)", 16, INK, "bold")
+text(RQY[0], RQY[1]+RQY[2]+40, "google/gemma-4-31b-it, zero-price verified", 13.5, GRAY, style="italic")
+text(RQY[0], RQY[1]+RQY[2]+66, "bounded 5-seat local experiment running:", 12.5)
+text(RQY[0], RQY[1]+RQY[2]+90, "20-request cap, separate local repo", 12.5)
+# one dashed link to the pool: the Coordinator manages every delivery seat and
+# activates a pool model for a seat by assigning scoped work within verified
+# free budgets - no separate owner gate per routine task
 arrow((COR[0]+20, 905), (335, 958), rad=0.08, style=(0, (5, 4)), shrink=40)
 text(186, 916, "Coordinator assigns scoped work", 13, ARROW, ha="left")
+
+# On-demand README roles: activated per task, not standing seats (no active
+# occupant today - stated, not drawn as seats)
+od = FancyBboxPatch((200, 1268), 1034, 112, boxstyle="round,pad=6,rounding_size=14",
+                    fc="white", ec="#c9ccd4", lw=1.2)
+ax.add_patch(od)
+text(717, 1284, "On demand (README roles, activated only when the task needs them)", 15, INK, "bold")
+text(717, 1316, "Architect + Independent QC - high-impact seats, called in for consequential work; a QC fail stands.", 13, GRAY)
+text(717, 1344, "Records - archive function; vacant today (git history covers it on this project).", 13, GRAY)
 
 # Footer: shared machine account is infrastructure, not a team member
 text(40, H-64, "@coolkowkank-bot is the shared machine account the Builder acts through:", 13, GRAY, ha="left")

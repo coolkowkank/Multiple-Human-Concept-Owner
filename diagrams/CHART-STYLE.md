@@ -33,7 +33,10 @@ a separate artifact with its own style.
   Builder in the middle, so each hand-off is a short straight arrow pair that never crosses
   a label.
 - Content rules: current occupants only - no unused seats, no adapter details, no
-  historical contributors.
+  historical contributors. README roles with no active occupant are NOT drawn as seats;
+  a small "On demand" note states they exist and are activated per task (owner steer
+  2026-11-04, Slack 1793790584.019179 + 1793790702.379659: README framework with
+  task-scaled activation, no empty-seat clutter).
 - Link rule (owner decision 2026-11-04, Slack 1793788269.210599): the review/verdict loop
   is directly between the Builder (@coolkowkank-bot) and the independent reviewer
   (@instinct-christina): review requests go Builder -> reviewer, verdicts go reviewer ->
@@ -41,17 +44,24 @@ a separate artifact with its own style.
   tasks to the Builder and checks the completed review loop. Never draw review arrows
   to or from the Coordinator, and never read independent review as a subordinate
   reporting line.
+- Coordination link (owner steer 2026-11-04, Slack 1793790702.379659): the Coordinator
+  manages BOTH delivery roles, so one shallow arc runs from the Coordinator side to the
+  reviewer above the Builder, labeled "coordinates both roles (never carries review)".
+  It is a coordination link, never a review arrow; the review loop stays untouched.
 - Arrow check: after rendering, read each arrowhead on the actual image and confirm it
   matches its label.
-- Standby routes (owner request 2026-11-04, Slack 1793788648.701489): qualified but
-  inactive provider routes sit in a separate dashed "Qualified backup routes" band below
-  the team row - never as active seats. Each standby node states only verified facts
-  (model or route, free-tier limit, what was probe-verified, and the date) plus the word
-  "standby". One dashed connector from the Coordinator to the band, labeled "Coordinator
-  assigns scoped work": the Coordinator activates a standby route by assigning
-  scoped work within verified free budgets and existing task authority - there
-  is no separate owner approval gate per routine task. Never mark a standby
-  route active until real assigned execution has run.
+- Available model pool (owner request 2026-11-04, Slack 1793788648.701489; refined
+  1793790702.379659): qualified but inactive PROVIDERS sit in a separate dashed
+  "Available model pool" band below the team row - never as active seats, and never
+  labeled as a role ("Builder route" is wrong: providers are model sources, roles are
+  seats). Each pool node states only verified facts (models, what was probe-verified,
+  the date, and its current grounded status - e.g. zero-price verified / on hold with
+  the reason) plus its assignment state. One dashed connector from the Coordinator to
+  the band, labeled "Coordinator assigns scoped work": the Coordinator activates a pool
+  model for a seat by assigning scoped work within verified free budgets and existing
+  task authority - there is no separate owner approval gate per routine task. Never
+  mark a pool model active until real assigned execution has run, and never infer seat
+  suitability (e.g. Architect/QC) from provider or price labels alone.
 
 ## Update rules
 
