@@ -59,8 +59,8 @@ def render(here, updated):
     labels(COR,"Telkomsel - Coordinator","@instinct-telkomsel","Plans, assigns work, tracks progress","Model: not project-configured")
     labels(BLD,"Alex - Builder","@coolkowkank-bot",("gpt-oss-120b (free plan)","Gq"),"via shared bot account")
     labels(REV,"Bill - Independent reviewer","@instinct-christina","Reviews the Builder's pinned commits","Model: not project-configured")
-    labels(EVA,"Eva - Evidence verifier","role only; no account",("Gemma 4 31B (free), trial-tested","Rq"),"runtime integration pending")
-    labels(RES,"Nora - Researcher","Uses @coolkowkank","dedicated Researcher token",("Nemotron-3 Ultra 550B (Requesty free)","Rq"),"verified-source synthesis; citations reviewed")
+    labels(EVA,"Eva - Evidence verifier","Uses @coolkowkank","shared research token",("Gemma 4 31B (free), trialed","Rq"),"runtime integration pending")
+    labels(RES,"Nora - Researcher","Uses @coolkowkank","shared research token",("Nemotron-3 Ultra 550B (free)","Rq"),"synthesis; citations reviewed")
     # hierarchy: owner > coordinator > others (plain lines, no arrowheads)
     HL="#b4b8c6"
     ax.plot([OWN[0],COR[0]],[258,COR[1]-COR[2]-4],color=HL,lw=2,zorder=1)

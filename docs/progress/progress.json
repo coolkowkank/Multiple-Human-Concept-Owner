@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04T15:32:00+02:00",
+ "as_of": "2026-11-04T15:41:00+02:00",
  "timezone": "EET (UTC+2), same as commit timestamps",
  "rules": "Weighted milestone progress, not independently verified completion. Milestone done = 100% of weight (tests pass or an independent review passed). Partial = 50%. In progress / not started = 0%. Weights are judgment calls. Commits alone never count.",
  "packages": [
