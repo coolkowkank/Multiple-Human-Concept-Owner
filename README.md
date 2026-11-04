@@ -49,7 +49,7 @@
 | RW5 | Prior art in public systems | S2 notes; partial level-2 read, no tested adoption decision | None; feeds RW1-RW4. Re-pin implementation and write adopt/skip decisions; Supports RW1-RW4, no separate WP credit |
 | RW6 | Rate-limit-aware provider routing | S0 placeholder; not started | Research scope must be assigned; no date committed; WP6 context only |
 
-**Individual jobs are in the same Gantt diagram**, after WP and RW rows. The chart includes latch revisions, independent reviews, performance analysis and Recovery Executor work. Markers show dated outputs or reviews only, not continuous runtime, idle time or extra milestone credit. Coordinator coordination is excluded.
+**Individual jobs are in the same Gantt diagram**, after WP and RW rows. The chart includes latch revisions, independent reviews, performance analysis and Builder 2 work (formerly Recovery Executor). Markers show dated outputs or reviews only, not continuous runtime, idle time or extra milestone credit. Coordinator coordination is excluded.
 
 
 ![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/76d9eca37f4e573657af5323b5e212d23c3530ba/docs/progress/gantt.png)
