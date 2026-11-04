@@ -458,20 +458,35 @@ class MockQueueTests(unittest.TestCase):
         self.addCleanup(os.unlink, path)
         return path
 
-    def test_pop_persists_across_processes(self):
+    def test_peek_then_consume_persists_across_processes(self):
         from launcher.adapters import MockAdapter
         path = self._queue([{"summary": "turn one"}, {"summary": "turn two"}])
-        # two separate adapter instances = two separate --once processes
-        r1 = MockAdapter([], script_path=path).complete("s", "p")
-        r2 = MockAdapter([], script_path=path).complete("s", "p")
+        a = MockAdapter([], script_path=path)
+        r1 = a.complete("s", "p")
+        # peek alone must not consume: a failed turn loses nothing
+        self.assertEqual(MockAdapter([], script_path=path)
+                         .complete("s", "p")["summary"], "turn one")
+        a.consume()
+        # next process reads the next response
+        self.assertEqual(MockAdapter([], script_path=path)
+                         .complete("s", "p")["summary"], "turn two")
         self.assertEqual(r1["summary"], "turn one")
-        self.assertEqual(r2["summary"], "turn two")
 
     def test_empty_queue_raises(self):
         from launcher.adapters import MockAdapter, AdapterError
         path = self._queue([])
         with self.assertRaises(AdapterError):
             MockAdapter([], script_path=path).complete("s", "p")
+
+    def test_consume_rejects_changed_queue(self):
+        from launcher.adapters import MockAdapter, AdapterError
+        path = self._queue([{"summary": "turn one"}])
+        a = MockAdapter([], script_path=path)
+        a.complete("s", "p")
+        with open(path, "w") as fh:
+            fh.write('{"summary": "swapped"}\n')
+        with self.assertRaises(AdapterError):
+            a.consume()
 
 
 class FalseGreenTests(unittest.TestCase):

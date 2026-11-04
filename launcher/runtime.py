@@ -87,6 +87,9 @@ class Seat:
             recent = self.bus.log(limit=20)
             response = self._call_adapter(state, brief, recent)
             self._apply(state, response)
+            consume = getattr(self.adapter, "consume", None)
+            if consume:
+                consume()
             return True
 
         return self.bus.transact(f"TURN: {self.name} acting", mutate)

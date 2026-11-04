@@ -231,6 +231,54 @@ class RaceAndResumeTests(unittest.TestCase):
         log_b = git(b, "log", "--format=%s").stdout
         self.assertEqual(log_b.count("a second"), 1)
 
+    def test_lost_race_replays_same_queued_response_exactly_once(self):
+        from launcher.bus import BusError
+        a = self._seed_remote()
+        # alpha gets a script_path queue (multi-process turn responses)
+        import json as _json
+        roster_path = os.path.join(a, ".team", "roster.json")
+        roster = _json.load(open(roster_path))
+        roster["seats"]["alpha"]["adapter"] = {
+            "type": "mock", "script_path": "work/.alpha.jsonl"}
+        _json.dump(roster, open(roster_path, "w"), indent=2)
+        os.makedirs(os.path.join(a, "work"), exist_ok=True)
+        with open(os.path.join(a, "work", ".alpha.jsonl"), "w") as fh:
+            fh.write(_json.dumps(
+                {"writes": {"work/x.txt": "hello"},
+                 "summary": "alpha turn one", "handoff": "beta"}) + "\n")
+            fh.write(_json.dumps(
+                {"summary": "alpha later turn", "handoff": "beta"}) + "\n")
+        bus0 = Bus(a, "team-work")
+        state = bus0.state()
+        state["turn"] = "alpha"
+        bus0.write_state(state)
+        bus0.commit_all("human: alpha queued, turn issued")
+        bus0.push()
+
+        bus_a = Bus(a, "team-work")
+        pushes = []
+        orig_push = bus_a.push
+        def flaky_push():
+            pushes.append(1)
+            if len(pushes) == 1:
+                raise BusError("simulated lost race")
+            return orig_push()
+        bus_a.push = flaky_push
+
+        seat = Seat(bus_a, "alpha")
+        self.assertTrue(seat.act_once())
+        self.assertEqual(len(pushes), 2)  # one lost race, one success
+        handoffs = [e for e in bus_a.log()
+                    if e["kind"] == "handoff" and e["seat"] == "alpha"]
+        self.assertEqual(len(handoffs), 1)  # applied exactly once
+        self.assertEqual(handoffs[0]["body"].split(" | ")[0],
+                         "alpha turn one")
+        self.assertEqual(open(os.path.join(a, "work", "x.txt")).read(),
+                         "hello")
+        remaining = open(os.path.join(a, "work", ".alpha.jsonl")).read()
+        self.assertNotIn("turn one", remaining)   # consumed once
+        self.assertIn("later turn", remaining)     # next response intact
+
     def test_fresh_session_resumes_from_record_alone(self):
         a = self._seed_remote()
         bus_a = Bus(a, "team-work")

@@ -28,6 +28,23 @@ class AdapterError(Exception):
 
 
 class Adapter:
+    def consume(self):
+        """Remove the peeked line after the turn was applied. Called by
+        the runtime inside the same transact mutation, so a reset after
+        a lost race also restores the queue. Raises if the file changed
+        between peek and consume (record would be incoherent)."""
+        if not self.script_path or self._peeked is None:
+            return
+        with open(self.script_path) as fh:
+            lines = [l for l in fh.read().splitlines() if l.strip()]
+        if not lines or lines[0] != self._peeked:
+            raise AdapterError(
+                f"mock script queue at {self.script_path} changed "
+                "between peek and consume")
+        with open(self.script_path, "w") as fh:
+            fh.write("\n".join(lines[1:]) + ("\n" if len(lines) > 1 else ""))
+        self._peeked = None
+
     def complete(self, system, prompt):
         raise NotImplementedError
 
@@ -36,15 +53,36 @@ class MockAdapter(Adapter):
     """Scripted adapter. `script` maps call index -> response dict,
     or a callable(system, prompt, call_index) -> dict.
 
-    `script_path` (JSONL file) is the multi-process variant: each call
-    pops the first line and persists the remainder, so separate
-    `seat --once` processes consume successive prepared responses
-    instead of every process restarting at script[0]."""
+    `script_path` (JSONL file) is the multi-process variant: complete()
+    PEEKS the first line, and the runtime calls consume() only after the
+    response has been applied inside the same transact mutation. A lost
+    commit race resets the tree (including the queue file), so a retried
+    turn re-reads the same response - no response is ever lost or
+    double-consumed, and separate `seat --once` processes consume
+    successive prepared responses instead of restarting at script[0]."""
 
     def __init__(self, script, script_path=None):
         self.script = script
         self.script_path = script_path
         self.calls = []
+        self._peeked = None
+
+    def consume(self):
+        """Remove the peeked line after the turn was applied. Called by
+        the runtime inside the same transact mutation, so a reset after
+        a lost race also restores the queue. Raises if the file changed
+        between peek and consume (record would be incoherent)."""
+        if not self.script_path or self._peeked is None:
+            return
+        with open(self.script_path) as fh:
+            lines = [l for l in fh.read().splitlines() if l.strip()]
+        if not lines or lines[0] != self._peeked:
+            raise AdapterError(
+                f"mock script queue at {self.script_path} changed "
+                "between peek and consume")
+        with open(self.script_path, "w") as fh:
+            fh.write("\n".join(lines[1:]) + ("\n" if len(lines) > 1 else ""))
+        self._peeked = None
 
     def complete(self, system, prompt):
         self.calls.append({"system": system, "prompt": prompt})
@@ -54,8 +92,7 @@ class MockAdapter(Adapter):
             if not lines:
                 raise AdapterError(
                     f"mock script queue empty at {self.script_path}")
-            with open(self.script_path, "w") as fh:
-                fh.write("\n".join(lines[1:]) + ("\n" if len(lines) > 1 else ""))
+            self._peeked = lines[0]
             return json.loads(lines[0])
         i = len(self.calls) - 1
         if callable(self.script):
@@ -75,6 +112,23 @@ class CliAdapter(Adapter):
     def __init__(self, command, timeout=1800):
         self.command = command
         self.timeout = timeout
+
+    def consume(self):
+        """Remove the peeked line after the turn was applied. Called by
+        the runtime inside the same transact mutation, so a reset after
+        a lost race also restores the queue. Raises if the file changed
+        between peek and consume (record would be incoherent)."""
+        if not self.script_path or self._peeked is None:
+            return
+        with open(self.script_path) as fh:
+            lines = [l for l in fh.read().splitlines() if l.strip()]
+        if not lines or lines[0] != self._peeked:
+            raise AdapterError(
+                f"mock script queue at {self.script_path} changed "
+                "between peek and consume")
+        with open(self.script_path, "w") as fh:
+            fh.write("\n".join(lines[1:]) + ("\n" if len(lines) > 1 else ""))
+        self._peeked = None
 
     def complete(self, system, prompt):
         import tempfile
@@ -103,6 +157,23 @@ class HttpAdapter(Adapter):
         self.model = model
         self.api_key_env = api_key_env
         self.timeout = timeout
+
+    def consume(self):
+        """Remove the peeked line after the turn was applied. Called by
+        the runtime inside the same transact mutation, so a reset after
+        a lost race also restores the queue. Raises if the file changed
+        between peek and consume (record would be incoherent)."""
+        if not self.script_path or self._peeked is None:
+            return
+        with open(self.script_path) as fh:
+            lines = [l for l in fh.read().splitlines() if l.strip()]
+        if not lines or lines[0] != self._peeked:
+            raise AdapterError(
+                f"mock script queue at {self.script_path} changed "
+                "between peek and consume")
+        with open(self.script_path, "w") as fh:
+            fh.write("\n".join(lines[1:]) + ("\n" if len(lines) > 1 else ""))
+        self._peeked = None
 
     def complete(self, system, prompt):
         key = os.environ.get(self.api_key_env)
