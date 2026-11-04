@@ -6,8 +6,9 @@
 - **Instance:** recovery-1, alias unassigned.
 - **Renamed 2026-11-04:** this role is now Builder 2 (instance builder-2),
   on owner direction (Slack 1793812104.985419). Same instance, work and
-  history. Review requests go to reviewer-1 Bill and his verdicts return
-  to Builder 2; technical acceptance stays with independent review. No
+  history. Review requests go to reviewer-1 Bill (route accepted by Bill
+  2026-11-04 as bounded, read-only, per-request; not standing work) and
+  his verdicts return to Builder 2; technical acceptance stays with independent review. No
   separate manager layer. This file is kept as the history of the name.
 - **Purpose:** finish the two late work packages the Coordinator was
   carrying, with measured evidence, not status prose.
