@@ -16,7 +16,22 @@
 - **Evidence standard:** every status claim carries its source pin;
   unknowns are reported as unknowns.
 - **Completed work:** none (vacant).
-- **Open issues:** none.
+- **Qualification trial 2026-11-04 (NOT activated):** one bounded
+  free-only trial (5 attempts, Requesty cost 0) of
+  nvidia/nemotron-3.5-lightning-30b-a3b on log-reconciliation tasks.
+  Result: good uncertainty discipline on one small task, but quote
+  fidelity flawed (analysis presented as verbatim quotes), one empty
+  answer and one truncated table on the realistic workload, reasoning
+  overhead 4-11x visible output. Decision (coordinator, 2026-11-04):
+  not activated; the recurring reconciliation workload goes to a
+  deterministic extractor instead - see
+  docs/proposals/deterministic-log-reconciliation.md. First candidate
+  nvidia/nemotron-3-super-120b-a12b was listed free but uncallable
+  (404). Same-day org usage floor 26 requests, daily reset boundary
+  unknown.
+- **Open issues:** role stays vacant until a workload exists that is
+  model-shaped (judgment, not extraction) and a fresh bounded trial
+  passes on it.
 - **Handoff notes:** activate only when the tracking workload is real
   and recurring; follows the same registry/blueprint rules so its work
   can be handed over or resumed.
