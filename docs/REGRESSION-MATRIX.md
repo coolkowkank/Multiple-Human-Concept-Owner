@@ -20,9 +20,18 @@ Pinned to the commit this file ships in. Live evidence below comes from
 At most 3 adapter calls: 1 initial + at most ONE format-correction + at
 most ONE path-guard correction. The two corrections can compose.
 Raw model output is preserved unmodified under .team/raw/ before and
-after corrections (attempt-<n>.txt), with file names in SeatError/success
-notes. No silent dropping of model output; ambiguous multi-object or
-contradictory trailing content fails closed.
+after corrections (attempt-<n>.txt), with file paths - never content -
+in SeatError/success notes. No silent dropping of model output;
+ambiguous multi-object or contradictory trailing content fails closed.
+
+Raw files are LOCAL-ONLY (review 2026-11-04): raw output may carry
+private input, secrets, or copied context, so .team/raw/ is excluded
+via .git/info/exclude and is never staged into public turn commits
+(fixtures pin this, including a secret-shaped marker and a follow-up
+turn). Publishing any raw payload requires an explicit
+reviewed/redacted opt-in. Consequence: "zero mutation" on a failed
+turn is git-state/app-code scoped - local untracked raw side-effect
+files can remain.
 
 ## Remaining gap
 

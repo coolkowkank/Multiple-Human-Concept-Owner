@@ -258,10 +258,30 @@ class Seat:
     # path-guard correction round (forbidden write paths). The two
     # correction rounds can compose: a format-corrected reply can still
     # fail the path guard and use the path round.
+    # Raw model output is LOCAL-ONLY evidence (review 2026-11-04): it
+    # may carry private input, secrets, or copied context, so it must
+    # never be auto-staged into public turn commits. Exclusion is
+    # enforced via .git/info/exclude (local, uncommitted, works on
+    # repos created before this rule existed) - `git add -A` sweeps
+    # skip ignored untracked files and `git status --porcelain` stays
+    # clean, so the preflight dirt check is unaffected. Publishing any
+    # raw payload requires an explicit reviewed/redacted opt-in.
+    # Consequence for reporting: a failed turn is "zero mutation" only
+    # in git-state/app-code terms - it can still leave these local
+    # untracked side-effect files.
     def _preserve_raw(self, state, exc, attempt):
         raw = getattr(exc, "raw", None)
         if raw is None:
             return None
+        exclude = os.path.join(self.bus.repo, ".git", "info", "exclude")
+        os.makedirs(os.path.dirname(exclude), exist_ok=True)
+        existing = ""
+        if os.path.exists(exclude):
+            with open(exclude) as fh:
+                existing = fh.read()
+        if ".team/raw/" not in existing.splitlines():
+            with open(exclude, "a") as fh:
+                fh.write(".team/raw/\n")
         path = (f".team/raw/{self.name}-seq{state['turn_seq']}"
                 f"-attempt-{attempt}.txt")
         self._write(self.bus.repo, path, raw)

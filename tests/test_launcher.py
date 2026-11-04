@@ -337,7 +337,10 @@ class SeatTests(unittest.TestCase):
             shutil.rmtree(repo, ignore_errors=True)
 
     def test_raw_output_preserved_on_successful_format_correction(self):
-        raw_text = '{"summary": "x"} trailing junk that broke parsing'
+        # Includes a secret-shaped marker: raw output may carry private
+        # input, so the fixture pins that it stays local-only.
+        marker = "sk-SECRET-DO-NOT-COMMIT-9f8e7d"
+        raw_text = ('{"summary": "x"} trailing junk ' + marker)
 
         def fn(system, prompt, i):
             if i == 0:
@@ -356,7 +359,38 @@ class SeatTests(unittest.TestCase):
                 repo, ".team", "raw", "builder-seq0-attempt-1.txt")
             self.assertTrue(os.path.exists(path))
             self.assertEqual(open(path).read(), raw_text)
-            self.assertIn("raw preserved", bus.log()[-1]["body"])
+            body = bus.log()[-1]["body"]
+            # path reported, content not
+            self.assertIn("raw preserved", body)
+            self.assertIn(".team/raw/builder-seq0-attempt-1.txt", body)
+            self.assertNotIn(marker, body)
+            # local-only: never staged into the public turn commit
+            tree = subprocess.run(
+                ["git", "-C", repo, "ls-tree", "-r", "--name-only",
+                 "HEAD"], capture_output=True, text=True).stdout
+            self.assertNotIn(".team/raw/", tree)
+            grep = subprocess.run(
+                ["git", "-C", repo, "grep", "-F", marker, "HEAD"],
+                capture_output=True, text=True)
+            self.assertNotEqual(grep.returncode, 0)
+            status = subprocess.run(
+                ["git", "-C", repo, "status", "--porcelain"],
+                capture_output=True, text=True).stdout
+            self.assertNotIn(".team/raw/", status)
+            # a later clean turn must not sweep raw into its commit
+            seat2 = self._seat_with_callable(repo, bus, fn)
+            self.assertTrue(seat2.act_once())
+            tree = subprocess.run(
+                ["git", "-C", repo, "ls-tree", "-r", "--name-only",
+                 "HEAD"], capture_output=True, text=True).stdout
+            self.assertNotIn(".team/raw/", tree)
+            revs = subprocess.run(
+                ["git", "-C", repo, "rev-list", "--all"],
+                capture_output=True, text=True).stdout.split()
+            grep_all = subprocess.run(
+                ["git", "-C", repo, "grep", "-F", marker] + revs,
+                capture_output=True, text=True)
+            self.assertNotIn(marker, grep_all.stdout)
         finally:
             shutil.rmtree(repo, ignore_errors=True)
 
@@ -378,6 +412,10 @@ class SeatTests(unittest.TestCase):
                     repo, ".team", "raw", f"builder-seq0-attempt-{n}.txt")
                 self.assertTrue(os.path.exists(path))
                 self.assertEqual(open(path).read(), f"garbage attempt {n}")
+            tree = subprocess.run(
+                ["git", "-C", repo, "ls-tree", "-r", "--name-only",
+                 "HEAD"], capture_output=True, text=True).stdout
+            self.assertNotIn(".team/raw/", tree)
         finally:
             shutil.rmtree(repo, ignore_errors=True)
 
