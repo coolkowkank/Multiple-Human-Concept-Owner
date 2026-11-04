@@ -1,8 +1,13 @@
 {
-  "turn": "coordinator",
-  "turn_seq": 0,
-  "turn_since": null,
+  "turn": "builder",
+  "turn_seq": 1,
+  "turn_since": "2026-11-04T11:12:55Z",
   "status": "running",
-  "status_line": "team forming",
-  "leases": {}
+  "status_line": "Building tinylib and tests",
+  "leases": {
+    "coordinator": {
+      "holder": "coordinator-32a14394",
+      "claimed_at": 1793790764.6772697
+    }
+  }
 }
