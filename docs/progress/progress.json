@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04T18:02:00+02:00",
+ "as_of": "2026-11-04T18:08:00+02:00",
  "timezone": "EET (UTC+2), same as commit timestamps",
  "rules": "Weighted milestone progress, not independently verified completion. Milestone done = 100% of weight (tests pass or an independent review passed). Partial = 50%. In progress / not started = 0%. Weights are judgment calls. Commits alone never count.",
  "packages": [
@@ -235,70 +235,77 @@
  },
  "continuous": {
   "title": "Continuous / out-of-WP work",
-  "note": "Work outside the milestones, with no credit and no effect on the score. Excludes the Coordinator's own coordination. A commit shows an output, not how long anyone worked. No live run telemetry exists, so a state comes from the latest evidence and says unknown when there is none. Idle is not assumed.",
+  "note": "Work outside the milestones, with no credit and no effect on the score. Excludes the Coordinator's own coordination. Role status is the current assignment, not live work. Model execution is unknown unless a run is observed. A commit is operator or member output, not duration, and its age does not show anyone is working or idle.",
   "rows": [
    {
     "member": "Nora - Researcher",
-    "assignment": "Research notes outside the work packages (E4 replay, RW3, RW1); WP8a source checks are in the Gantt above",
+    "assignment": "Researcher role: research notes outside the work packages (E4 replay, RW3, RW1); WP8a source checks are in the Gantt above",
     "last": "2026-11-04T17:34",
     "ref": "328cec7",
-    "what": "RW3 token baseline and RW1 handoff validator spec, offline, no model instance",
-    "state": "Working",
-    "source": "Research_lab commit"
+    "what": "Offline research support (RW3 token baseline, RW1 handoff validator spec), no model instance. Not evidence that a Researcher model ran",
+    "state": "Assigned",
+    "source": "Research_lab commit",
+    "exec": "Unknown, not currently observed"
    },
    {
     "member": "Eva - Evidence verifier",
     "assignment": "Review of the E4 replay and the RW3/RW1 notes",
     "last": "2026-11-04T15:37",
     "ref": "3aff4c6",
-    "what": "Review 2 of the first audit loop",
+    "what": "Review 2 of the first audit loop. Review queued; no review recorded since",
     "state": "Waiting",
-    "source": "Research_lab commit. Review queued; no review recorded since. The model route is cooling down after an unclear 429 (team-launcher record)"
+    "source": "Research_lab commit; model route cooling down after an unclear 429 (team-launcher record)",
+    "exec": "Unknown, not currently observed"
    },
    {
     "member": "Alex - Builder",
-    "assignment": "Escalation-latch follow-up to the accepted WP5 fix (operator-authored, no model draft)",
+    "assignment": "Builder role: escalation-latch follow-up to the accepted WP5 fix",
     "last": "2026-11-04T17:50",
     "ref": "4459866",
-    "what": "Third latch revision. Earlier two got changes-required; the third also has open findings",
-    "state": "Working",
-    "source": "live/builder-gate-latch-v2 commit"
+    "what": "Third latch revision, operator-authored, not a Builder model call. Earlier two got changes-required; the third also has open findings",
+    "state": "Assigned",
+    "source": "live/builder-gate-latch-v2 commit",
+    "exec": "Unknown, not currently observed"
    },
    {
     "member": "Bill - Independent reviewer",
-    "assignment": "Independent review of Builder commits",
+    "assignment": "Independent reviewer role for Builder commits",
     "last": null,
     "ref": null,
-    "what": "No Bill-authored review recorded in the repo after review 1 on 45cec13. The latch reviews came from another independent reviewer",
+    "what": "No Bill-authored review recorded since review 1 on 45cec13. The latch reviews came from an independent reviewer who is not Bill, Nora or Eva",
     "state": "Unknown",
-    "source": "No Bill activity evidence"
+    "source": "No Bill activity evidence",
+    "exec": "Unknown, not currently observed"
    },
    {
     "member": "Ryan - Team Resources",
-    "assignment": "Model-route checks; team performance analysis (assigned 17:48)",
+    "assignment": "Team Resources role: model-route checks; team performance analysis (assigned 17:48)",
     "last": "2026-11-04T17:54",
     "ref": "0584bbe",
-    "what": "Role contract: performance job, proposal review chain, support functions",
-    "state": "Working",
-    "source": "team-launcher commit"
+    "what": "Role contract update by the operator, not Ryan model analysis: performance job, proposal review chain, support functions",
+    "state": "Assigned",
+    "source": "team-launcher commit",
+    "exec": "Unknown, not currently observed"
    },
    {
     "member": "Sam - Coordinator Assistant",
-    "assignment": "Status drafts, each reviewed",
+    "assignment": "Coordinator Assistant role: status drafts, each reviewed",
     "last": null,
     "ref": null,
-    "what": "No Sam draft has been requested or produced yet. The 17:50 update was prepared by the maintainer",
-    "state": "Unassigned",
-    "source": "No draft task on record"
+    "what": "One Gemma draft was produced earlier (T3) with a Groq backup (T4). No current draft observed. The 17:50 update was prepared by the maintainer, not by Sam's model",
+    "state": "Assigned",
+    "source": "Earlier trial record",
+    "exec": "Unknown, not currently observed"
    },
    {
     "member": "Ryan's Verifier",
-    "assignment": "Check claims before Ryan sends proposals",
+    "assignment": "Independent analysis verification: checks claims before Ryan sends proposals",
     "last": null,
     "ref": null,
-    "what": "Role defined, no one assigned, no model assigned",
-    "state": "Unassigned",
-    "source": "team-launcher 0584bbe"
+    "what": "An active assignment now exists. It is not a project-model-staffed seat",
+    "state": "Assigned",
+    "source": "Current assignment",
+    "exec": "Not project-model staffed; not currently observed"
    }
   ]
  }

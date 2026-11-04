@@ -36,19 +36,19 @@
 
 ### Project progress
 
-*As of 2026-11-04 18:02 EET. Weighted milestone progress is **61.0%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
+*As of 2026-11-04 18:08 EET. Weighted milestone progress is **61.0%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
 
-**Continuous / out-of-WP work** (as of 2026-11-04 18:02 EET). Work outside the milestones, with no credit and no effect on the score. Excludes the Coordinator's own coordination. A commit shows an output, not how long anyone worked. No live run telemetry exists, so a state comes from the latest evidence and says unknown when there is none. Idle is not assumed. [Pages view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/charts/)
+**Continuous / out-of-WP work** (as of 2026-11-04 18:08 EET). Work outside the milestones, with no credit and no effect on the score. Excludes the Coordinator's own coordination. Role status is the current assignment, not live work. Model execution is unknown unless a run is observed. A commit is operator or member output, not duration, and its age does not show anyone is working or idle. [Pages view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/charts/)
 
-| Member | Assignment | State | Latest evidenced output | Age |
-|---|---|---|---|---|
-| Nora - Researcher | Research notes outside the work packages (E4 replay, RW3, RW1); WP8a source checks are in the Gantt above | **Working** | 328cec7: RW3 token baseline and RW1 handoff validator spec, offline, no model instance | 17:34 (28 min) |
-| Eva - Evidence verifier | Review of the E4 replay and the RW3/RW1 notes | **Waiting** | 3aff4c6: Review 2 of the first audit loop | 15:37 (2.4 h) |
-| Alex - Builder | Escalation-latch follow-up to the accepted WP5 fix (operator-authored, no model draft) | **Working** | 4459866: Third latch revision. Earlier two got changes-required; the third also has open findings | 17:50 (12 min) |
-| Bill - Independent reviewer | Independent review of Builder commits | **Unknown** | No Bill-authored review recorded in the repo after review 1 on 45cec13. The latch reviews came from another independent reviewer | no evidence |
-| Ryan - Team Resources | Model-route checks; team performance analysis (assigned 17:48) | **Working** | 0584bbe: Role contract: performance job, proposal review chain, support functions | 17:54 (8 min) |
-| Sam - Coordinator Assistant | Status drafts, each reviewed | **Unassigned** | No Sam draft has been requested or produced yet. The 17:50 update was prepared by the maintainer | no evidence |
-| Ryan's Verifier | Check claims before Ryan sends proposals | **Unassigned** | Role defined, no one assigned, no model assigned | no evidence |
+| Member | Role assignment | Role status | Model execution | Latest evidenced output | Output age |
+|---|---|---|---|---|---|
+| Nora - Researcher | Researcher role: research notes outside the work packages (E4 replay, RW3, RW1); WP8a source checks are in the Gantt above | **Assigned** | Unknown, not currently observed | 328cec7: Offline research support (RW3 token baseline, RW1 handoff validator spec), no model instance. Not evidence that a Researcher model ran. Source: Research_lab commit | 17:34 (28 min) |
+| Eva - Evidence verifier | Review of the E4 replay and the RW3/RW1 notes | **Waiting** | Unknown, not currently observed | 3aff4c6: Review 2 of the first audit loop. Review queued; no review recorded since. Source: Research_lab commit; model route cooling down after an unclear 429 (team-launcher record) | 15:37 (2.4 h) |
+| Alex - Builder | Builder role: escalation-latch follow-up to the accepted WP5 fix | **Assigned** | Unknown, not currently observed | 4459866: Third latch revision, operator-authored, not a Builder model call. Earlier two got changes-required; the third also has open findings. Source: live/builder-gate-latch-v2 commit | 17:50 (12 min) |
+| Bill - Independent reviewer | Independent reviewer role for Builder commits | **Unknown** | Unknown, not currently observed | No Bill-authored review recorded since review 1 on 45cec13. The latch reviews came from an independent reviewer who is not Bill, Nora or Eva. Source: No Bill activity evidence | no output evidence |
+| Ryan - Team Resources | Team Resources role: model-route checks; team performance analysis (assigned 17:48) | **Assigned** | Unknown, not currently observed | 0584bbe: Role contract update by the operator, not Ryan model analysis: performance job, proposal review chain, support functions. Source: team-launcher commit | 17:54 (8 min) |
+| Sam - Coordinator Assistant | Coordinator Assistant role: status drafts, each reviewed | **Assigned** | Unknown, not currently observed | One Gemma draft was produced earlier (T3) with a Groq backup (T4). No current draft observed. The 17:50 update was prepared by the maintainer, not by Sam's model. Source: Earlier trial record | no output evidence |
+| Ryan's Verifier | Independent analysis verification: checks claims before Ryan sends proposals | **Assigned** | Not project-model staffed; not currently observed | An active assignment now exists. It is not a project-model-staffed seat. Source: Current assignment | no output evidence |
 
 ![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/23a3eb5b4964416fd5cb757e8751aa20064c698c/docs/progress/gantt.png)
 

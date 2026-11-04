@@ -97,9 +97,9 @@ const tb=$('tbl');tb.innerHTML='<tr><th>ID</th><th>Package</th><th>Weight</th><t
 P.forEach(p=>{const r=tb.insertRow();[p.id,p.name,p.weight+'%',LAB[p.status],(p.weight*(CRED[p.status]||0)).toFixed(1)+'%'].forEach(v=>{r.insertCell().textContent=v})});
 
 // continuous work
-(function(){const C=D.continuous;if(!C)return;$('ctitle').textContent=C.title;$('cnote').textContent=C.note;const t=$('ctbl');t.innerHTML='<tr><th>Member</th><th>Assignment</th><th>State</th><th>Latest evidenced output</th><th>Age at '+hhmm(D.as_of)+'</th></tr>';
- const col={Working:'#e3f1e6',Waiting:'#fff3d6',Blocked:'#fbe3e3',Unassigned:'#ececec',Unknown:'#e8eaf6'};
- C.rows.forEach(r=>{const tr=t.insertRow();tr.insertCell().textContent=r.member;(function(c){c.textContent=r.assignment;c.dataset.l='Assignment'})(tr.insertCell());const s=tr.insertCell();s.dataset.l='State';const b=document.createElement('b');b.textContent=r.state;b.style.cssText='background:'+(col[r.state]||'#eee')+';padding:1px 8px;border-radius:6px;font-size:12px';s.appendChild(b);
+(function(){const C=D.continuous;if(!C)return;$('ctitle').textContent=C.title;$('cnote').textContent=C.note;const t=$('ctbl');t.innerHTML='<tr><th>Member</th><th>Assignment</th><th>Role status</th><th>Model execution</th><th>Latest evidenced output</th><th>Output age at '+hhmm(D.as_of)+'</th></tr>';
+ const col={Assigned:'#e3f1e6',Working:'#e3f1e6',Waiting:'#fff3d6',Blocked:'#fbe3e3',Unassigned:'#ececec',Unknown:'#e8eaf6'};
+ C.rows.forEach(r=>{const tr=t.insertRow();tr.insertCell().textContent=r.member;(function(c){c.textContent=r.assignment;c.dataset.l='Assignment'})(tr.insertCell());const s=tr.insertCell();s.dataset.l='State';const b=document.createElement('b');b.textContent=r.state;b.style.cssText='background:'+(col[r.state]||'#eee')+';padding:1px 8px;border-radius:6px;font-size:12px';s.appendChild(b);const x=tr.insertCell();x.dataset.l='Model execution';x.textContent=r.exec;
   const o=tr.insertCell();o.dataset.l='Latest output';o.textContent=(r.ref?r.ref+': ':'')+r.what+'. Source: '+r.source+'.';
   const a=tr.insertCell();a.dataset.l='Age';if(r.last){const m=Math.round((new Date(D.as_of.slice(0,16))-new Date(r.last))/60000);a.textContent=(r.last.slice(11,16))+' ('+(m<60?m+' min':(m/60).toFixed(1)+' h')+')'}else a.textContent='no evidence'})})();
 </script></body></html>
