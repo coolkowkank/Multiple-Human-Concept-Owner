@@ -365,12 +365,20 @@ def safe_path(path):
 def _git(repo, *a):
     return subprocess.run(["git", "-C", repo] + list(a), capture_output=True, text=True)
 
+MODEL_DIRS = ("docs", "tasks", "launcher", "tests")
+
 def _worktree_fingerprint(repo):
+    # Binds everything a push can publish: every TRACKED file's content, plus
+    # untracked files under the model-writable dirs (the model's git_commit
+    # only stages those dirs; a new file there becomes pushable product).
+    # Operator runtime artifacts (.team/ transcripts) and ignored noise are
+    # outside the model's push surface and stay unbound by design.
     h = hashlib.sha256()
     tracked = _git(repo, "ls-files", "-z").stdout.split("\x00")
     untracked = _git(repo, "ls-files", "--others", "--exclude-standard", "-z").stdout.split("\x00")
     paths = sorted(p for p in tracked + untracked
-                   if p and "__pycache__" not in p and not p.endswith(".pyc"))
+                   if p and "__pycache__" not in p and not p.endswith(".pyc")
+                   and (p in tracked or p.split("/", 1)[0] in MODEL_DIRS))
     for rel in paths:
         fp = os.path.join(repo, rel)
         if not os.path.isfile(fp):

@@ -427,14 +427,30 @@ class ExecutorCase(unittest.TestCase):
         subprocess.run([sys.executable, EXECUTOR, "--write-gate", gate, self.repo],
                        check=True, capture_output=True)
         self.assertIsNone(ns["_push_gate_check"](self.repo))
+        # TRACKED root file edit invalidates (tracked content is pushable)
         open(os.path.join(self.repo, "README.md"), "w").write("changed\n")
+        git("-c", "user.name=t", "-c", "user.email=t@t", "add", "README.md", cwd=self.repo)
+        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "readme", cwd=self.repo)
+        subprocess.run([sys.executable, EXECUTOR, "--write-gate", gate, self.repo],
+                       check=True, capture_output=True)
+        open(os.path.join(self.repo, "README.md"), "a").write("more\n")
         self.assertIn("STALE", ns["_push_gate_check"](self.repo))
-        os.remove(os.path.join(self.repo, "README.md"))
+        git("checkout", "--", "README.md", cwd=self.repo)
+        # untracked file at root is NOT bound (model cannot stage/push it)
+        open(os.path.join(self.repo, "stray_root.py"), "w").write("x = 1\n")
+        self.assertIsNone(ns["_push_gate_check"](self.repo))
+        os.remove(os.path.join(self.repo, "stray_root.py"))
         subprocess.run([sys.executable, EXECUTOR, "--write-gate", gate, self.repo],
                        check=True, capture_output=True)
         self.assertIsNone(ns["_push_gate_check"](self.repo))
-        open(os.path.join(self.repo, "runtime_new.py"), "w").write("x = 1\n")
+        open(os.path.join(self.repo, "launcher", "runtime_new.py"), "w").write("x = 1\n")
         self.assertIn("STALE", ns["_push_gate_check"](self.repo))
+        os.remove(os.path.join(self.repo, "launcher", "runtime_new.py"))
+        # operator runtime artifacts (.team/ transcripts) are NOT bound:
+        # the model cannot stage or push them
+        os.makedirs(os.path.join(self.repo, ".team", "attempts"), exist_ok=True)
+        open(os.path.join(self.repo, ".team", "attempts", "run.json"), "w").write("{}")
+        self.assertIsNone(ns["_push_gate_check"](self.repo))
 
     def test_push_gate_pycache_does_not_invalidate(self):
         self._committed_repo()
