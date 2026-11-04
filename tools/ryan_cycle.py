@@ -30,7 +30,8 @@ Hard rules (all enforced in code, all tested with a mock transport):
   - adoption is never done here: finished questions stop at
     'ready-for-chain' (Coordinator -> owner decides).
 """
-import json, os, sys, datetime, time, urllib.request, urllib.error
+import json
+import math, os, sys, datetime, time, urllib.request, urllib.error
 import contextlib, re, socket
 try:
     import fcntl
@@ -337,6 +338,24 @@ def settle(store, rid, qid, role, model, res, now):
             "role": role, "model": model, "usage": res.get("usage")}
     if res.get("diag"):
         done["diag"] = clean_diag(res["diag"])
+    sig = res.get("cost_signal")
+    if sig is None and (res.get("usage") or {}).get("cost"):
+        sig = "nonzero"
+    bad = sig in ("nonzero", "invalid") or res.get("usage_flag") == "invalid"
+    if bad:
+        # any nonzero/invalid cost or invalid usage halts for EVERY kind,
+        # keeping the original outcome and the signal.
+        done["outcome"] = ("unknown" if res["kind"] == "unknown" else
+                           "http_%d" % res["code"] if res["kind"] == "http"
+                           else "ok")
+        done["cost_signal"] = sig or "usage_invalid"
+        store.append(done)
+        store.append({"phase": "halt", "ts": iso(now),
+                      "reason": "cost/usage signal %s on %s"
+                                % (done["cost_signal"], rid)})
+        raise Halt("nonzero or invalid cost/usage signal")
+    if res.get("usage_flag") == "extra_keys":
+        done["usage_extra_keys"] = 1
     if res["kind"] == "unknown":
         done["outcome"] = "unknown"
         store.append(done)
@@ -801,22 +820,79 @@ def clean_diag(d):
     return out
 
 
-def num_only(u, depth=0):
-    """Usage structure with numeric leaves only (token counts, cost);
-    no strings, so no reasoning or body text can be persisted."""
-    if not isinstance(u, dict) or depth > 3:
+FINISH_ENUM = ("stop", "length", "content_filter", "tool_calls",
+               "function_call", "error")
+USAGE_TOP = ("prompt_tokens", "completion_tokens", "total_tokens", "cost",
+             "prompt_tokens_details", "completion_tokens_details")
+USAGE_NEST = ("cached_tokens", "reasoning_tokens", "audio_tokens",
+              "accepted_prediction_tokens", "rejected_prediction_tokens",
+              "caching_tokens", "cache_creation_tokens")
+
+
+def _num_ok(v):
+    return (isinstance(v, (int, float)) and not isinstance(v, bool)
+            and math.isfinite(v) and v >= 0)
+
+
+def finish_enum(fr):
+    if not isinstance(fr, str):
         return None
-    out = {}
+    return fr if fr in FINISH_ENUM else "unknown"
+
+
+def sanitize_usage(u):
+    """-> (clean, flag). Explicit key allowlist per level; finite
+    non-negative numbers only. flag None | 'invalid' (an allowlisted key
+    with a bad value, incl. string/bool/negative cost) | 'extra_keys'
+    (provider keys dropped). 'invalid' must pause the run."""
+    if u is None:
+        return None, None
+    if not isinstance(u, dict):
+        return None, "invalid"
+    out, flag = {}, None
     for k, v in u.items():
-        if isinstance(v, bool):
-            continue
-        if isinstance(v, (int, float)):
-            out[str(k)[:40]] = v
-        elif isinstance(v, dict):
-            sub = num_only(v, depth + 1)
-            if sub:
-                out[str(k)[:40]] = sub
-    return out
+        if k in USAGE_TOP and k.endswith("_details"):
+            if not isinstance(v, dict):
+                flag = "invalid"
+                continue
+            sub = {}
+            for k2, v2 in v.items():
+                if k2 not in USAGE_NEST:
+                    flag = flag or "extra_keys"
+                elif _num_ok(v2):
+                    sub[k2] = v2
+                else:
+                    flag = "invalid"
+            out[k] = sub
+        elif k in USAGE_TOP:
+            if _num_ok(v):
+                out[k] = v
+            else:
+                flag = "invalid"
+        else:
+            flag = flag or "extra_keys"
+    return out, flag
+
+
+def cost_signal(usage_raw):
+    """Judge cost on the RAW usage value, before any sanitization:
+    None absent, 'zero', 'nonzero', 'invalid' (string, bool, negative,
+    non-finite)."""
+    if not isinstance(usage_raw, dict) or "cost" not in usage_raw:
+        return None
+    c = usage_raw["cost"]
+    if not _num_ok(c):
+        return "invalid"
+    return "zero" if c == 0 else "nonzero"
+
+
+def raw_usage(raw):
+    try:
+        d = json.loads(raw)
+    except (ValueError, TypeError):
+        return None
+    u = d.get("usage") if isinstance(d, dict) else None
+    return u if isinstance(u, dict) else None
 
 
 def http_post_factory(env="REQUESTY_API_KEY"):
@@ -837,6 +913,7 @@ def http_post_factory(env="REQUESTY_API_KEY"):
                 d["body_len"] = len(raw)
                 d["body_kind"] = body_kind(raw)
             return {"kind": "unknown", "usage": None, "content": "",
+                    "cost_signal": cost_signal(raw_usage(raw)),
                     "diag": clean_diag(d)}
         body = json.dumps({
             "model": model, "temperature": 0,
@@ -859,6 +936,7 @@ def http_post_factory(env="REQUESTY_API_KEY"):
             eb = e.read()[:2000]
             return {"kind": "http", "code": e.code, "usage": None,
                     "content": "",
+                    "cost_signal": cost_signal(raw_usage(eb)),
                     "diag": clean_diag({
                         "stage": "http-status", "class": "http",
                         "status": e.code, "content_type": ct.split(";")[0],
@@ -891,23 +969,25 @@ def http_post_factory(env="REQUESTY_API_KEY"):
             content = ch["message"]["content"]
         except (KeyError, IndexError, TypeError, AttributeError) as e:
             return unk("response-shape", "malformed", e, raw, ctype)
-        usage = data.get("usage") if isinstance(data, dict) else None
+        usage_raw = data.get("usage") if isinstance(data, dict) else None
+        usage, uflag = sanitize_usage(usage_raw)
+        csig = cost_signal(usage_raw)
+        fr = finish_enum(ch.get("finish_reason")
+                         if isinstance(ch, dict) else None)
         if not isinstance(content, str) or not content.strip():
             # a 200 with no usable content is a response-shape failure,
             # never a success; tokens may have been consumed (unknown).
             r = unk("response-shape", "empty-content", None, raw, ctype)
-            fr = ch.get("finish_reason") if isinstance(ch, dict) else None
-            r["diag"]["finish_reason"] = redact(str(fr), 30) \
-                if fr is not None else None
+            r["diag"]["finish_reason"] = fr
+            msg = ch.get("message") if isinstance(ch, dict) else None
             r["diag"]["reasoning_present"] = int(bool(
-                isinstance(ch.get("message"), dict) and (
-                    ch["message"].get("reasoning_content")
-                    or ch["message"].get("reasoning"))))
-            r["usage"] = num_only(usage)
+                isinstance(msg, dict) and (msg.get("reasoning_content")
+                                           or msg.get("reasoning"))))
+            r["usage"], r["usage_flag"], r["cost_signal"] = usage, uflag, csig
             return r
-        fr = ch.get("finish_reason") if isinstance(ch, dict) else None
-        return {"kind": "ok", "usage": num_only(usage), "content": content,
-                "finish_reason": fr if isinstance(fr, str) else None}
+        return {"kind": "ok", "usage": usage, "content": content,
+                "finish_reason": fr, "usage_flag": uflag,
+                "cost_signal": csig}
     return post
 
 

@@ -658,6 +658,70 @@ class Diag(Base):
         self.assertNotIn(self.KEY, json.dumps(out))
         self.assertEqual(out["content"], "")
 
+    def _tx(self, body, status=200):
+        import json as J, urllib.error, io
+        raw = J.dumps(body).encode()
+
+        def uo(req, timeout=None):
+            if status != 200:
+                raise urllib.error.HTTPError("u", status, "x", {
+                    "content-type": "application/json"}, io.BytesIO(raw))
+            return self.Resp(raw)
+        return self.call(uo)
+
+    def test_finish_reason_enum_only(self):
+        for fr, want in (("stop", "stop"), ("length", "length"),
+                         ("shortsecret12", "unknown"), (5, None)):
+            out = self._tx({"choices": [{"message": {"content": ""},
+                                         "finish_reason": fr}]})
+            self.assertEqual(out["diag"].get("finish_reason"), want)
+            self.assertNotIn("shortsecret12", str(out))
+
+    def test_usage_allowlist_and_validity(self):
+        out = self._tx({"choices": [{"message": {"content": "hi"}}],
+                        "usage": {"prompt_tokens": 3, "shortsecretkey": 1,
+                                  "completion_tokens_details": {
+                                      "reasoning_tokens": 4, "zz": 9}}})
+        self.assertEqual(out["usage"], {"prompt_tokens": 3,
+                         "completion_tokens_details": {"reasoning_tokens": 4}})
+        self.assertEqual(out["usage_flag"], "extra_keys")
+        self.assertNotIn("shortsecretkey", str(out))
+        for bad in (-1, float("inf"), "5", True):
+            o = self._tx({"choices": [{"message": {"content": "hi"}}],
+                          "usage": {"completion_tokens": bad}})
+            self.assertEqual(o["usage_flag"], "invalid", bad)
+
+    def test_cost_signal_from_raw_before_sanitizing(self):
+        for c, want in (("0.25", "invalid"), (True, "invalid"), (-1, "invalid"),
+                        (0.25, "nonzero"), (0, "zero")):
+            o = self._tx({"choices": [{"message": {"content": "hi"}}],
+                          "usage": {"cost": c}})
+            self.assertEqual(o["cost_signal"], want, c)
+        o = self._tx({"error": "x", "usage": {"cost": 0.25}}, status=500)
+        self.assertEqual((o["kind"], o["cost_signal"]), ("http", "nonzero"))
+
+    def test_settle_halts_on_cost_for_every_kind(self):
+        cases = [
+            {"kind": "http", "code": 500, "usage": None, "content": "",
+             "cost_signal": "nonzero"},
+            {"kind": "unknown", "usage": None, "content": "",
+             "cost_signal": "invalid", "diag": {"stage": "response-shape"}},
+            {"kind": "ok", "usage": {"prompt_tokens": 1}, "content": "x",
+             "cost_signal": "invalid"},
+            {"kind": "ok", "usage": {}, "content": "x", "usage_flag": "invalid"},
+            {"kind": "ok", "usage": {"cost": "0.25"}, "content": "x"},
+        ]
+        for res in cases:
+            self.setUp()
+            self.seed()
+            with self.assertRaises(rc.Halt):
+                self.run_step([res])
+            led = self.store.ledger()
+            r = [e for e in led if e["phase"] == "result"][0]
+            self.assertIn(r["outcome"], ("http_500", "unknown", "ok"))
+            self.assertTrue(r.get("cost_signal"))
+            self.assertEqual(led[-1]["phase"], "halt")
+
     def test_settle_persists_only_clean_diag_in_ledger(self):
         self.seed()
         post = lambda *a: {"kind": "unknown", "usage": None, "content": "",
