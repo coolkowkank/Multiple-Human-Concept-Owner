@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04T14:56:00+02:00",
+ "as_of": "2026-11-04T15:01:00+02:00",
  "timezone": "EET (UTC+2), same as commit timestamps",
  "rules": "Weighted milestone progress, not independently verified completion. Milestone done = 100% of weight (tests pass or an independent review passed). Partial = 50%. In progress / not started = 0%. Weights are judgment calls. Commits alone never count.",
  "packages": [
@@ -27,7 +27,7 @@
    "start": "2026-11-04T01:19",
    "end": "2026-11-04T14:38",
    "credit_at": "2026-11-04T14:38",
-   "evidence": "team-launcher at d02927f: 178/178 offline tests pass. Not proof the runtime works end to end: runtime defects (WP5) are unresolved",
+   "evidence": "team-launcher: 180/180 offline tests pass at 1fcb034 (earlier 178/178 at d02927f). Not proof the runtime works end to end",
    "pic": [
     "instinct-telkomsel"
    ],
@@ -70,15 +70,17 @@
    "id": "WP5",
    "name": "Builder fix: null-handoff deadlock and stall-clock UTC bug",
    "weight": 15,
-   "status": "in_progress",
+   "status": "partial",
    "start": "2026-11-04T13:24",
-   "forecast_end": "2026-11-04T17:00",
-   "evidence": "live/builder-deadlock-fix: Builder commit 0fa083a pushed with 1 of 4 regression tests failing. Repair batch 3 running (4 of 6 calls used). No green pin or review yet. Not fixed",
+   "forecast_end": "2026-11-04T19:00",
+   "evidence": "Builder head 45cec13 pushed to live/builder-deadlock-fix (base 625de3f; implementation 0fa083a plus test repair). Coordinator reports full suite 164/164. Checked by us in a clean checkout: tests/test_deadlock_fix.py 5/5 pass, also under TZ=America/Los_Angeles. Partial: full credit needs the independent review verdict (WP7). Unit tests only, not a live multi-seat run",
    "pic": [
     "coolkowkank-bot"
    ],
    "contributors": [],
-   "baseline_end": "2026-11-04T17:00"
+   "baseline_end": "2026-11-04T17:00",
+   "end": "2026-11-04T14:58",
+   "credit_at": "2026-11-04T14:58"
   },
   {
    "id": "WP6",
@@ -89,7 +91,7 @@
    "end": "2026-11-04T14:38",
    "credit_at": "2026-11-04T14:38",
    "forecast_end": "2026-11-04T19:00",
-   "evidence": "Gate 93b3552 shipped a stale executor that dropped edit_file and the ledger; fixed forward in d02927f (178/178 offline tests). No independent review yet, so credit stays partial",
+   "evidence": "Gate support 180/180 at 1fcb034; fingerprint adjusted so transcript self-writes no longer invalidate approvals. Earlier regression fixed forward in d02927f. No independent review yet, so credit stays partial",
    "pic": [
     "instinct-telkomsel"
    ],
@@ -100,10 +102,10 @@
    "id": "WP7",
    "name": "Independent review of the Builder fix",
    "weight": 6,
-   "status": "not_started",
-   "start": "2026-11-04T17:00",
+   "status": "in_progress",
+   "start": "2026-11-04T14:58",
    "forecast_end": "2026-11-04T19:00",
-   "evidence": "Waits for green tests on WP5",
+   "evidence": "Christina accepted the review request for base 625de3f to head 45cec13. No verdict yet. Not a review PASS",
    "pic": [
     "instinct-christina"
    ],
@@ -119,7 +121,7 @@
    "end": "2026-11-04T14:44",
    "credit_at": "2026-11-04T14:44",
    "forecast_end": "2026-11-04T20:00",
-   "evidence": "Note b42f670 published with citations, evidence classes, limits and proposed experiments. Independent spot check at 14:44: 3 of 3 arXiv links resolve with matching titles; F1 numbers match the paper abstract. F2 and F3 numbers not yet checked, so partial",
+   "evidence": "Note b42f670 plus research plan v3 and REFERENCES published (76351f3, per execution report). Spot check: 3 of 3 arXiv links resolve with matching titles; F1 numbers match the paper abstract. The Researcher later labelled the F2 figures as abstract-only. Partial until F2 and F3 are checked",
    "pic": [
     "researcher"
    ],
@@ -160,7 +162,7 @@
    "status": "not_started",
    "start": "2026-11-04T19:00",
    "forecast_end": "2026-11-05T12:00",
-   "evidence": "No autonomous PASS yet. Also re-proves WP4 cleanly",
+   "evidence": "No autonomous PASS yet. Reviewer-skip guard still open. Also re-proves WP4 cleanly",
    "pic": [
     "instinct-telkomsel"
    ],

@@ -2,13 +2,13 @@
 
 ## Project Team
 
-*Latest update: 2026-11-04 14:56 EET.*
+*Latest update: 2026-11-04 15:01 EET.*
 
 ![Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/48d0cfa22066a5ff891d8a76bd541c445bb9f76a/docs/progress/team.png)
 
 ### Project progress
 
-*As of 2026-11-04 14:56 EET. Weighted milestone progress is **40.0%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
+*As of 2026-11-04 15:01 EET. Weighted milestone progress is **47.5%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
 
 ![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/48d0cfa22066a5ff891d8a76bd541c445bb9f76a/docs/progress/gantt.png)
 

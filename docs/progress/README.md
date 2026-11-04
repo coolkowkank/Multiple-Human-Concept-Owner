@@ -32,6 +32,14 @@ The large icon is the accountable current owner by role assignment, not by who a
 
 GitHub caches branch-path image URLs (query strings are ignored), so the main README links the charts pinned to a commit. After regenerating: commit and push the charts, then set the two image URLs in the main README to `https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/<that commit sha>/docs/progress/<chart>.png`, and push again.
 
+## R&D states (not part of the score)
+
+Research work packages are tracked separately from delivered product progress. States: S0 scoped, S1 sources read, S2 finding published, S3 experiment designed, S4 experiment run, S5 reviewed with an adopt or reject decision. As reported at 14:52 EET: RW1 handoffs S2, RW2 independent review gates S2, RW3 token efficiency S1, RW4 stall and liveness S0, RW5 prior art S0 to S1, RW6 rate-limit-aware routing S0. No experiment has run. A state is not a completion percentage, and a finding is not an adopted feature.
+
+## Commit identity
+
+Coordination work (this progress page, planning, team display) is committed by instinct-telkomsel. Research and implementation work is committed under coolkowkank-bot, with the actual role and model named in the commit. Past history is unchanged.
+
 ## Project Team chart
 
 `team_chart.py` draws docs/progress/team.png (called by render_progress.py). Its facts come from docs/developers.md and the team roster chart on the team-launcher branch. Edit the labels there when the team changes, and pin all three images to the commit as described above.
