@@ -1372,3 +1372,52 @@ class LoopErrorPathTests(unittest.TestCase):
         cli_main(["respond", "builder", "--repo", repo, "--branch",
                   "team-work", "--file", os.path.join(scratch, "r.json"),
                   "--discard-stale"])
+
+
+class HttpAdapterMaxTokensTests(unittest.TestCase):
+    """Reasoning models can exhaust the provider's default completion
+    cap on reasoning and return empty content (observed live against
+    Groq gpt-oss-20b, 2026-11-04). The optional max_tokens config must
+    reach the request body; absent config must not change the body."""
+
+    def _capture(self, spec):
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        import threading
+        seen = {}
+
+        class H(BaseHTTPRequestHandler):
+            def do_POST(self):
+                n = int(self.headers.get("content-length", 0))
+                seen["body"] = json.loads(self.rfile.read(n))
+                payload = {"choices": [{"message": {"content":
+                    '{"summary": "ok", "handoff": null}'}}]}
+                data = json.dumps(payload).encode()
+                self.send_response(200)
+                self.send_header("content-type", "application/json")
+                self.send_header("content-length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def log_message(self, *a):
+                pass
+
+        srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+        self.addCleanup(srv.shutdown)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        os.environ["TEAM_TEST_MT_KEY"] = "k"
+        self.addCleanup(os.environ.pop, "TEAM_TEST_MT_KEY", None)
+        from launcher.adapters import build_adapter
+        adapter = build_adapter({
+            "type": "http",
+            "base_url": f"http://127.0.0.1:{srv.server_address[1]}",
+            "model": "m", "api_key_env": "TEAM_TEST_MT_KEY", **spec})
+        adapter.complete("sys", "prompt")
+        return seen["body"]
+
+    def test_max_tokens_reaches_request_body(self):
+        body = self._capture({"max_tokens": 8192})
+        self.assertEqual(body.get("max_completion_tokens"), 8192)
+
+    def test_absent_max_tokens_leaves_body_unchanged(self):
+        body = self._capture({})
+        self.assertNotIn("max_completion_tokens", body)

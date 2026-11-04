@@ -165,11 +165,19 @@ class HttpAdapter(Adapter):
     local server exposing that API shape. API key from env var."""
 
     def __init__(self, base_url, model, api_key_env, timeout=600,
-                 max_retries=3, backoff=2.0, sleeper=time.sleep):
+                 max_retries=3, backoff=2.0, sleeper=time.sleep,
+                 max_tokens=None):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.api_key_env = api_key_env
         self.timeout = timeout
+        # Optional completion-token cap (request field
+        # max_completion_tokens). Reasoning models can burn the
+        # provider default entirely on reasoning and return EMPTY
+        # content (observed live: Groq gpt-oss-20b, finish_reason
+        # length, 2041 reasoning tokens, 0 content, 2026-11-04) - set
+        # this high enough for reasoning plus the answer.
+        self.max_tokens = max_tokens
         # 429/backoff policy: retry rate-limited requests with
         # exponential backoff, honoring Retry-After when the provider
         # sends one. Other HTTP errors are not retried (a 4xx will not
@@ -183,13 +191,16 @@ class HttpAdapter(Adapter):
         key = os.environ.get(self.api_key_env)
         if not key:
             raise AdapterError(f"missing API key env var {self.api_key_env}")
-        body = json.dumps({
+        payload = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": prompt},
             ],
-        }).encode()
+        }
+        if self.max_tokens:
+            payload["max_completion_tokens"] = self.max_tokens
+        body = json.dumps(payload).encode()
         req = urllib.request.Request(
             f"{self.base_url}/chat/completions", data=body,
             headers={
@@ -264,5 +275,6 @@ def build_adapter(spec):
     if kind == "http":
         return HttpAdapter(
             spec["base_url"], spec["model"], spec["api_key_env"],
-            timeout=spec.get("timeout", 600))
+            timeout=spec.get("timeout", 600),
+            max_tokens=spec.get("max_tokens"))
     raise AdapterError(f"unknown adapter type {kind!r}")
