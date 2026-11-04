@@ -529,5 +529,96 @@ class JobDesc(unittest.TestCase):
         self.assertNotIn("tokens", st)
 
 
+class Diag(Base):
+    KEY = "sk-live-ABCDEF1234567890SECRET"
+
+    def call(self, urlopen):
+        from unittest import mock
+        os.environ["REQUESTY_API_KEY"] = self.KEY
+        try:
+            with mock.patch("urllib.request.urlopen", urlopen):
+                return rc.http_post_factory()("m", "s", "p", 10)
+        finally:
+            os.environ.pop("REQUESTY_API_KEY", None)
+
+    class Resp:
+        def __init__(self, body, ct="application/json", read_exc=None):
+            self.body, self.read_exc = body, read_exc
+            self.headers = {"content-type": ct}
+
+        def read(self):
+            if self.read_exc:
+                raise self.read_exc
+            return self.body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def test_classification_without_inferring_cause(self):
+        import socket, urllib.error
+        R = self.Resp
+        cases = [
+            (socket.timeout("timed out"), "connect-or-send", "timeout"),
+            (urllib.error.URLError(socket.timeout()), "connect-or-send",
+             "timeout"),
+            (urllib.error.URLError(ConnectionRefusedError("x")),
+             "connect-or-send", "network"),
+            (OSError("boom"), "connect-or-send", "network"),
+            (R(b"", read_exc=socket.timeout()), "read-body", "timeout"),
+            (R(b"<html>not json</html>", "text/html"), "parse-json",
+             "malformed"),
+            (R(b'{"choices": []}'), "response-shape", "malformed"),
+        ]
+        for c, stage, cls in cases:
+            def uo(*a, **k):
+                if isinstance(c, BaseException):
+                    raise c
+                return c
+            out = self.call(uo)
+            self.assertEqual(out["kind"], "unknown", stage)
+            self.assertEqual((out["diag"]["stage"], out["diag"]["class"]),
+                             (stage, cls))
+            self.assertNotIn("error_text", out["diag"])
+
+    def test_excerpt_is_redacted_and_bounded_and_no_key_anywhere(self):
+        body = (b"oops " + self.KEY.encode() + b" Bearer abc.def.ghi "
+                + b"A" * 300)
+        out = self.call(lambda *a, **k: self.Resp(body, "text/plain"))
+        blob = json.dumps(out)
+        self.assertNotIn(self.KEY, blob)
+        self.assertNotIn("abc.def.ghi", blob)
+        self.assertLessEqual(len(out["diag"]["excerpt"]), 200)
+        self.assertEqual(out["diag"]["content_type"], "text/plain")
+
+    def test_http_error_diag_has_status_no_headers(self):
+        import urllib.error, io
+        def uo(*a, **k):
+            raise urllib.error.HTTPError(
+                "u", 500, "x", {"content-type": "application/json"},
+                io.BytesIO(b'{"error":"' + self.KEY.encode() + b'"}'))
+        out = self.call(uo)
+        self.assertEqual(out["diag"]["status"], 500)
+        self.assertNotIn(self.KEY, json.dumps(out))
+
+    def test_settle_persists_only_clean_diag_in_ledger(self):
+        self.seed()
+        post = lambda *a: {"kind": "unknown", "usage": None, "content": "",
+                           "diag": {"stage": "read-body", "class": "timeout",
+                                    "authorization": "Bearer SECRET",
+                                    "excerpt": "x" * 900,
+                                    "error_type": "TimeoutError"}}
+        with self.assertRaises(rc.Halt):
+            self.run_step([post()])
+        res = [e for e in self.store.ledger() if e["phase"] == "result"][0]
+        self.assertEqual(res["outcome"], "unknown")
+        self.assertEqual(res["diag"]["stage"], "read-body")
+        self.assertNotIn("authorization", res["diag"])
+        self.assertLessEqual(len(res["diag"]["excerpt"]), 200)
+        self.assertNotIn("SECRET", json.dumps(self.store.ledger()))
+
+
 if __name__ == "__main__":
     unittest.main()

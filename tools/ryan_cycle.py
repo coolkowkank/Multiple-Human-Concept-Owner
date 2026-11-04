@@ -31,7 +31,7 @@ Hard rules (all enforced in code, all tested with a mock transport):
     'ready-for-chain' (Coordinator -> owner decides).
 """
 import json, os, sys, datetime, time, urllib.request, urllib.error
-import contextlib
+import contextlib, re, socket
 try:
     import fcntl
 except ImportError:  # non-POSIX: refuse to run unlocked
@@ -370,6 +370,8 @@ def settle(store, rid, qid, role, model, res, now):
     Raises Halt for 429/unknown/auth/nonzero cost (PAUSED)."""
     done = {"phase": "result", "rid": rid, "ts": iso(now), "qid": qid,
             "role": role, "model": model, "usage": res.get("usage")}
+    if res.get("diag"):
+        done["diag"] = clean_diag(res["diag"])
     if res["kind"] == "unknown":
         done["outcome"] = "unknown"
         store.append(done)
@@ -777,11 +779,60 @@ def jobdesc_scan(repo, root, now, max_packet=6, passage_chars=600):
             "calls": 0}
 
 
+_REDACT = [re.compile(r"(?i)bearer\s+\S+"),
+           re.compile(r"(?i)\b(?:sk|rk|pk|key|tok|ghp|gho|xox[a-z])[-_][A-Za-z0-9_\-]{6,}"),
+           re.compile(r"[A-Za-z0-9_\-+/=]{32,}")]
+
+
+def redact(text, n=200, secret=None):
+    """Allowlist-style scrub for ledger diagnostics: strip control chars,
+    mask key-shaped strings and the live key if known, bound the size.
+    Never used on request bodies or headers."""
+    t = "".join(c if c.isprintable() else " " for c in str(text))
+    if secret:
+        t = t.replace(secret, "[REDACTED]")
+    for rx in _REDACT:
+        t = rx.sub("[REDACTED]", t)
+    return t[:n]
+
+
+DIAG_KEYS = ("stage", "class", "error_type", "status", "content_type",
+             "elapsed_s", "excerpt")
+
+
+def clean_diag(d):
+    """Only allowlisted keys, bounded, scalars only."""
+    if not isinstance(d, dict):
+        return None
+    out = {}
+    for k in DIAG_KEYS:
+        v = d.get(k)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            out[k] = round(v, 2) if isinstance(v, float) else v
+        elif isinstance(v, str):
+            out[k] = redact(v, 200 if k == "excerpt" else 60)
+    return out
+
+
 def http_post_factory(env="REQUESTY_API_KEY"):
     def post(model, system, prompt, max_tokens):
         key = os.environ.get(env)
         if not key:
             raise Halt("missing key env " + env)
+        t0 = time.monotonic()
+
+        def unk(stage, cls, exc=None, raw=None, ctype=None):
+            d = {"stage": stage, "class": cls,
+                 "elapsed_s": time.monotonic() - t0}
+            if exc is not None:
+                d["error_type"] = type(exc).__name__   # class only, no text
+            if ctype:
+                d["content_type"] = ctype
+            if raw is not None:
+                d["excerpt"] = redact(raw[:400].decode("utf-8", "replace"),
+                                      200, key)
+            return {"kind": "unknown", "usage": None, "content": "",
+                    "diag": clean_diag(d)}
         body = json.dumps({
             "model": model, "temperature": 0,
             "max_completion_tokens": max_tokens,
@@ -793,16 +844,43 @@ def http_post_factory(env="REQUESTY_API_KEY"):
                 "authorization": "Bearer " + key,
                 "user-agent": "team-launcher-ryan-cycle/0.1"})
         try:
-            with urllib.request.urlopen(req, timeout=120) as r:
-                data = json.loads(r.read())
-            return {"kind": "ok", "usage": data.get("usage"),
-                    "content": data["choices"][0]["message"]["content"] or ""}
+            resp = urllib.request.urlopen(req, timeout=120)
         except urllib.error.HTTPError as e:
+            ct = e.headers.get("content-type", "") if e.headers else ""
             return {"kind": "http", "code": e.code, "usage": None,
-                    "content": e.read()[:300].decode("utf-8", "replace")}
-        except (urllib.error.URLError, TimeoutError, OSError,
-                ValueError, KeyError):
-            return {"kind": "unknown", "usage": None, "content": ""}
+                    "content": redact(e.read()[:300].decode(
+                        "utf-8", "replace"), 300, key),
+                    "diag": clean_diag({
+                        "stage": "http-status", "class": "http",
+                        "status": e.code, "content_type": ct.split(";")[0],
+                        "elapsed_s": time.monotonic() - t0})}
+        except urllib.error.URLError as e:
+            r = e.reason
+            cls = "timeout" if isinstance(r, (TimeoutError, socket.timeout)) \
+                else "network"
+            return unk("connect-or-send", cls, r)
+        except (TimeoutError, socket.timeout) as e:
+            return unk("connect-or-send", "timeout", e)
+        except OSError as e:
+            return unk("connect-or-send", "network", e)
+        with resp:
+            ctype = (resp.headers.get("content-type", "") or "").split(
+                ";")[0]
+            try:
+                raw = resp.read()
+            except (TimeoutError, socket.timeout) as e:
+                return unk("read-body", "timeout", e, ctype=ctype)
+            except OSError as e:
+                return unk("read-body", "network", e, ctype=ctype)
+        try:
+            data = json.loads(raw)
+        except ValueError as e:
+            return unk("parse-json", "malformed", e, raw, ctype)
+        try:
+            content = data["choices"][0]["message"]["content"] or ""
+        except (KeyError, IndexError, TypeError, AttributeError) as e:
+            return unk("response-shape", "malformed", e, raw, ctype)
+        return {"kind": "ok", "usage": data.get("usage"), "content": content}
     return post
 
 
