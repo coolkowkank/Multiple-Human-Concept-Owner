@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04T18:50:15+02:00",
+ "as_of": "2026-11-04T19:00:02+02:00",
  "timezone": "EET (UTC+2), same as commit timestamps",
  "rules": "Weighted milestone progress, not independently verified completion. Milestone done = 100% of weight (tests pass or an independent review passed). Partial = 50%. In progress / not started = 0%. Weights are judgment calls. Commits alone never count.",
  "packages": [
@@ -58,7 +58,7 @@
    "start": "2026-11-04T13:12",
    "end": "2026-11-04T13:21",
    "credit_at": "2026-11-04T13:21",
-   "evidence": "live/requesty-tinylib-experiment reached DONE, but needed manual recovery and skipped Reviewer Current execution transferred to Recovery Executor (operator, no project model configured), registry 63de5d0 available at 7c5b753. Earlier Telkomsel work retains its historical attribution. Acceptance gaps unchanged. Fresh proof must include Reviewer and QC on the same application pin, unattended; the 55e7c7e reviewer-skip branch is task-only and latch v5 does not implement that guard. UPDATE 18:30: pure completion predicate 9a0dc94 independently accepted, 21 focused tests plus three probes. Fails closed on missing/stale/mismatched evidence. No runtime integration or execution-provenance certification; pure tests do not prove unattended Reviewer participation or complete WP4. Separate integrated WIP 9d8cbe1 (recovery/wp4-integrated-offline): actual runtime hook, opt-in host-only, legacy CLI unguarded. Independent 18:48 review found blocking durable-DONE behavior when confirmation and invalidation both fail. Structural fix in progress; not accepted, no live proof or new credit.",
+   "evidence": "live/requesty-tinylib-experiment reached DONE, but needed manual recovery and skipped Reviewer Current execution transferred to Recovery Executor (operator, no project model configured), registry 63de5d0 available at 7c5b753. Earlier Telkomsel work retains its historical attribution. Acceptance gaps unchanged. Fresh proof must include Reviewer and QC on the same application pin, unattended; the 55e7c7e reviewer-skip branch is task-only and latch v5 does not implement that guard. UPDATE 18:30: pure completion predicate 9a0dc94 independently accepted, 21 focused tests plus three probes. Fails closed on missing/stale/mismatched evidence. No runtime integration or execution-provenance certification; pure tests do not prove unattended Reviewer participation or complete WP4. Separate integrated WIP 9d8cbe1 (recovery/wp4-integrated-offline): actual runtime hook, opt-in host-only, legacy CLI unguarded. Independent 18:48 review found blocking durable-DONE behavior when confirmation and invalidation both fail. Structural fix in progress; not accepted, no live proof or new credit. UPDATE18:59:b2074f9 structural fix independently accepted narrow offline opt-in mechanics,23focused/247suite+6probes. Prior blocking double fault fixed; hostprocesslocalonly,legacyCLIunguarded,restartrequiresoperatorrecovery. No WP4 completion or credit.",
    "forecast_end": "2026-11-05T12:00",
    "pic": [
     "recovery-executor"
@@ -445,5 +445,149 @@
     "deadline": null
    }
   ]
- }
+ },
+ "jobs": [
+  {
+   "id": "BJ1",
+   "name": "Escalation-latch revisions",
+   "owner": "Builder support, operator-authored",
+   "state": "Narrow offline acceptance",
+   "markers": [
+    {
+     "at": "2026-11-04T17:30",
+     "label": "v1 changes required"
+    },
+    {
+     "at": "2026-11-04T17:40",
+     "label": "v2 changes required"
+    },
+    {
+     "at": "2026-11-04T18:10",
+     "label": "v5 published"
+    },
+    {
+     "at": "2026-11-04T18:14",
+     "label": "Independent review accepted"
+    }
+   ],
+   "evidence": "561f2e5 accepted narrow offline lifecycle delta. Not Alex model authorship, live concurrency or autonomy certification.",
+   "dependencies": "No work duration evidenced; markers are outputs/review reports, not model execution.",
+   "links_to": "Supplemental work only; no extra milestone credit",
+   "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner",
+   "approved": "Scope/status shown only; no live execution authority"
+  },
+  {
+   "id": "RJ1",
+   "name": "Original F1-F4 fix re-review",
+   "owner": "Bill / Christina, independent peer",
+   "state": "Review complete",
+   "markers": [
+    {
+     "at": "2026-11-04T18:19",
+     "label": "Peer re-review complete"
+    }
+   ],
+   "evidence": "Exact26ff4bc: F1-F4 resolved,8deadlock/167suite unit tests. Not latch review or live proof.",
+   "dependencies": "No work duration evidenced; markers are outputs/review reports, not model execution.",
+   "links_to": "Supplemental work only; no extra milestone credit",
+   "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner",
+   "approved": "Scope/status shown only; no live execution authority"
+  },
+  {
+   "id": "AJ1",
+   "name": "Team performance analysis",
+   "owner": "Ryan function, operator research + one Groq sample",
+   "state": "Analysis complete",
+   "markers": [
+    {
+     "at": "2026-11-04T18:03",
+     "label": "Corrected-packet model sample"
+    },
+    {
+     "at": "2026-11-04T18:17",
+     "label": "Analysis/source check complete"
+    }
+   ],
+   "evidence": "One3076-token second-opinion sample,provider-reportedcost0,not qualification. Proposals still require Sam,Coordinator,Owner review.",
+   "dependencies": "No work duration evidenced; markers are outputs/review reports, not model execution.",
+   "links_to": "Supplemental work only; no extra milestone credit",
+   "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner",
+   "approved": "Scope/status shown only; no live execution authority"
+  },
+  {
+   "id": "RJ2",
+   "name": "Performance evidence verification",
+   "owner": "Independent operator verifier",
+   "state": "Review complete",
+   "markers": [
+    {
+     "at": "2026-11-04T18:17",
+     "label": "Source/citation check complete"
+    }
+   ],
+   "evidence": "One-shot verification complete; no standing running verifier. Dedicated Researcher+Verifier support requested,model assignments unresolved.",
+   "dependencies": "No work duration evidenced; markers are outputs/review reports, not model execution.",
+   "links_to": "Supplemental work only; no extra milestone credit",
+   "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner",
+   "approved": "Scope/status shown only; no live execution authority"
+  },
+  {
+   "id": "BJ2",
+   "name": "Prompt-source audit and failure fixes",
+   "owner": "Recovery Executor, model not configured",
+   "state": "Accepted offline; unwired",
+   "markers": [
+    {
+     "at": "2026-11-04T18:18",
+     "label": "Initial audit accepted"
+    },
+    {
+     "at": "2026-11-04T18:20",
+     "label": "Follow-up published"
+    },
+    {
+     "at": "2026-11-04T18:25",
+     "label": "Follow-up accepted"
+    }
+   ],
+   "evidence": "ac42a04:18focused/214suite independently reproduced. Opt-in/unwired; no measured savings or WP9 completion.",
+   "dependencies": "No work duration evidenced; markers are outputs/review reports, not model execution.",
+   "links_to": "Supplemental work only; no extra milestone credit",
+   "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner",
+   "approved": "Scope/status shown only; no live execution authority"
+  },
+  {
+   "id": "BJ3",
+   "name": "Completion guard integration",
+   "owner": "Recovery Executor, model not configured",
+   "state": "Accepted offline opt-in",
+   "markers": [
+    {
+     "at": "2026-11-04T18:30",
+     "label": "Pure predicate accepted"
+    },
+    {
+     "at": "2026-11-04T18:36",
+     "label": "Runtime WIP published"
+    },
+    {
+     "at": "2026-11-04T18:48",
+     "label": "Blocking review"
+    },
+    {
+     "at": "2026-11-04T18:50",
+     "label": "Structural fix prepared"
+    },
+    {
+     "at": "2026-11-04T18:59",
+     "label": "Independent follow-up accepted"
+    }
+   ],
+   "evidence": "b2074f9 independently accepted18:59:23focused/247suite+6adversarial probes. completing then path-only finalization fixes durable-DONE double fault. Hostprocesslocalonly,legacyCLIunguarded,restartrequiresoperatorrecovery; no modelindependence or unattended WP4 completion.",
+   "dependencies": "No work duration evidenced; markers are outputs/review reports, not model execution.",
+   "links_to": "Supplemental work only; no extra milestone credit",
+   "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner",
+   "approved": "Scope/status shown only; no live execution authority"
+  }
+ ]
 }

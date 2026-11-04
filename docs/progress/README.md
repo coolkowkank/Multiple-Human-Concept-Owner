@@ -71,3 +71,7 @@ A static PNG is a daily chart only. It is exported once, after the Europe/Helsin
 ## Research work packages
 
 RW1-RW6 come from Research_lab/research/PLAN.md, reconciled with later dated findings in progress.json. render_research.py shows dated outputs/replays only, not duration. The plan gives no RW start/end/deadline dates. Research stages are separate from implementation, approval and weighted WPs. Related WP references do not add credit. Refresh render_research.py and charts/build_charts.py with substantive research changes only.
+
+## Unified Gantt
+
+WP rows, RW1-RW6 and individual job rows share one time axis in the main Gantt. Only WPs carry weights. Purple markers are dated outputs/reviews, not intervals or runtime. Research/job detail cards supplement the diagram; they do not replace rows. Coordinator coordination is excluded from supplemental jobs.

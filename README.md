@@ -21,7 +21,7 @@
 
 ### Legacy Members
 
-*As of 2026-11-04 18:50 EET. [Scrollable full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/legacy-members/) (sideways and down, header and first column stay put). Full table with instance IDs, blueprints and rules: [registry](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/registry.md). `*` marks an instance with repo evidence of work. Backup coverage for model failures is a known gap.*
+*As of 2026-11-04 19:00 EET. [Scrollable full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/legacy-members/) (sideways and down, header and first column stay put). Full table with instance IDs, blueprints and rules: [registry](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/registry.md). `*` marks an instance with repo evidence of work. Backup coverage for model failures is a known gap.*
 
 | Role | Member | Status | Assignment | Model / provider | Blueprint | Parallels |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -36,11 +36,9 @@
 
 ### Project progress
 
-*As of 2026-11-04 18:50 EET. Weighted milestone progress is **62.5%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
+*As of 2026-11-04 19:00 EET. Weighted milestone progress is **62.5%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
 
-**Research work packages: RW1-RW6**. Researcher plan and dependencies are tracked separately from WP milestone credit. Dates are evidenced publications/replays, not continuous work time; no RW deadlines were specified. [Plan](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/Research_lab/research/PLAN.md) · [Status and dependencies](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/charts/)
-
-![Research work packages RW1-RW6: dated output timeline](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/a0f9d3abc2396e0c86b8b4cbbf301395d752ed32/docs/progress/research-gantt.png)
+**Research work packages: RW1-RW6**. RW1-RW6 are rows in the same Gantt, after the WPs; research dependencies/details below do not add milestone credit. Dates are evidenced publications/replays, not continuous work time; no RW deadlines were specified. [Plan](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/Research_lab/research/PLAN.md) · [Status and dependencies](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/charts/)
 
 | ID | Research work | Current research state | Dependencies / related work |
 |---|---|---|---|
@@ -51,17 +49,8 @@
 | RW5 | Prior art in public systems | S2 notes; partial level-2 read, no tested adoption decision | None; feeds RW1-RW4. Re-pin implementation and write adopt/skip decisions; Supports RW1-RW4, no separate WP credit |
 | RW6 | Rate-limit-aware provider routing | S0 placeholder; not started | Research scope must be assigned; no date committed; WP6 context only |
 
-**Continuous / out-of-WP work** (as of 2026-11-04 18:23 EET). Work outside the milestones, with no credit and no effect on the score. Excludes the Coordinator's own coordination. Role status is the current assignment, not live work. Model execution is unknown unless a run is observed. A commit is operator or member output, not duration, and its age does not show anyone is working or idle. [Pages view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/charts/)
+**Individual jobs are in the same Gantt diagram**, after WP and RW rows. The chart includes latch revisions, independent reviews, performance analysis and Recovery Executor work. Markers show dated outputs or reviews only, not continuous runtime, idle time or extra milestone credit. Coordinator coordination is excluded.
 
-| Member | Role assignment | Role status | Model execution | Latest evidenced output | Output age |
-|---|---|---|---|---|---|
-| Nora - Researcher | Researcher role: research notes outside the work packages (E4 replay, RW3, RW1); WP8a source checks are in the Gantt above | **Assigned** | Unknown, not currently observed | bbb310d: Research-support publication corrected F2/F3 using an independent full-PDF check. No Researcher model instance; WP8a credit is in the Gantt, not this row. Source: Research_lab commit | 18:12 (11 min) |
-| Eva - Evidence verifier | Review of the E4 replay and the RW3/RW1 notes | **Waiting** | Unknown, not currently observed | 3aff4c6: Review 2 of the first audit loop. Review queued; no review recorded since. Source: Research_lab commit; model route cooling down after an unclear 429 (team-launcher record) | 15:37 (166 min) |
-| Alex - Builder | Builder role: escalation-latch follow-up to the accepted WP5 fix | **Assigned** | Unknown, not currently observed | 561f2e5: Operator-authored latch v5; independent narrow offline lifecycle review accepted at 18:14. Not an Alex model call or autonomy pass. Source: live/builder-gate-latch-v2 commit | 18:10 (13 min) |
-| Bill - Independent reviewer | Independent reviewer role for Builder commits | **Review complete** | Unknown, not currently observed | 26ff4bc: Bill/Christina peer re-review: F1-F4 resolved; 8 deadlock and 167 full-suite unit tests independently passed. Not a latch review or live/autonomy pass. Source: Independent peer confirmation; original fix compare | 18:19 (4 min) |
-| Ryan - Team Resources | Team Resources role: model-route checks; team performance analysis (assigned 17:48) | **Analysis complete** | Unknown, not currently observed | 001448b: Operator performance research and independent source/citation check completed. One corrected-packet Groq second-opinion sample, 3076 tokens, provider-reported cost 0, not general qualification. Source: team-launcher registry and availability record | 18:17 (6 min) |
-| Sam - Coordinator Assistant | Coordinator Assistant role: status drafts, each reviewed | **Assigned** | Unknown, not currently observed | One Gemma draft was produced earlier (T3) with a Groq backup (T4). No current draft observed. The 17:50 update was prepared by the maintainer, not by Sam's model. Source: Earlier trial record | no output evidence |
-| Ryan's Verifier | Dedicated Researcher and Verifier support requested; model assignments unresolved | **Awaiting staffing** | No project model assigned; no current verification run observed | One-shot independent operator verification complete; no standing running verifier. Dedicated support request remains open, models not qualified. Source: team-launcher 001448b | 18:17 (6 min) |
 
 ![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/a0f9d3abc2396e0c86b8b4cbbf301395d752ed32/docs/progress/gantt.png)
 

@@ -23,10 +23,16 @@ LAB = {"verified": "Milestone done", "partial": "Partial (50%)", "in_progress": 
 plt.rcParams["svg.fonttype"] = "none"; plt.rcParams["font.family"] = "DejaVu Sans"
 x0, x1 = D(2026,11,3,12), D(2026,11,5,15)
 
-# Gantt
-fig, ax = plt.subplots(figsize=(11, 7.4))
-for i, p in enumerate(P):
-    y = len(P) - 1 - i; s = t(p["start"])
+# Gantt: all rows share the same time axis
+G = P + [dict(r, row_type="research") for r in d.get("research",{}).get("rows",[])] + [dict(r,row_type="job") for r in d.get("jobs",[])]
+fig, ax = plt.subplots(figsize=(12, 13))
+for i, p in enumerate(G):
+    y = len(G) - 1 - i
+    if p.get("row_type"):
+        for e in p.get("markers",[]): ax.plot(md.date2num(t(e["at"])),y,marker="D",color="#5b4f9a",markersize=5)
+        if not p.get("markers"): ax.text(md.date2num(x1)-.01,y,"No dated output",ha="right",fontsize=7,color="#666")
+        continue
+    s = t(p["start"])
     if p["status"] in ("verified", "partial"):
         e = t(p["end"]); ax.barh(y, max(md.date2num(e)-md.date2num(s), 0.012), left=md.date2num(s), color=COL[p["status"]], height=.55)
     elif p["status"] == "in_progress":
@@ -36,32 +42,32 @@ for i, p in enumerate(P):
         fe = t(p["forecast_end"])
         if p["status"] in ("verified","partial"): fs = t(p["end"])
         ax.barh(y, md.date2num(fe)-md.date2num(fs), left=md.date2num(fs), height=.55, facecolor="none", edgecolor="#555", hatch="////", linewidth=.8, linestyle="--")
-ax.axvline(md.date2num(asof), color="#c62828", lw=1.4); ax.text(md.date2num(asof), len(P)-.35, " now", color="#c62828", fontsize=8, va="bottom")
+ax.axvline(md.date2num(asof), color="#c62828", lw=1.4); ax.text(md.date2num(asof), len(G)-.35, " now", color="#c62828", fontsize=8, va="bottom")
 ppl = d.get("people", {})
 icons = {k: mpimg.imread(os.path.join(here, v["icon"])) for k, v in ppl.items()}
-ax.text(1.05, len(P)-.05, "Owner + contributors", transform=ax.get_yaxis_transform(), fontsize=8, ha="center", va="bottom", fontweight="bold")
-for i, p in enumerate(P):
-    y = len(P) - 1 - i
+ax.text(1.05, len(G)-.05, "Owner + contributors", transform=ax.get_yaxis_transform(), fontsize=8, ha="center", va="bottom", fontweight="bold")
+for i, p in enumerate(G):
+    y = len(G) - 1 - i
     for j, k in enumerate(p.get("pic", [])):
         ax.add_artist(AnnotationBbox(OffsetImage(icons[k], zoom=0.17), (1.02, y), xycoords=ax.get_yaxis_transform(), frameon=False, annotation_clip=False))
     for j, k in enumerate(p.get("contributors", [])):
         ax.add_artist(AnnotationBbox(OffsetImage(icons[k], zoom=0.1), (1.065 + j*0.03, y), xycoords=ax.get_yaxis_transform(), frameon=False, annotation_clip=False))
     if "baseline_end" in p:
         ax.plot([md.date2num(t(p["baseline_end"]))], [y], marker="D", color="#c62828", markersize=5, zorder=6)
-ax.set_yticks(range(len(P))); ax.set_yticklabels([f'{p["id"]}  {p["name"]}  ({p["weight"]}%)' for p in reversed(P)], fontsize=8)
-ax.set_xlim(md.date2num(x0), md.date2num(x1)); ax.set_ylim(-.6, len(P)-.1)
+ax.set_yticks(range(len(G))); ax.set_yticklabels([p["id"]+"  "+p["name"]+(" ("+str(p["weight"])+"%)" if "weight" in p else "") for p in reversed(G)], fontsize=8)
+ax.set_xlim(md.date2num(x0), md.date2num(x1)); ax.set_ylim(-.6, len(G)-.1)
 ax.xaxis.set_major_locator(md.HourLocator(byhour=[0,6,12,18])); ax.xaxis.set_major_formatter(md.DateFormatter("%b %d\n%H:%M"))
 ax.tick_params(axis="x", labelsize=7); ax.grid(axis="x", color="#ddd", lw=.6); ax.set_axisbelow(True)
 for s_ in ("top","right"): ax.spines[s_].set_visible(False)
 h = [Patch(color=COL[k], label=LAB[k]) for k in COL] + [Patch(facecolor="none", edgecolor="#555", hatch="////", label="Forecast (not a commitment)"), Line2D([0],[0], marker="D", color="w", markerfacecolor="#c62828", markersize=6, label="Baseline end, frozen "+d["baseline"]["set_at"][11:16])]
 ax.legend(handles=h, fontsize=7, loc="lower center", bbox_to_anchor=(.5, 1.0), ncol=3, frameon=False)
-ax.set_title("Gantt chart (times in EET). Solid = observed in repo evidence. Hatched = forecast.", fontsize=9, loc="left", pad=34)
-fig.tight_layout(rect=(0, 0.21, 0.92, 1))
+ax.set_title("Combined Gantt (EET): WP then RW then jobs. Purple diamonds = outputs/reviews, not durations.", fontsize=9, loc="left", pad=34)
+fig.tight_layout(rect=(0, 0.15, 0.92, 1))
 for n, (k, v) in enumerate(ppl.items()):
-    yy = 0.17 - n*0.032
+    yy = 0.12 - n*0.022
     fig.add_artist(AnnotationBbox(OffsetImage(icons[k], zoom=0.17), (0.035, yy), xycoords="figure fraction", frameon=False))
     fig.text(0.06, yy, v.get("alias","")+" ("+v["label"]+"): "+v["role"] if v.get("alias") else v["label"]+": "+v["role"], fontsize=8, va="center")
-fig.text(0.02, 0.202, d.get("pic_note",""), fontsize=7, color="#555")
+fig.text(0.02, 0.143, d.get("pic_note",""), fontsize=7, color="#555")
 fig.savefig(os.path.join(here, "gantt.svg")); fig.savefig(os.path.join(here, "gantt.png"), dpi=130); plt.close(fig)
 
 # S-curve

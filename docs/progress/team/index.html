@@ -35,7 +35,7 @@ main{max-width:1100px;margin:0 auto}h1{font-size:24px;margin:0 0 4px}h2{font-siz
 a{color:#1a5fb4}
 </style><link rel="stylesheet" href="../nav.css"><script src="../nav.js"></script></head><body><main>
 <h1>Current Project Team</h1>
-<p class="mut">Static page, updated when the team changes. Large avatar = role holder. "Not project-configured" means the project does not document a model or provider. Active members and vacant roles are listed separately.</p>
+<p class="mut">Static page, updated when the team changes. Large avatar = role holder. "Model not configured" means the project does not document a model or provider. Active members and vacant roles are listed separately.</p>
 
 <div class="org">
  <div class="o-owner"><div class="card top"><img class="av" src="../avatars/coolkowkank.png" alt=""><div class="role">Project owner</div><div class="handle">@coolkowkank</div><div class="ln">Decision authority: merges, spend, access</div></div></div>
@@ -44,7 +44,7 @@ a{color:#1a5fb4}
  <div class="o-sh" aria-label="Coordinator and Sam, two-way"><span>&#8644;</span><em>status drafts / review</em></div>
  <div class="o-sam"><div class="card top"><div class="av" style="background:#b0702a;color:#fff;font-size:30px;line-height:60px;font-weight:700;text-align:center" aria-hidden="true">S</div><div class="role">Sam - Coordinator Assistant <span class="tag act">active</span></div><div class="handle">status drafts only</div><div class="ln"><span class="b Rq">Rq</span>Model: google/gemma-4-31b-it (free)</div><div class="ln">Coordinator reviews every draft</div><div class="ln">Publication stays coordination-run</div></div></div>
  <div class="o-trunk"><i></i></div>
- <div class="o-ryan"><div class="card top"><div class="av" style="background:#4a6fa5;color:#fff;font-size:30px;line-height:60px;font-weight:700;text-align:center" aria-hidden="true">R</div><div class="role">Ryan - Team Resources <span class="tag act">active</span></div><div class="handle">coordination-run</div><div class="ln">Checks model routes (working / capped) from evidence and proposes replacements from free resources only</div><div class="ln">Status-draft backup: Groq gpt-oss-120b, narrow, fixed template, every draft reviewed. Code and research backup: gap</div><div class="ln">Model: not project-configured</div></div></div>
+ <div class="o-ryan"><div class="card top"><div class="av" style="background:#4a6fa5;color:#fff;font-size:30px;line-height:60px;font-weight:700;text-align:center" aria-hidden="true">R</div><div class="role">Ryan - Team Resources <span class="tag act">active</span></div><div class="handle">coordination-run</div><div class="ln">Checks model routes (working / capped) from evidence and proposes replacements from free resources only</div><div class="ln">Status-draft backup: Groq gpt-oss-120b, narrow, fixed template, every draft reviewed. Code and research backup: gap</div><div class="ln">Model: not project-configured</div></div><div class="ryan-support" style="border-left:2px solid #b4b8c6;padding-left:10px;margin-top:12px"><div class="card vac"><div class="role">Ryan's Researcher</div><div class="ln">Requested, pending staffing</div><div class="ln">Model not configured</div></div><div class="card vac" style="margin-top:8px"><div class="role">Ryan's Verifier</div><div class="ln">Requested, pending staffing</div><div class="ln">Model not configured</div><div class="ln">One-shot operator evidence check complete; no standing running verifier</div></div></div></div>
  <div class="o-rh" aria-label="Ryan and the Coordinator line, two-way"><span class="mar">&#8644;</span><div class="bar d"><i></i></div><em class="d">route checks / proposals</em><em class="m">Ryan is a side branch of the Coordinator line (two-way): route checks / proposals</em></div>
 </div>
 <p class="ln" style="text-align:center;margin:0">&#8595; Coordinator line to the teams. Ryan is a side branch of this line, not a step in it.</p>
@@ -64,8 +64,9 @@ a{color:#1a5fb4}
    </div>
 </div>
 
-<h2>Vacant roles</h2>
-<p class="ln">None right now. Known gap: a status-draft backup is qualified (Groq gpt-oss-120b, fixed template only, per-draft review). No qualified backup exists for code or research, so Ryan's replacement proposals go back to the Coordinator. This is not automatic failover.</p>
+<div class="tier"><div class="link"></div><div class="card top"><img class="av" src="../avatars/recovery-executor.png" alt=""><div class="role">Recovery Executor <span class="tag act">assigned</span></div><div class="ln">WP4 closeout and WP9 measurement</div><div class="ln"><b>Model not configured</b></div><div class="ln">Real offline execution support; not autonomous model-member proof</div></div></div>
+<h2>Requested support / vacant roles</h2>
+<p class="ln">Ryan's dedicated Researcher and Verifier are requested, with model assignments unresolved. Known gap: a status-draft backup is qualified (Groq gpt-oss-120b, fixed template only, per-draft review). No qualified backup exists for code or research, so Ryan's replacement proposals go back to the Coordinator. This is not automatic failover.</p>
 
 <h2>Provider pool</h2>
 <p class="ln"><span class="b Gq">Gq</span>1) Groq: Builder &nbsp; <span class="b Ce">Ce</span>2) Cerebras: on hold &nbsp; <span class="b Rq">Rq</span>3) Requesty: free route, Nora and Eva trials. Badges are stylized letter marks.</p>
