@@ -39,6 +39,7 @@ class ExecutorCase(unittest.TestCase):
         self.addCleanup(self._restore_env)
         os.environ["GROQ_KEY_FILE"] = self.key
         os.environ["RECORDS_DIR"] = self.wt
+        os.environ["MODEL_COMMITTER"] = "Test Bot <1+test-bot@users.noreply.github.com>"
 
     def _restore_env(self):
         os.environ.clear(); os.environ.update(self._env)
@@ -63,6 +64,29 @@ class ExecutorCase(unittest.TestCase):
     def tc(name, args, i="c1"):
         return {"id": i, "type": "function",
                 "function": {"name": name, "arguments": args}}
+
+    def test_committer_derived_from_github_token(self):
+        del os.environ["MODEL_COMMITTER"]
+        os.environ["GITHUB_TOKEN"] = "fake-token"
+        import urllib.request, io
+        real = urllib.request.urlopen
+        class R(io.BytesIO):
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+        urllib.request.urlopen = lambda req, timeout=0: R(json.dumps({"login": "alice-bot", "id": 42}).encode())
+        try:
+            ns = self.load()
+        finally:
+            urllib.request.urlopen = real
+        self.assertEqual(ns["MODEL_COMMITTER_NAME"], "alice-bot")
+        self.assertEqual(ns["MODEL_COMMITTER_EMAIL"], "42+alice-bot@users.noreply.github.com")
+        self.assertEqual(ns["MODEL_COMMITTER_SOURCE"], "derived from the GITHUB_TOKEN account")
+
+    def test_committer_fail_closed_without_identity(self):
+        del os.environ["MODEL_COMMITTER"]
+        os.environ.pop("GITHUB_TOKEN", None)
+        with self.assertRaises(SystemExit):
+            self.load()
 
     def break_remote(self):
         git("remote", "set-url", "origin", os.path.join(self.tmp, "gone.git"), cwd=self.wt)
@@ -178,8 +202,9 @@ class ExecutorCase(unittest.TestCase):
         self.assertIn("instinct-telkomsel", ns["RECORDS_COMMITTER"])
         self.assertEqual(ns["MODEL"], "openai/gpt-oss-120b")
         self.assertIn("api.groq.com", ns["API_URL"])
-        self.assertEqual(ns["MODEL_COMMITTER_NAME"], "coolkowkank-bot")
-        self.assertEqual(ns["MODEL_COMMITTER_EMAIL"], "350571665+coolkowkank-bot@users.noreply.github.com")
+        self.assertEqual(ns["MODEL_COMMITTER_NAME"], "Test Bot")
+        self.assertEqual(ns["MODEL_COMMITTER_EMAIL"], "1+test-bot@users.noreply.github.com")
+        self.assertEqual(ns["MODEL_COMMITTER_SOURCE"], "explicit MODEL_COMMITTER")
         os.environ["MODEL_AUTHOR"] = "Kimi (k2 model) <350571665+coolkowkank-bot@users.noreply.github.com>"
         os.environ["RECORDS_COMMITTER"] = "alice <alice@users.noreply.github.com>"
         os.environ["PROVIDER_MODEL"] = "kimi-k2"

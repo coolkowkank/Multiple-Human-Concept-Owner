@@ -43,11 +43,33 @@ MAX_BYTES = 20000
 # (whichever credential authenticates the push) - committer metadata is
 # configured independently of push authentication.
 MODEL_AUTHOR = os.environ.get("MODEL_AUTHOR", "Groq (gpt-oss-120b model) <350571665+coolkowkank-bot@users.noreply.github.com>")
-# Committer identity for MODEL-issued commits: the shared bot account whose
-# credential also authenticates the push (owner decision 2026-11-04). Operator
-# record-keeping commits (records branch, LOOP.json) keep the operator identity.
-_mcn, _mce = os.environ.get("MODEL_COMMITTER", "coolkowkank-bot <350571665+coolkowkank-bot@users.noreply.github.com>").rsplit("<", 1)
-MODEL_COMMITTER_NAME, MODEL_COMMITTER_EMAIL = _mcn.strip(), _mce.rstrip(">").strip()
+# Committer identity for MODEL-issued commits (owner decision 2026-11-04 for THIS
+# project's runs: the shared bot account whose credential also authenticates the
+# push). The tool hardcodes NO default identity - silently attributing commits to
+# a specific account would be dishonest for any other user onboarding with their
+# own token. Resolution order: explicit MODEL_COMMITTER ("Name <email>"), else
+# derive "login <id+login@users.noreply.github.com>" from the GITHUB_TOKEN account
+# (verified via the GitHub API), else fail closed. Operator record-keeping commits
+# (records branch, LOOP.json) keep the operator identity regardless.
+def _resolve_model_committer():
+    explicit = os.environ.get("MODEL_COMMITTER")
+    if explicit:
+        n, e = explicit.rsplit("<", 1)
+        return n.strip(), e.rstrip(">").strip(), "explicit MODEL_COMMITTER"
+    tok = os.environ.get("GITHUB_TOKEN")
+    if tok:
+        import urllib.request
+        req = urllib.request.Request("https://api.github.com/user", headers={
+            "Authorization": f"Bearer {tok}", "Accept": "application/vnd.github+json",
+            "User-Agent": "mhco-standalone-committer-resolution"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            u = json.loads(r.read())
+        login, uid = u["login"], u["id"]
+        return login, f"{uid}+{login}@users.noreply.github.com", "derived from the GITHUB_TOKEN account"
+    raise SystemExit("MODEL_COMMITTER ('Name <email>') is required, or set GITHUB_TOKEN to derive the "
+                     "committer identity from the verified token account; refusing to attribute commits "
+                     "to a hardcoded account.")
+MODEL_COMMITTER_NAME, MODEL_COMMITTER_EMAIL, MODEL_COMMITTER_SOURCE = _resolve_model_committer()
 CRED = re.compile(r"(gsk_[A-Za-z0-9]|ghp_[A-Za-z0-9]|github_pat_|gho_[A-Za-z0-9]|AKIA[0-9A-Z]{16}|xox[baprs]-|Bearer\s+[A-Za-z0-9._-]{20,}|-----BEGIN)")
 transcript = []
 
