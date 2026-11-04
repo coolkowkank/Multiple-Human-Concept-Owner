@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04T19:52:29+02:00",
+ "as_of": "2026-11-04T20:01:40+02:00",
  "timezone": "EET (UTC+2), same as commit timestamps",
  "rules": "Weighted milestone progress, not independently verified completion. Milestone done = 100% of weight (tests pass or an independent review passed). Partial = 50%. In progress / not started = 0%. Weights are judgment calls. Commits alone never count.",
  "packages": [
@@ -593,7 +593,7 @@
    "id": "AJ2",
    "name": "Ryan continuous setup and incident",
    "owner": "Project operator; Ryan models not configured",
-   "state": "PAUSED: unknown transport",
+   "state": "Provisional models assigned; UNQUALIFIED / PAUSED",
    "markers": [
     {
      "at": "2026-11-04T19:40",
@@ -606,13 +606,38 @@
     {
      "at": "2026-11-04T19:44",
      "label": "Operator model assignment restored"
+    },
+    {
+     "at": "2026-11-04T19:54",
+     "label": "Operator provisional assignment, zero model calls"
+    },
+    {
+     "at": "2026-11-04T20:01",
+     "label": "Transport follow-up review: changes required"
     }
    ],
-   "evidence": "Independent offline runner review passed233full/37focused at95b68b1. First live allocation had one consumed reserve and unknown transport, no assignments or completed cycle, no usage/cost returned. Diagnostic and operator-owned manual assignment follow-up2f0e722 remains under review. Ryan cannot select, assign or change models. Researcher reference verification before Ryan review remains required.",
+   "evidence": "Independent offline runner review passed233full/37focused at95b68b1. First live allocation had one consumed reserve and unknown transport, no assignments or completed cycle, no usage/cost returned. Diagnostic and operator-owned manual assignment follow-up2f0e722 remains under review. Ryan cannot select, assign or change models. Researcher reference verification before Ryan review remains required. Superseding19:54 assignment ebc123e: Researcher nvidia/nemotron-3-ultra-550b-a55b, Verifier and Ryan novita/ling-3.1-flash, separate executions, no independence claim between Verifier/Ryan. All provisional/unqualified/paused, original unknown halt unchanged. Latest0268393 transport delta NOT accepted: independent review found structural finish-reason/usage-key leaks and malformed/all-result cost-gate blockers. Author fixing; no diagnostic call/clearance.",
    "dependencies": "Provider route remains paused; no retry or model qualification implied. Research question on model choice under fixed harness queued; no result yet.",
    "links_to": "Supplemental individual job; no extra milestone credit",
    "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/ryan-continuous-offline/docs/team/ryan/incident-1.md",
    "approved": "Status only; no provider call or retry authority"
+  },
+  {
+   "id": "RJ3",
+   "name": "Model choice under fixed harness research",
+   "owner": "Research support, independent PDF checks; not Ryan-model output",
+   "state": "Published literature note; no project experiment",
+   "markers": [
+    {
+     "at": "2026-11-04T19:53",
+     "label": "Corrected note published"
+    }
+   ],
+   "evidence": "b0e4ebf corrected public literature synthesis with original-PDF checks. Model choice still matters under fixed harness and can interact with harness/task; no project measurement, best-model qualification, automatic adoption or score credit. Document uses RW6 label; frozen PLAN RW6 routing row is distinct and unchanged.",
+   "dependencies": "Feeds Ryan pipeline when route unpaused; published findings kept separate from project tests.",
+   "links_to": "Requested research supplement only; no extra milestone credit",
+   "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/b0e4ebf0a736be6ad7f57e4eba254c0c392bbee0/research/findings/2026-11-04-rw6-model-selection-under-fixed-harness.md",
+   "approved": "Publication/evidence only; no implementation or provider authority"
   }
  ]
 }
