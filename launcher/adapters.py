@@ -166,7 +166,7 @@ class HttpAdapter(Adapter):
 
     def __init__(self, base_url, model, api_key_env, timeout=600,
                  max_retries=3, backoff=2.0, sleeper=time.sleep,
-                 max_tokens=None):
+                 max_tokens=None, reasoning_effort=None):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.api_key_env = api_key_env
@@ -178,6 +178,14 @@ class HttpAdapter(Adapter):
         # length, 2041 reasoning tokens, 0 content, 2026-11-04) - set
         # this high enough for reasoning plus the answer.
         self.max_tokens = max_tokens
+        # Optional reasoning effort hint (request field
+        # reasoning_effort: low/medium/high). Reasoning models scale
+        # thinking with token headroom; low keeps latency inside
+        # constrained run windows while preserving structured output
+        # (observed live: Groq gpt-oss-120b, low -> 12 reasoning
+        # tokens and a 1.1s complete response vs ~6.7k reasoning
+        # tokens and truncation at the same task, 2026-11-04).
+        self.reasoning_effort = reasoning_effort
         # 429/backoff policy: retry rate-limited requests with
         # exponential backoff, honoring Retry-After when the provider
         # sends one. Other HTTP errors are not retried (a 4xx will not
@@ -200,6 +208,8 @@ class HttpAdapter(Adapter):
         }
         if self.max_tokens:
             payload["max_completion_tokens"] = self.max_tokens
+        if self.reasoning_effort:
+            payload["reasoning_effort"] = self.reasoning_effort
         body = json.dumps(payload).encode()
         req = urllib.request.Request(
             f"{self.base_url}/chat/completions", data=body,
@@ -276,5 +286,6 @@ def build_adapter(spec):
         return HttpAdapter(
             spec["base_url"], spec["model"], spec["api_key_env"],
             timeout=spec.get("timeout", 600),
-            max_tokens=spec.get("max_tokens"))
+            max_tokens=spec.get("max_tokens"),
+            reasoning_effort=spec.get("reasoning_effort"))
     raise AdapterError(f"unknown adapter type {kind!r}")

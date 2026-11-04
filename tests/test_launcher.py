@@ -1421,3 +1421,11 @@ class HttpAdapterMaxTokensTests(unittest.TestCase):
     def test_absent_max_tokens_leaves_body_unchanged(self):
         body = self._capture({})
         self.assertNotIn("max_completion_tokens", body)
+
+    def test_reasoning_effort_reaches_request_body(self):
+        body = self._capture({"reasoning_effort": "low"})
+        self.assertEqual(body.get("reasoning_effort"), "low")
+
+    def test_absent_reasoning_effort_leaves_body_unchanged(self):
+        body = self._capture({})
+        self.assertNotIn("reasoning_effort", body)
