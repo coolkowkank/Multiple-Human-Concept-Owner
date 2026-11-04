@@ -8,7 +8,7 @@ from matplotlib.patches import Circle, FancyBboxPatch, Polygon
 INK = "#1a1a2e"; GRAY = "#5a6272"; ARROW = "#8a8fa3"; PURPLE = "#8b7ec8"
 
 def render(here, updated):
-    W, H = 1180, 1170
+    W, H = 1180, 1270
     fig = plt.figure(figsize=(W/100, H/100), dpi=100)
     ax = fig.add_axes([0, 0, 1, 1]); ax.set_xlim(0, W); ax.set_ylim(H, 0); ax.axis("off")
     img = lambda n: mpimg.imread(os.path.join(here, "avatars", n + ".png"))
@@ -45,11 +45,11 @@ def render(here, updated):
         if label: text((a[0]+b[0])/2+lx, (a[1]+b[1])/2+ly, label, 10, "#8a8fa3")
     text(W/2, 14, "Current Project Team", 22, INK, "bold")
     text(W/2, 46, "Latest update: " + updated, 12, GRAY)
-    OWN=(590,135,46); COR=(590,335,46); RES=(190,565,40); EVA=(450,565,40); BLD=(700,565,40); REV=(990,565,46)
+    OWN=(590,135,46); COR=(590,335,46); RES=(190,815,40); EVA=(450,815,40); BLD=(700,815,40); REV=(990,815,46)
     node(OWN[0],OWN[1],OWN[2],"coolkowkank"); node(COR[0],COR[1],COR[2],"instinct-telkomsel")
     node(BLD[0],BLD[1],BLD[2],"coolkowkank-bot"); node(REV[0],REV[1],REV[2],"instinct-christina")
     node(RES[0],RES[1],RES[2],"researcher-role"); node(EVA[0],EVA[1],EVA[2],icon="✓",bg="#2a9d8f")
-    RYN=(330,790,34); AST=(850,790,34)
+    RYN=(590,545,34); AST=(920,335,46)
     node(RYN[0],RYN[1],RYN[2],icon="R",bg="#4a6fa5",fs=20); node(AST[0],AST[1],AST[2],icon="S",bg="#b0702a",fs=20)
     def labels(c, role, handle, l1, l2=None, l3=None):
         x, y, r = c; text(x, y+r+10, role, 14, INK, "bold"); text(x, y+r+32, handle, 11, GRAY, style="italic")
@@ -68,14 +68,14 @@ def render(here, updated):
     # hierarchy: owner > coordinator > others (plain lines, no arrowheads)
     HL="#b4b8c6"
     ax.plot([OWN[0],COR[0]],[258,COR[1]-COR[2]-4],color=HL,lw=2,zorder=1)
-    busy=495
-    ax.plot([COR[0],COR[0]],[COR[1]+COR[2]+60,busy],color=HL,lw=2,zorder=1)
+    busy=745
+    ax.plot([COR[0],COR[0]],[COR[1]+COR[2]+60,RYN[1]-RYN[2]-4],color=HL,lw=2,zorder=1)
+    ax.plot([RYN[0],RYN[0]],[RYN[1]+RYN[2]+78,busy],color=HL,lw=2,zorder=1)
     ax.plot([RES[0],REV[0]],[busy,busy],color=HL,lw=2,zorder=1)
     for c in (RES,EVA,BLD,REV): ax.plot([c[0],c[0]],[busy,c[1]-c[2]-4],color=HL,lw=2,zorder=1)
-    b2=712
-    ax.plot([COR[0],COR[0]],[busy,b2],color=HL,lw=2,zorder=1)
-    ax.plot([RYN[0],AST[0]],[b2,b2],color=HL,lw=2,zorder=1)
-    for c in (RYN,AST): ax.plot([c[0],c[0]],[b2,c[1]-c[2]-4],color=HL,lw=2,zorder=1)
+    ax.plot([OWN[0],AST[0]],[258,258],color=HL,lw=2,zorder=1)
+    ax.plot([AST[0],AST[0]],[258,AST[1]-AST[2]-4],color=HL,lw=2,zorder=1)
+    arrow((COR[0]+COR[2]+8,COR[1]),(AST[0]-AST[2]-8,COR[1]),"drafts, reviewed by Coordinator",0,-26)
     text(OWN[0]+14,262,"direction + gates",10,"#8a8fa3",ha="left")
     # workflow arrows (lateral, not hierarchy)
     arrow((RES[0]+50,RES[1]-12),(EVA[0]-46,EVA[1]-12),"sources + claims",0,-24)
@@ -85,13 +85,13 @@ def render(here, updated):
     ax.annotate("", xy=(0,0), xytext=(0,0))
     ax.annotate("", xy=(0,0), xytext=(0,0))
     # compact provider line (details live in docs)
-    y0=985
+    y0=1085
     text(60,y0-8,"Provider pool:",12,INK,"bold",ha="left")
     badge(215,y0+2,"Gq",11); text(232,y0-6,"1) Groq: Builder",10,ha="left")
     badge(405,y0+2,"Ce",11); text(422,y0-6,"2) Cerebras: on hold",10,ha="left")
     badge(620,y0+2,"Rq",11); text(637,y0-6,"3) Requesty: free route, Nora and Eva trials",10,ha="left")
     text(60,y0+34,"On demand, not staffed: Architect, Independent QC, Records.  The Coordinator keeps responsibility for accepting reviewed work.",10,ha="left")
-    text(40,1085,"Sources: docs/developers.md and the team roster chart on the team-launcher branch, plus the current Researcher assignment.",9,"#8a8fa3",ha="left")
-    text(40,1103,"Lines show three levels: owner, Coordinator, others. Arrows show review loops: Alex and Bill on code, Nora and Eva on sources.",9,"#8a8fa3",ha="left")
-    text(40,1121,"Builder commits go through @coolkowkank-bot. Researcher commits: role author, owner @coolkowkank as committer.",9,"#8a8fa3",ha="left")
+    text(40,1185,"Sources: docs/developers.md and the team roster chart on the team-launcher branch, plus the current Researcher assignment.",9,"#8a8fa3",ha="left")
+    text(40,1203,"Lines show levels: owner; Coordinator and Sam; Team Resources; teams. Arrows show review loops: Alex and Bill on code, Nora and Eva on sources.",9,"#8a8fa3",ha="left")
+    text(40,1221,"Builder commits go through @coolkowkank-bot. Researcher commits: role author, owner @coolkowkank as committer.",9,"#8a8fa3",ha="left")
     fig.savefig(os.path.join(here, "team.png")); plt.close(fig)
