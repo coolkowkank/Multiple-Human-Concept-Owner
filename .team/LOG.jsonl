@@ -10,3 +10,4 @@
 {"ts": "2026-11-04T11:19:55Z", "seat": "supervisor", "kind": "stall", "body": "turn stalled on qc; restarting seat"}
 {"ts": "2026-11-04T11:20:00Z", "seat": "supervisor", "kind": "restart", "body": "seat qc exited -15; restart 1"}
 {"ts": "2026-11-04T11:20:16Z", "seat": "qc", "kind": "handoff", "body": "Verifying implementation of tinylib.add and tests. | verify: `ls -R && cat tinylib/__init__.py && cat tests/test_tinylib.py && python3 -m unittest discover -s tests -v` exit=0 | tail:  / ---------------------------------------------------------------------- / Ran 1 test in 0.000s /  / OK", "turn_seq": 4}
+{"ts": "2026-11-04T11:20:54Z", "seat": "coordinator", "kind": "handoff", "body": "Relaying QC verification pass to Builder for final confirmation.", "turn_seq": 5}

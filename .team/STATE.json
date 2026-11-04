@@ -1,13 +1,13 @@
 {
-  "turn": "coordinator",
-  "turn_seq": 4,
-  "turn_since": "2026-11-04T11:20:16Z",
+  "turn": "builder",
+  "turn_seq": 5,
+  "turn_since": "2026-11-04T11:20:54Z",
   "status": "running",
-  "status_line": "QC verifying ACs",
+  "status_line": "QC passed all ACs; requesting builder confirmation",
   "leases": {
     "coordinator": {
       "holder": "coordinator-32a14394",
-      "claimed_at": 1793791175.2809389
+      "claimed_at": 1793791217.602138
     },
     "builder": {
       "holder": "builder-d21f29f3",
