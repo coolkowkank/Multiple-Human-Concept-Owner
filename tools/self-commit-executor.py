@@ -121,12 +121,17 @@ def save_transcript():
     with open(dst, "w") as f:
         json.dump(transcript, f, indent=2)
     subprocess.run(["git", "-C", RECORDS_DIR, "add", "--", rel], check=True, capture_output=True)
-    _rn, _re_ = RECORDS_COMMITTER.rsplit("<", 1)
-    subprocess.run(["git", "-C", RECORDS_DIR, "-c", f"user.name={_rn.strip()}",
-                    "-c", f"user.email={_re_.rstrip('>').strip()}",
-                    "commit", "--quiet", "-m",
-                    f"operator: {ATTEMPT} transcript checkpoint {CHECKPOINT['n']} (auto, per-event durability)"],
-                   check=True, capture_output=True)
+    # Relaunch-safe: a checkpoint whose bytes are already committed (e.g. a
+    # run relaunched after a halt) must not fail on "nothing to commit".
+    staged = subprocess.run(["git", "-C", RECORDS_DIR, "diff", "--cached", "--quiet"],
+                            capture_output=True)
+    if staged.returncode != 0:
+        _rn, _re_ = RECORDS_COMMITTER.rsplit("<", 1)
+        subprocess.run(["git", "-C", RECORDS_DIR, "-c", f"user.name={_rn.strip()}",
+                        "-c", f"user.email={_re_.rstrip('>').strip()}",
+                        "commit", "--quiet", "-m",
+                        f"operator: {ATTEMPT} transcript checkpoint {CHECKPOINT['n']} (auto, per-event durability)"],
+                       check=True, capture_output=True)
     subprocess.run(["git", "-C", RECORDS_DIR, "push", "--quiet", "origin", "HEAD"], check=True, capture_output=True)
     PERSIST["saved"] = len(transcript)
 

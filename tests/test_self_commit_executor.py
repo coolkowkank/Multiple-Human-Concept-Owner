@@ -289,6 +289,15 @@ class ExecutorCase(unittest.TestCase):
         self.assertEqual(ns2["api"]([])["usage"]["cost"], 0.5)
 
     # 7. every event checkpointed exactly once; no duplicate clean-exit checkpoint
+
+    def test_checkpoint_idempotent_on_relaunch(self):
+        # A relaunched run re-saves identical first-event bytes; the
+        # checkpoint must not fail on "nothing to commit" (b6 halt lesson).
+        ns = self.load()
+        ns["record"]({"system": "s", "user": "u"})
+        ns["record"]({"system": "s", "user": "u"})  # same bytes again
+        self.assertFalse(ns["PERSIST"]["halt"])
+
     def test_checkpoint_per_event_no_dup(self):
         ns = self.load()
         seq = [self.msg(tool_calls=[self.tc("write_file", json.dumps({"path": "docs/x.md", "content": "hi"}))]),
