@@ -1,0 +1,32 @@
+{
+  "updated": "2026-11-04",
+  "unknowns": ["Requesty daily reset boundary", "Groq remaining org token budget"],
+  "routes": [
+    {"id": "openai/gpt-oss-120b", "provider": "groq", "price": 0,
+     "status": "working", "evidence": "2026-11-04 WP5/F3 draft completions x3, cost 0",
+     "job_shapes": ["code-draft"]},
+    {"id": "google/gemma-4-31b-it", "provider": "requesty", "price": 0,
+     "status": "working", "evidence": "2026-11-04 price-0 re-verified in /v1/models + status-draft completion, cost 0",
+     "job_shapes": ["status-draft", "evidence-check"]},
+    {"id": "nvidia/nemotron-3-ultra-550b", "provider": "requesty", "price": 0,
+     "status": "working", "evidence": "2026-11-04 researcher-1 outputs RW5, corrections 61143ba",
+     "job_shapes": ["research"]},
+    {"id": "nvidia/nemotron-3.5-lightning-30b-a3b", "provider": "requesty", "price": 0,
+     "status": "not-qualified", "evidence": "2026-11-04 trial: empty/truncated on multi-KB inputs, 4-11x reasoning overhead",
+     "job_shapes": []},
+    {"id": "nvidia/nemotron-3-super-120b-a12b", "provider": "requesty", "price": 0,
+     "status": "uncallable", "evidence": "2026-11-04 HTTP 404 twice; listing != callable",
+     "job_shapes": []}
+  ],
+  "supply_map": {
+    "code-draft": ["openai/gpt-oss-120b"],
+    "status-draft": ["google/gemma-4-31b-it"],
+    "evidence-check": ["google/gemma-4-31b-it"],
+    "research": ["nvidia/nemotron-3-ultra-550b"]
+  },
+  "excluded_money": [
+    "cerebras free trial (credits = money)",
+    "any provider-prefixed Requesty variant with nonzero price",
+    "any paid tier, auto-recharge, or new credential"
+  ]
+}
