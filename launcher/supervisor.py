@@ -126,6 +126,9 @@ class Supervisor:
         # Handle routing failures before stall detection
         turn = state.get("turn")
         status = state.get("status")
+        if status == "running" and turn:
+            # valid turn observed; consecutive-failure counting starts over
+            self._routing_failure_count = 0
         if status == "running" and not turn:
             # routing failure detected
             count = getattr(self, "_routing_failure_count", 0) + 1
