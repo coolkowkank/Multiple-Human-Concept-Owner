@@ -14,6 +14,7 @@
    since then: instinct-telkomsel = coordination commits only; role/model work
    = coolkowkank-bot with role-honest author labels; the owner coolkowkank
    token is used only for actual Researcher-role research/** publications and,
-   per the owner's explicit grant (Slack message 1793799527.885349,
-   2026-11-04 15:38 EET), Eva's Research_lab review publications. Eva reviews
+   per the owner's explicit grant (2026-11-04 15:38 EET, given on the owner's
+   private coordination channel; locator withheld from the public record),
+   Eva's Research_lab review publications. Eva reviews
    1-2 remain bot-published; no history rewrite.
