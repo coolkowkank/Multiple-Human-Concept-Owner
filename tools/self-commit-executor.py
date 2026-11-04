@@ -33,12 +33,12 @@ MAX_ROUNDS = 6
 MAX_CALLS = int(os.environ.get("MAX_CALLS", "6"))  # coordinator passes the loop's REMAINING global budget; every attempted provider request counts, including failed/error responses; the executor never retries
 CALLS = {"n": 0}
 MAX_BYTES = 20000
-# Fixed HARNESS-controlled author identity for every model-issued commit: visible
-# model credit without inventing a GitHub account. RFC 2606 reserves .invalid as
-# always-non-routable, so this address can never be verified or linked to an account;
-# per GitHub docs an unmatched/generic address renders as a plain unlinked author name
-# and never enters a contributions graph. Committer stays the operator account.
-MODEL_AUTHOR = "Groq (gpt-oss-120b model) <groq-gpt-oss-120b@model.invalid>"
+# Fixed HARNESS-controlled author identity for every model-issued commit: the
+# owner-approved shared project machine account (coolkowkank-bot), per-model credit
+# in the author NAME. The noreply email is account-linked, so work that lands on the
+# default branch can be credited to the bot account per GitHub's email grouping.
+# Committer stays the operator account (transport identity, separate and honest).
+MODEL_AUTHOR = "Groq (gpt-oss-120b model) <350571665+coolkowkank-bot@users.noreply.github.com>"
 CRED = re.compile(r"(gsk_[A-Za-z0-9]|ghp_[A-Za-z0-9]|github_pat_|gho_[A-Za-z0-9]|AKIA[0-9A-Z]{16}|xox[baprs]-|Bearer\s+[A-Za-z0-9._-]{20,}|-----BEGIN)")
 transcript = []
 
