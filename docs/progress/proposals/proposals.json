@@ -1,0 +1,18 @@
+{
+ "asOf": "2026-11-04T17:58",
+ "route": "Sam reviews first, then the Coordinator (Telkomsel), then the owner. If a step is absent or does not approve, it moves up. Spending, security or access changes and merges always need the owner.",
+ "items": [
+  {
+   "id": "P1",
+   "title": "Update-view button on the website",
+   "proposed_by": "Coordinator",
+   "summary": "A site button that opens a GitHub-authenticated workflow. The owner would confirm Run workflow there. The workflow would collect new project evidence, prepare a status update and publish it after checks. A plain redraw of old data is not enough.",
+   "current_reviewer": "Coordinator",
+   "status": "Coordinator preparing the proposal",
+   "decision": "Not decided",
+   "reason": "Not ready for a decision yet: the exact permissions, cost and the evidence-collection step are still being worked out. It will go to the owner once those are written down. A new workflow and its token permission need the owner's approval. No Sam model review has been run.",
+   "updated": "2026-11-04 17:58"
+  }
+ ],
+ "note": "Proposals from the Team Resources (Ryan) performance analysis will be listed here after Sam reviews them. None have been submitted yet."
+}

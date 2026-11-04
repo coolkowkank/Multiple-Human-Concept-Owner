@@ -1,0 +1,32 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Proposal Waitlist</title>
+<style>
+:root{--ink:#1a1a2e;--mut:#5a6272;--hair:#e2dfd8}
+*{box-sizing:border-box}body{font:15px/1.5 system-ui,sans-serif;margin:0;padding:16px;background:#fcfbf9;color:var(--ink)}
+main{max-width:900px;margin:0 auto}h1{font-size:24px;margin:0 0 4px}h2{font-size:16px;margin:24px 0 8px}
+.mut{color:var(--mut)}.card{background:#fff;border:1px solid var(--hair);border-radius:12px;padding:12px 14px;margin:0 0 10px}
+.t{font-weight:700}.row{font-size:13px;color:var(--mut);margin-top:4px}.row b{color:var(--ink)}
+.tag{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;margin-left:6px;background:#fff3d6;color:#7a5200}
+.flow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0 4px}.flow span{background:#fff;border:1px solid var(--hair);border-radius:8px;padding:2px 10px;font-size:13px}
+.flow i{font-style:normal;color:#8a8fa3}
+</style><link rel="stylesheet" href="../nav.css"><script src="../nav.js"></script></head><body><main>
+<h1>Proposal Waitlist</h1>
+<p class="mut" id="asof"></p>
+<div class="flow" aria-label="Review route"><span>Sam</span><i>&rarr;</i><span>Coordinator (Telkomsel)</span><i>&rarr;</i><span>Owner</span></div>
+<p class="mut" id="route"></p>
+<h2>Waiting on the owner</h2><div id="own"></div>
+<h2>Waiting on the Coordinator or Sam</h2><div id="other"></div>
+<h2>Decided</h2><div id="done"></div>
+<p class="mut" id="note"></p>
+<p class="mut">Read-only view of committed facts. It has no approve button: decisions are given to the Coordinator in the project chat and recorded here by an update. The Sam step is shown only when a Sam draft review actually happened.</p>
+<script>
+var D=__DATA__;
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+document.getElementById('asof').textContent='As of '+D.asOf.replace('T',' ')+' EET.';
+document.getElementById('route').textContent=D.route;document.getElementById('note').textContent=D.note;
+function card(p){return '<div class="card"><div class="t">'+esc(p.id)+' '+esc(p.title)+'<span class="tag">'+esc(p.status)+'</span></div><div class="row">'+esc(p.summary)+'</div><div class="row"><b>Proposed by:</b> '+esc(p.proposed_by)+' | <b>Current reviewer:</b> '+esc(p.current_reviewer)+' | <b>Decision:</b> '+esc(p.decision)+' | <b>Updated:</b> '+esc(p.updated)+'</div><div class="row"><b>Reason:</b> '+esc(p.reason)+'</div></div>'}
+function fill(id,l){document.getElementById(id).innerHTML=l.length?l.map(card).join(''):'<p class="mut">None.</p>'}
+var I=D.items;fill('own',I.filter(function(p){return p.current_reviewer==='Owner'&&p.decision==='Not decided'}));
+fill('other',I.filter(function(p){return p.current_reviewer!=='Owner'&&p.decision==='Not decided'}));
+fill('done',I.filter(function(p){return p.decision!=='Not decided'}));
+</script></main></body></html>

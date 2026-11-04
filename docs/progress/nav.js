@@ -1,6 +1,6 @@
 (function(){
 var s=document.currentScript,base=new URL('.',s.src).href;
-var items=[['Home','../'],['Team','team/'],['Legacy Members','legacy-members/'],['Timeline','timeline/'],['Gantt and S-curve','charts/'],['README','https://github.com/coolkowkank/Multiple-Human-Concept-Owner#readme']];
+var items=[['Home','../'],['Team','team/'],['Legacy Members','legacy-members/'],['Timeline','timeline/'],['Proposals','proposals/'],['Gantt and S-curve','charts/'],['README','https://github.com/coolkowkank/Multiple-Human-Concept-Owner#readme']];
 var nav=document.createElement('nav');nav.className='sitenav';nav.setAttribute('aria-label','Site menu');
 var inn=document.createElement('div');inn.className='in';
 var t=document.createElement('b');t.textContent='Project Under Construction';inn.appendChild(t);
