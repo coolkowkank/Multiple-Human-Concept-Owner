@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04T14:40:00+02:00",
+ "as_of": "2026-11-04T14:45:00+02:00",
  "timezone": "EET (UTC+2), same as commit timestamps",
  "rules": "Weighted milestone progress, not independently verified completion. Milestone done = 100% of weight (tests pass or an independent review passed). Partial = 50%. In progress / not started = 0%. Weights are judgment calls. Commits alone never count.",
  "packages": [
@@ -21,7 +21,7 @@
    "start": "2026-11-04T01:19",
    "end": "2026-11-04T14:38",
    "credit_at": "2026-11-04T14:38",
-   "evidence": "team-launcher at 93b3552: 177/177 offline tests pass. Not proof the runtime works end to end: known runtime defects (WP5) are unresolved"
+   "evidence": "team-launcher at d02927f: 178/178 offline tests pass. Not proof the runtime works end to end: runtime defects (WP5) are unresolved"
   },
   {
    "id": "WP3",
@@ -51,7 +51,7 @@
    "status": "in_progress",
    "start": "2026-11-04T13:24",
    "forecast_end": "2026-11-04T17:00",
-   "evidence": "live/builder-deadlock-fix: Builder commit 0fa083a pushed, 1 of 4 regression tests fails; repair running. Not fixed until tests are green"
+   "evidence": "live/builder-deadlock-fix: Builder commit 0fa083a pushed with 1 of 4 regression tests failing. Repair batch 3 running (2 of 6 calls used). No green pin or review yet. Not fixed"
   },
   {
    "id": "WP6",
@@ -62,7 +62,7 @@
    "end": "2026-11-04T14:38",
    "credit_at": "2026-11-04T14:38",
    "forecast_end": "2026-11-04T19:00",
-   "evidence": "team-launcher 93b3552 implemented and unit tested; no independent review yet"
+   "evidence": "Gate 93b3552 shipped a stale executor that dropped edit_file and the ledger; fixed forward in d02927f (178/178 offline tests). No independent review yet, so credit stays partial"
   },
   {
    "id": "WP7",
@@ -80,7 +80,7 @@
    "status": "in_progress",
    "start": "2026-11-04T14:35",
    "forecast_end": "2026-11-04T20:00",
-   "evidence": "Research_lab scaffold pushed (b8df577); verified findings not yet published"
+   "evidence": "Research_lab: first literature note published (b42f670, 3 findings). Findings are untested and unreviewed, adoption not proven, so 0% until a finding is tested"
   },
   {
    "id": "WP9",
