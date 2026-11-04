@@ -170,5 +170,53 @@
       "x-ratelimit-reset-tokens": "11.362s"
     },
     "call": 3
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-853b5d4a-e007-4e9d-a7e6-66bdb3a96474",
+      "object": "chat.completion",
+      "created": 1793799657,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "Let's open file.",
+            "tool_calls": [
+              {
+                "id": "fc_5b1e328e-2c3f-4646-b8d7-ad5288151f3f",
+                "type": "function",
+                "function": {
+                  "name": "write_file",
+                  "arguments": "{\"content\":\"# placeholder\",\"path\":\"launcher/supervisor.py\"}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.175617823,
+        "prompt_tokens": 1210,
+        "prompt_time": 0.065599221,
+        "completion_tokens": 43,
+        "completion_time": 0.091082147,
+        "total_tokens": 1253,
+        "total_time": 0.156681368,
+        "completion_tokens_details": {
+          "reasoning_tokens": 6
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_8ea50c0161",
+      "x_groq": {
+        "id": "req_01m6kcn5wmeyztxc54w2tx0f3r",
+        "seed": 947797620
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
