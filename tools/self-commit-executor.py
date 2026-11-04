@@ -189,9 +189,14 @@ def api(messages):
                 "refusing further provider requests")
     return r
 
+# Paths the model may write. docs/tasks markdown for records; launcher/tests
+# Python for implementation batches (widened 2026-11-04 for the
+# deadlock-fix batch; each widening is a disclosed operator infra change,
+# never a silent one).
+WRITE_RE = re.compile(r"(docs|tasks)/[A-Za-z0-9._-]+\.md|(launcher|tests)/[A-Za-z0-9._-]+\.py")
 def safe_path(path):
-    if not re.fullmatch(r"docs/[A-Za-z0-9._-]+\.md", path or ""):
-        return "path must match docs/<name>.md"
+    if not WRITE_RE.fullmatch(path or ""):
+        return "path must match docs|tasks/<name>.md or launcher|tests/<name>.py"
     full = os.path.join(REPO, path)
     d = os.path.dirname(full)
     cur = REPO
@@ -218,8 +223,9 @@ def run_tool(name, args):
         if name == "git_commit":
             msg = args.get("message", "")
             if CRED.search(msg): return {"ok": False, "error": "credential-pattern message refused"}
-            trailer = "\n\nCommitted-by: Groq gpt-oss-120b via own tool calls"
-            subprocess.run(["git", "-C", REPO, "add", "--", "docs/"], capture_output=True)
+            author_name = MODEL_AUTHOR.split(" <", 1)[0]
+            trailer = f"\n\nCommitted-by: {author_name} via own tool calls"
+            subprocess.run(["git", "-C", REPO, "add", "--", "docs/", "tasks/", "launcher/", "tests/"], capture_output=True)
             _env = dict(os.environ, GIT_COMMITTER_NAME=MODEL_COMMITTER_NAME, GIT_COMMITTER_EMAIL=MODEL_COMMITTER_EMAIL)
             p = subprocess.run(["git", "-C", REPO, "commit", "--author", MODEL_AUTHOR, "-m", msg + trailer], capture_output=True, text=True, env=_env)
             if p.returncode != 0:
