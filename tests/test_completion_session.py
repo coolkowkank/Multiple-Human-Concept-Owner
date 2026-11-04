@@ -3,6 +3,8 @@ import os
 import sys
 import unittest
 from unittest.mock import patch
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from test_launcher import make_repo, seat_spec
 from launcher.runtime import Seat, SeatError
 from launcher.completion_session import CompletionSession
@@ -15,7 +17,8 @@ class CompletionSessionTests(unittest.TestCase):
                  [('build', 'builder'), ('review', 'reviewer'), ('quality', 'qc'), ('coord', 'coordinator')]}
         self.repo, self.bus = make_repo(seats)
         self.addCleanup(shutil.rmtree, self.repo, True)
-        self.guard = CompletionSession([sys.executable, '-c', 'pass'], 'accepted-runtime-fixture')
+        self.guard = CompletionSession([sys.executable, '-c', 'pass'], 'accepted-runtime-fixture',
+                                       verification_is_side_effect_free=True, reviews_write_artifacts=False)
         self.seats = {name: Seat(self.bus, name, instance_id='instance-' + name,
                                 completion_session=self.guard) for name in seats}
         self.state = self.bus.state()
@@ -65,7 +68,8 @@ class CompletionSessionTests(unittest.TestCase):
 
     def test_restart_loses_evidence_refuses(self):
         self.review('review'); self.review('quality')
-        new = CompletionSession(self.guard.verify_argv, self.guard.runtime_pin)
+        new = CompletionSession(self.guard.verify_argv, self.guard.runtime_pin,
+                                verification_is_side_effect_free=True, reviews_write_artifacts=False)
         self.assertFalse(new.decide(self.seats['coord'])[0])
 
     def test_same_session_cannot_self_review(self):
@@ -89,7 +93,7 @@ class CompletionSessionTests(unittest.TestCase):
         self.review('review'); self.review('quality')
         state = self.bus.state(); state.update(turn='coord', status='running')
         self.seats['coord']._apply(state, {'status_line': 'DONE', 'handoff': None})
-        self.assertEqual(self.bus.state()['status'], 'done')
+        self.assertEqual(self.bus.state()['status'], 'completing')
         self.bus.commit_all('operator: completion fixture')
         self.guard.confirm_committed(self.repo)
 
@@ -139,3 +143,77 @@ class CompletionSessionTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 self.seats['review'].act_once()
         self.assertEqual(self.guard.snapshot(), before)
+
+
+    def prepare_done_turn(self):
+        self.review('review'); self.review('quality')
+        state = self.bus.state(); state.update(turn='coord', status='running')
+        self.bus.write_state(state); self.bus.commit_all('operator: issue coordinator turn')
+        self.seats['coord'].adapter.complete = lambda system, prompt: {'status_line': 'DONE', 'handoff': None}
+
+    def test_confirmation_and_recording_doublefault_never_commits_done(self):
+        self.prepare_done_turn()
+        with patch.object(self.guard, 'confirm_committed', side_effect=ValueError('bad binding')):
+            with patch.object(self.bus, 'transact_paths', side_effect=RuntimeError('unavailable')):
+                with self.assertRaises(SeatError):
+                    self.seats['coord'].act_once()
+        import subprocess
+        committed = json.loads(subprocess.run(['git', '-C', self.repo, 'show', 'HEAD:.team/STATE.json'],
+                               capture_output=True, text=True, check=True).stdout)
+        self.assertEqual(committed['status'], 'completing')
+        self.assertNotEqual(self.bus.state()['status'], 'done')
+
+    def test_foreign_dirt_not_swept_into_failure_record(self):
+        self.prepare_done_turn()
+        def fail(repo):
+            self.write_app()
+            raise ValueError('foreign dirt')
+        with patch.object(self.guard, 'confirm_committed', side_effect=fail):
+            with self.assertRaises(SeatError):
+                self.seats['coord'].act_once()
+        import subprocess
+        tracked = subprocess.run(['git', '-C', self.repo, 'ls-tree', '-r', '--name-only', 'HEAD'],
+                                 capture_output=True, text=True, check=True).stdout
+        self.assertNotIn('app/a.py', tracked)
+        self.assertEqual(self.bus.state()['status'], 'blocked')
+        self.assertTrue(self.bus.pending_gates())
+
+    def test_final_state_commit_failure_never_leaves_done_worktree(self):
+        self.prepare_done_turn()
+        original = self.bus.commit_paths
+        def fail_final(message, paths):
+            if 'finalize' in message:
+                raise RuntimeError('final state commit failed')
+            return original(message, paths)
+        with patch.object(self.bus, 'commit_paths', side_effect=fail_final):
+            with self.assertRaises(SeatError):
+                self.seats['coord'].act_once()
+        self.assertNotEqual(self.bus.state()['status'], 'done')
+
+    def test_config_requires_side_effect_and_review_artifact_contracts(self):
+        with self.assertRaises(ValueError):
+            CompletionSession(self.guard.verify_argv, 'pin')
+        with self.assertRaises(ValueError):
+            CompletionSession(self.guard.verify_argv, 'pin', verification_is_side_effect_free=True,
+                              reviews_write_artifacts=True)
+
+
+    def test_first_commit_is_only_completing_then_verified_done(self):
+        self.prepare_done_turn()
+        observed = []
+        original = self.bus.commit_all
+        def capture(message):
+            result = original(message)
+            if result:
+                observed.append(self.bus.state()['status'])
+            return result
+        with patch.object(self.bus, 'commit_all', side_effect=capture):
+            self.seats['coord'].act_once()
+        self.assertEqual(observed, ['completing'])
+        self.assertEqual(self.bus.state()['status'], 'done')
+
+    def test_verify_side_effect_refused_even_with_host_contract(self):
+        self.guard.verify_argv = (sys.executable, '-c', "open('generated.txt','w').write('side effect')")
+        with self.assertRaises(ValueError):
+            self.review('review')
+        self.assertFalse(self.guard.decide(self.seats['coord'])[0])

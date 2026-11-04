@@ -21,7 +21,7 @@ import uuid
 
 from . import prompts
 from .adapters import AdapterError, build_adapter
-from .bus import Bus, BusError, LOG
+from .bus import Bus, BusError, LOG, STATE
 
 
 class SeatError(Exception):
@@ -183,21 +183,48 @@ class Seat:
             if self.completion_session:
                 self.completion_session.restore(completion_snapshot)
             raise
-        if self.completion_session:
-            try:
+        if self.completion_session and self.completion_session.has_pending():
+            # The first commit contains only COMPLETING, never durable DONE.
+            # Every replay of the final path-only transaction revalidates the
+            # committed worktree before setting DONE. No dangerous compensation.
+            def finalize():
                 self.completion_session.confirm_committed(self.bus.repo)
+                final = self.bus.state()
+                if final.get('status') != 'completing':
+                    raise SeatError('pending completion state changed')
+                final['status'] = 'done'
+                final['status_line'] = 'DONE: independently reviewed completion'
+                self.bus.write_state(final)
+            try:
+                self.bus.transact_paths('operator: finalize verified completion',
+                                        [STATE], finalize)
+                self.completion_session.clear_pending()
             except Exception as exc:
-                # Fail closed in durable state too, not just the return value.
-                def invalidate():
-                    failed = self.bus.state()
-                    failed['status'] = 'blocked'
-                    failed['turn'] = None
-                    failed['status_line'] = 'Completion unconfirmed after commit'
-                    self.bus.write_state(failed)
+                # DONE was never authorized by a failed confirmation. On a
+                # final commit failure leave local STATE matching committed
+                # HEAD rather than an uncommitted done flag. A landed verified
+                # final commit can legitimately already be done.
+                committed = subprocess.run(
+                    ['git', '-C', self.bus.repo, 'show', 'HEAD:' + STATE],
+                    capture_output=True, text=True)
+                if committed.returncode == 0:
+                    with open(os.path.join(self.bus.repo, STATE), 'w') as fh:
+                        fh.write(committed.stdout)
                 try:
-                    self.bus.transact('operator: invalidate unconfirmed completion', invalidate)
+                    def blocked():
+                        current = self.bus.state()
+                        if current.get('status') == 'done':
+                            return  # a verified final commit already landed
+                        self.bus.open_gate(self.name,
+                            'Completion pending: post-commit verification or finalization failed')
+                        current['status'] = 'blocked'
+                        current['turn'] = None
+                        current['status_line'] = 'Completion unconfirmed after commit'
+                        self.bus.write_state(current)
+                    self.bus.transact_paths('operator: record pending completion failure',
+                        [STATE, '.team/gates/PENDING.jsonl'], blocked)
                 except Exception:
-                    pass  # Surface the original check failure; never claim done.
+                    pass  # committed completing remains fail-closed even here
                 self.completion_session.restore(completion_snapshot)
                 raise SeatError('completion unconfirmed after commit') from exc
         return result
@@ -573,7 +600,8 @@ class Seat:
                     state['status'] = 'blocked'
                     state['turn'] = None
                 else:
-                    state['status'] = 'done'
+                    state['status'] = 'completing'
+                    state['status_line'] = 'Completion pending committed binding check'
                     state['turn'] = None
             else:
                 state["status"] = "done"

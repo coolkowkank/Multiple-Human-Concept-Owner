@@ -3,6 +3,12 @@
 Only the host constructs this object and supplies it to Seat. Model responses,
 log records and files cannot populate its evidence store. Not cross-process
 identity, sandbox security, portable evidence authentication or model quality.
+
+Fixed verification must be deterministic and side-effect-free except ignored
+pycache files. Bound review-file writes change acceptance inputs, so this narrow
+mode refuses that configuration and uses response verdicts only. Independent
+runtime seat IDs are mechanical separation, NOT proof of different models or
+independently reasoned answers. The host remains responsible for that staffing.
 """
 import hashlib
 import json
@@ -12,11 +18,18 @@ from .completion_policy import Binding, Policy, Evidence, evaluate_completion
 
 
 class CompletionSession:
-    def __init__(self, verify_argv, runtime_pin):
+    def __init__(self, verify_argv, runtime_pin, *, verification_is_side_effect_free=False,
+                 reviews_write_artifacts=None):
         if not verify_argv or not all(isinstance(x, str) for x in verify_argv):
             raise ValueError('fixed verification argv required')
         if not isinstance(runtime_pin, str) or not runtime_pin:
             raise ValueError('explicit runtime policy pin required')
+        # Explicit host contracts, not model fields. Runtime binding checks
+        # independently detect violations; no automatic command sanitizing.
+        if verification_is_side_effect_free is not True:
+            raise ValueError('fixed verifier must explicitly be side-effect-free (except pycache)')
+        if reviews_write_artifacts is not False:
+            raise ValueError('process-local reviews must not write bound artifacts; use verdict responses')
         self.verify_argv = tuple(verify_argv)
         self.runtime_pin = runtime_pin
         self._evidence = []
@@ -109,6 +122,12 @@ class CompletionSession:
             self._pending = current
         return verdict.eligible, ','.join(verdict.reasons)
 
+    def has_pending(self):
+        return self._pending is not None
+
+    def clear_pending(self):
+        self._pending = None
+
     def confirm_committed(self, repo):
         if self._pending is None:
             return
@@ -120,4 +139,4 @@ class CompletionSession:
                                capture_output=True, text=True, check=True).stdout
         if dirty.strip():
             raise ValueError('post-commit tree is dirty; completion unconfirmed')
-        self._pending = None
+
