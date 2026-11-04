@@ -15,15 +15,15 @@ Observed project gaps: G1 manual null-handoff recovery; G2 premature stall flag;
 - Experiment E1 [H]: Reviewer receives spec + diff + test output only. Compare findings and tokens vs history-fed review.
 
 ## F2 - Self-verdict gates degrade (G3)
-- Source [R2]: When Do Agent Loops Mistake Stagnation for Progress?, [PP] https://arxiv.org/abs/2607.25152 (read: abstract, intro, draft note, sec 3.16 via the PDF https://arxiv.org/pdf/2607.25152; 56%/44% figures confirmed in the abstract; the 56% intro mention is author-reported, not independently re-verified (Eva X1))
-- Finding: in a 54-cycle pilot, 56% of agent-claimed improvements had zero/negative measured delta; an in-band judge accepted 44% regressions. Gap closed when success was verifiable from the artifact.
-- Limits [R2 draft note, sec 3.16]: UNVERIFIED by Eva review 1 (C5): full text was not retrievable by the coordinator at the HTML URL on 2026-11-04. The Researcher read it in the PDF copy https://arxiv.org/pdf/2607.25152 ("Draft note. This manuscript is a preliminary draft ... single-deployment field observation ... Generalization to multiple models and tasks ... deferred"); pending Eva recheck against that retrievable copy. Until then, do not treat "preliminary, single-agent pilot, generalization deferred" as verified.
+- Source [R2]: When Do Agent Loops Mistake Stagnation for Progress?, [PP] https://arxiv.org/abs/2607.25152 (full PDF text read and independently verified 2026-11-04, incl. sec 3.16 and 4.2, by an independent verifier reading the PDF directly - not Eva-model authorship. The earlier "56% also in the intro" remark (X1) was NOT FOUND in the source and is dropped)
+- Finding: in a 54-cycle pilot the agent claimed improvement in all 54 cycles; 56% of ALL 54 cycles had measured delta zero or below (that share is over all cycles - it is NOT the mirage rate, which the paper defines over evaluator-accepted cycles, sec 3.15). The strongest in-band judge had 44% of its ACCEPTED cycles be real-world regressions, and it also rejected 38% of real improvements (37.5% in the body text). The stagnation gap closed when success was verifiable from the artifact.
+- Limits [R2 draft note, sec 3.16, 4.2]: preliminary single-deployment pilot with one real frontier agent; pre-registration not completed (H3/HA2 not run); the "zero out-of-band mirage" result is a DEFINITION scope, not an empirical measurement; auxiliary mechanisms (append-only logs, file handoff) are design notes, not individually validated.
 - Use: supports pushes gated on pinned HEAD + real test output, not model self-report.
 
 ## F3 - Structured handoff state (G1, G4)
 - Source: Benchmarking Task Takeover Across Agent Handoffs (HSC-Bench), [PP] https://arxiv.org/abs/2610.36523 (html read)
-- Finding [R3 sec 5.2]: structured state improved repo evidence recovery for all six receivers and continuation for most.
-- Limits [R3 sec 3.3/4.1]: state built by a fixed model (GPT-4.1) in the benchmark; benchmark tasks.
+- Finding [R3 sec 5.2, Table 6]: structured state improved repo evidence recovery for all six receivers, line-F1 gains 0.114-0.162; five of six receivers also improve in continuation (Kimi is the exception).
+- Limits [R3 sec 3.3/4.1/5.2, Table 6]: bootstrap intervals are above zero only for the all-tasks and earlier-only-evidence aggregates; small subgroups cross 0. State and recent-transcript contexts are matched at the same visible token count, so the gain is not from more tokens; absolute line-F1 stays low (0.189-0.263 with state). State built by a fixed model (GPT-4.1); benchmark tasks, not multi-seat launcher runs - not evidence that our launcher handoff works.
 - Experiment E2 [H]: fixed schema (base/head, changed files, test output, failed attempts, open findings, next owner) + validator rejecting empty handoffs. Replay the null-handoff incident; compare tokens vs free text.
 
 ## Open / not supported
