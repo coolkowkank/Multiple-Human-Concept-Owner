@@ -62,5 +62,53 @@
       "path": "docs/proposed-vs-tested.md",
       "bytes": 7793
     }
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-7e568bbe-0c5e-4a8e-96d0-e76c81e9baf2",
+      "object": "chat.completion",
+      "created": 1793779417,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "Now commit.",
+            "tool_calls": [
+              {
+                "id": "fc_97d33e36-e844-4005-b28b-009aa0cdabcd",
+                "type": "function",
+                "function": {
+                  "name": "git_commit",
+                  "arguments": "{\"message\":\"Restore full proposed-vs-tested.md and add live-verified token push section\\n\\nTURN: builder\"}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.114665724,
+        "prompt_tokens": 3951,
+        "prompt_time": 0.17884127,
+        "completion_tokens": 45,
+        "completion_time": 0.094662502,
+        "total_tokens": 3996,
+        "total_time": 0.273503772,
+        "completion_tokens_details": {
+          "reasoning_tokens": 4
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_19b184c447",
+      "x_groq": {
+        "id": "req_01m6jsbg58ehqsb2aagsqsghk1",
+        "seed": 2023206688
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
