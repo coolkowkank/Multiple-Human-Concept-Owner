@@ -98,5 +98,53 @@
       "x-ratelimit-reset-tokens": "21.772s"
     },
     "call": 2
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-da06e899-ccd6-48e8-9e16-04809c8e4c64",
+      "object": "chat.completion",
+      "created": 1793795253,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "Now need to replace _check_stall method. Need old_string exact. Let's fetch it from file. We'll assume exact block.",
+            "tool_calls": [
+              {
+                "id": "fc_4eb38d94-3883-400a-9ff7-dae03b619b98",
+                "type": "function",
+                "function": {
+                  "name": "edit_file",
+                  "arguments": "{\"new_string\":\"    def _check_stall(self, state):\\n        # Handle routing failures before stall detection\\n        turn = state.get(\\\"turn\\\")\\n        status = state.get(\\\"status\\\")\\n        if status == \\\"running\\\" and not turn:\\n            # routing failure detected\\n            count = getattr(self, \\\"_routing_failure_count\\\", 0) + 1\\n            self._routing_failure_count = count\\n            self.bus.append_log(\\\"supervisor\\\", \\\"routing-failure\\\",\\n                                f\\\"routing failure detected; state: {state}\\\")\\n            if count \\u003e= 2:\\n                self._escalate(\\\"consecutive routing failures\\\")\\n                return\\n            # re-issue turn to coordinator\\n            state[\\\"turn\\\"] = \\\"coordinator\\\"\\n            state[\\\"turn_since\\\"] = time.strftime(\\\"%Y-%m-%dT%H:%M:%SZ\\\", time.gmtime())\\n            self.bus.write_state(state)\\n            self.bus.commit_all(\\\"supervisor: reissued turn to coordinator after routing failure\\\")\\n            return\\n        if not turn or status != \\\"running\\\":\\n            return\\n        since = state.get(\\\"turn_since\\\")\\n        if not since:\\n            return\\n        try:\\n            # parse as UTC using calendar.timegm\\n            ts = calendar.timegm(time.strptime(since, \\\"%Y-%m-%dT%H:%M:%SZ\\\"))\\n        except ValueError:\\n            return\\n        if time.time() - ts \\u003c self.stall_timeout:\\n            return\\n        if turn in self._stalled_seats:\\n            return\\n        self._stalled_seats.add(turn)\\n        if turn in self.procs:\\n            self.bus.append_log(\\\"supervisor\\\", \\\"stall\\\",\\n                                f\\\"turn stalled on {turn}; restarting seat\\\")\\n            self.bus.commit_all(f\\\"supervisor: stall on {turn}\\\")\\n            self.procs[turn].terminate()\\n        else:\\n            self._escalate(\\n                f\\\"turn stalled on interactive seat {turn}; \\\"\\n                \\\"a human must nudge or re-open that session\\\")\\n\",\"old_string\":\"    def _check_stall(self, state):\\n        turn = state.get(\\\"turn\\\")\\n        if not turn or state.get(\\\"status\\\") != \\\"running\\\":\\n            return\\n        since = state.get(\\\"turn_since\\\")\\n        if not since:\\n            return\\n        try:\\n            ts = time.mktime(time.strptime(since, \\\"%Y-%m-%dT%H:%M:%SZ\\\"))\\n        except ValueError:\\n            return\\n        if time.time() - ts \\u003c self.stall_timeout:\\n            return\\n        if turn in self._stalled_seats:\\n            return\\n        self._stalled_seats.add(turn)\\n        if turn in self.procs:\\n            self.bus.append_log(\\\"supervisor\\\", \\\"stall\\\",\\n                                f\\\"turn stalled on {turn}; restarting seat\\\")\\n            self.bus.commit_all(f\\\"supervisor: stall on {turn}\\\")\\n            self.procs[turn].terminate()\\n        else:\\n            self._escalate(\\n                f\\\"turn stalled on interactive seat {turn}; \\\"\\n                \\\"a human must nudge or re-open that session\\\")\\n\",\"path\":\"launcher/supervisor.py\"}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.175553264,
+        "prompt_tokens": 2826,
+        "prompt_time": 0.161599358,
+        "completion_tokens": 767,
+        "completion_time": 1.620227579,
+        "total_tokens": 3593,
+        "total_time": 1.781826937,
+        "completion_tokens_details": {
+          "reasoning_tokens": 27
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_8ea50c0161",
+      "x_groq": {
+        "id": "req_01m6k8eq50ek9bgp92k2kphbhp",
+        "seed": 733616950
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
