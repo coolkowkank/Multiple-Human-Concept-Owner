@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04T17:34:00+02:00",
+ "as_of": "2026-11-04T17:50:00+02:00",
  "timezone": "EET (UTC+2), same as commit timestamps",
  "rules": "Weighted milestone progress, not independently verified completion. Milestone done = 100% of weight (tests pass or an independent review passed). Partial = 50%. In progress / not started = 0%. Weights are judgment calls. Commits alone never count.",
  "packages": [
@@ -72,7 +72,7 @@
    "weight": 15,
    "status": "verified",
    "start": "2026-11-04T13:24",
-   "evidence": "Candidate live/builder-f3-roster-fix 26ff4bc (on cd7f32c) fixes F1 escalation test, F2 consecutive-null counter reset, F3 no reissue to a missing coordinator seat (escalates instead), F4 dead setUp injection, plus regression tests. An independent review accepted it after static review and 167/167 offline tests in a restricted runner. Counts under the frozen rule (independent review passed). Offline fix on a project branch: not merged, not a live end-to-end run, no autonomy claim. Baseline end 17:00 was missed by about 24 minutes.",
+   "evidence": "Candidate live/builder-f3-roster-fix 26ff4bc (on cd7f32c) fixes F1 escalation test, F2 consecutive-null counter reset, F3 no reissue to a missing coordinator seat (escalates instead), F4 dead setUp injection, plus regression tests. An independent review accepted it after static review and 167/167 offline tests in a restricted runner. Counts under the frozen rule (independent review passed). Offline fix on a project branch: not merged, not a live end-to-end run, no autonomy claim. Baseline end 17:00 was missed by about 24 minutes.. 17:50: a separate escalation-latch follow-up (76a1554) got changes-required from an independent review (it could hide distinct incidents); its revision (6dd99bd, author-reported 174 offline tests) also got changes-required at 17:47 (a failed gate commit could lose a crashed seat; a read error could crash the run loop); a third revision is being prepared. It is not part of the accepted fix; no credit change",
    "pic": [
     "coolkowkank-bot"
    ],

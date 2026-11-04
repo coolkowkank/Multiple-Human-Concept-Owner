@@ -1,5 +1,5 @@
 {
- "asOf": "2026-11-04T17:30",
+ "asOf": "2026-11-04T17:50",
  "timezone": "Europe/Helsinki",
  "note": "Recorded events use commit times. Planned items are not events. A check that finds no change leaves no record.",
  "events": [
@@ -924,6 +924,81 @@
     {
      "label": "Commit 4a81cf9",
      "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/4a81cf9"
+    }
+   ]
+  },
+  {
+   "id": "trg-34aff4a",
+   "day": "2026-11-04",
+   "time": "17:29",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Assistant named Sam; engineer role retracted",
+   "status": "Registry: assistant-1 is Sam (Gemma is the model). Status drafts only, every draft reviewed, publication coordination-run, no separate chat account. The Project Engineer role was withdrawn as an alternative, not an addition.",
+   "evidence": [
+    {
+     "label": "Commit 34aff4a",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/34aff4a"
+    }
+   ]
+  },
+  {
+   "id": "trg-76a1554",
+   "day": "2026-11-04",
+   "time": "17:30",
+   "kind": "trigger",
+   "lane": "Builder and review",
+   "title": "Escalation-latch delta: changes required",
+   "status": "Operator-authored follow-up to stop repeated gates. An independent review reproduced a regression: one pending gate could hide a separate incident. Not accepted. The accepted fix 26ff4bc is unchanged.",
+   "evidence": [
+    {
+     "label": "Commit 76a1554",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/76a1554"
+    }
+   ]
+  },
+  {
+   "id": "trg-9e55d20",
+   "day": "2026-11-04",
+   "time": "17:33",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Team Resources: freshness and cap rules",
+   "status": "Offline tooling, 15 stdlib tests. A price listing must be recent and sourced. A dated success is not proof of current quota. An unclear 429 cools down the route only. Status-draft backup qualified (narrow); code and research backup are still gaps.",
+   "evidence": [
+    {
+     "label": "Commit 9e55d20",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/9e55d20"
+    }
+   ]
+  },
+  {
+   "id": "trg-328cec7",
+   "day": "2026-11-04",
+   "time": "17:34",
+   "kind": "trigger",
+   "lane": "Research and Eva",
+   "title": "Researcher: RW3 token baseline and RW1 validator spec",
+   "status": "Offline analysis, no model instance. Composition of tokens in one recorded run (N=1), no savings claim. RW1 is a design only. Both pending Eva review, no adoption.",
+   "evidence": [
+    {
+     "label": "Commit 328cec7",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/328cec7"
+    }
+   ]
+  },
+  {
+   "id": "trg-6dd99bd",
+   "day": "2026-11-04",
+   "time": "17:40",
+   "kind": "trigger",
+   "lane": "Builder and review",
+   "title": "Escalation-latch revision submitted for review",
+   "status": "Incident-keyed latch on a branch from the accepted base. 174 offline tests reported by the author. Awaiting independent retest; not accepted, not merged.",
+   "evidence": [
+    {
+     "label": "Commit 6dd99bd",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/6dd99bd"
     }
    ]
   }
