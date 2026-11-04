@@ -35,13 +35,14 @@
 <text x="690" y="433" font-size="11.5" fill="#8f857d" font-weight="400" text-anchor="start" >appears in the contributors graph.</text>
 <circle cx="640" cy="500" r="26" fill="#fff" stroke="#a39a93" stroke-width="2.6"/>
 <text x="640" y="506" font-size="13" fill="#a39a93" font-weight="700" text-anchor="middle" >GH</text>
-<text x="690" y="482" font-size="14" fill="#2b2523" font-weight="700" text-anchor="start" >Shared GitHub identity - @coolkowkank-bot</text>
-<text x="690" y="502" font-size="12" fill="#6a615c" font-weight="400" text-anchor="start" >Machine account, not a seat: links per-model</text>
-<text x="690" y="519" font-size="12" fill="#6a615c" font-weight="400" text-anchor="start" >author names into one contributor entry and</text>
-<text x="690" y="536" font-size="12" fill="#6a615c" font-weight="400" text-anchor="start" >authenticates model pushes (public_repo token;</text>
-<text x="690" y="553" font-size="12" fill="#6a615c" font-weight="400" text-anchor="start" >models never see it).</text>
-<text x="690" y="573" font-size="11.5" fill="#8f857d" font-weight="400" text-anchor="start" >Author, committer and pusher stay three</text>
-<text x="690" y="590" font-size="11.5" fill="#8f857d" font-weight="400" text-anchor="start" >separate facts.</text>
+<text x="690" y="482" font-size="14" fill="#2b2523" font-weight="700" text-anchor="start" >Shared GitHub identity</text>
+<text x="690" y="500" font-size="12.5" fill="#2b2523" font-weight="700" text-anchor="start" >@coolkowkank-bot</text>
+<text x="690" y="520" font-size="12" fill="#6a615c" font-weight="400" text-anchor="start" >Machine account, not a seat: links per-model</text>
+<text x="690" y="537" font-size="12" fill="#6a615c" font-weight="400" text-anchor="start" >author names into one contributor entry and</text>
+<text x="690" y="554" font-size="12" fill="#6a615c" font-weight="400" text-anchor="start" >authenticates model pushes (public_repo token;</text>
+<text x="690" y="571" font-size="12" fill="#6a615c" font-weight="400" text-anchor="start" >models never see it).</text>
+<text x="690" y="591" font-size="11.5" fill="#8f857d" font-weight="400" text-anchor="start" >Author, committer and pusher stay three</text>
+<text x="690" y="608" font-size="11.5" fill="#8f857d" font-weight="400" text-anchor="start" >separate facts.</text>
 <rect x="52" y="630" width="940" height="170" rx="20" fill="#faf6f3" stroke="#e6d9d2" stroke-width="2"/>
 <text x="72" y="656" font-size="13" fill="#2b2523" font-weight="700" text-anchor="start" letter-spacing="0.6">CONFIGURED SEATS - solid = occupied today, dashed = available</text>
 <circle cx="140" cy="722" r="22" fill="#fff" stroke="#2b2523" stroke-width="2.6"/>

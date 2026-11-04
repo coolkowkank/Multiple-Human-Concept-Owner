@@ -43,6 +43,11 @@ MAX_BYTES = 20000
 # (whichever credential authenticates the push) - committer metadata is
 # configured independently of push authentication.
 MODEL_AUTHOR = os.environ.get("MODEL_AUTHOR", "Groq (gpt-oss-120b model) <350571665+coolkowkank-bot@users.noreply.github.com>")
+# Committer identity for MODEL-issued commits: the shared bot account whose
+# credential also authenticates the push (owner decision 2026-11-04). Operator
+# record-keeping commits (records branch, LOOP.json) keep the operator identity.
+_mcn, _mce = os.environ.get("MODEL_COMMITTER", "coolkowkank-bot <350571665+coolkowkank-bot@users.noreply.github.com>").rsplit("<", 1)
+MODEL_COMMITTER_NAME, MODEL_COMMITTER_EMAIL = _mcn.strip(), _mce.rstrip(">").strip()
 CRED = re.compile(r"(gsk_[A-Za-z0-9]|ghp_[A-Za-z0-9]|github_pat_|gho_[A-Za-z0-9]|AKIA[0-9A-Z]{16}|xox[baprs]-|Bearer\s+[A-Za-z0-9._-]{20,}|-----BEGIN)")
 transcript = []
 
@@ -166,7 +171,8 @@ def run_tool(name, args):
             if CRED.search(msg): return {"ok": False, "error": "credential-pattern message refused"}
             trailer = "\n\nCommitted-by: Groq gpt-oss-120b via own tool calls"
             subprocess.run(["git", "-C", REPO, "add", "--", "docs/"], capture_output=True)
-            p = subprocess.run(["git", "-C", REPO, "commit", "--author", MODEL_AUTHOR, "-m", msg + trailer], capture_output=True, text=True)
+            _env = dict(os.environ, GIT_COMMITTER_NAME=MODEL_COMMITTER_NAME, GIT_COMMITTER_EMAIL=MODEL_COMMITTER_EMAIL)
+            p = subprocess.run(["git", "-C", REPO, "commit", "--author", MODEL_AUTHOR, "-m", msg + trailer], capture_output=True, text=True, env=_env)
             if p.returncode != 0:
                 return {"ok": False, "error": (p.stderr or p.stdout)[-500:]}
             head = subprocess.run(["git", "-C", REPO, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()

@@ -178,16 +178,21 @@ class ExecutorCase(unittest.TestCase):
         self.assertIn("instinct-telkomsel", ns["RECORDS_COMMITTER"])
         self.assertEqual(ns["MODEL"], "openai/gpt-oss-120b")
         self.assertIn("api.groq.com", ns["API_URL"])
+        self.assertEqual(ns["MODEL_COMMITTER_NAME"], "coolkowkank-bot")
+        self.assertEqual(ns["MODEL_COMMITTER_EMAIL"], "350571665+coolkowkank-bot@users.noreply.github.com")
         os.environ["MODEL_AUTHOR"] = "Kimi (k2 model) <350571665+coolkowkank-bot@users.noreply.github.com>"
         os.environ["RECORDS_COMMITTER"] = "alice <alice@users.noreply.github.com>"
         os.environ["PROVIDER_MODEL"] = "kimi-k2"
         os.environ["PROVIDER_API_URL"] = "https://example.test/v1/chat/completions"
+        os.environ["MODEL_COMMITTER"] = "alice-bot <123+alice-bot@users.noreply.github.com>"
         ns = self.load()
         self.assertEqual(ns["MODEL_AUTHOR"], "Kimi (k2 model) <350571665+coolkowkank-bot@users.noreply.github.com>")
         self.assertEqual(ns["RECORDS_COMMITTER"], "alice <alice@users.noreply.github.com>")
         self.assertEqual(ns["MODEL"], "kimi-k2")
         self.assertEqual(ns["API_URL"], "https://example.test/v1/chat/completions")
-        for k in ("MODEL_AUTHOR", "RECORDS_COMMITTER", "PROVIDER_MODEL", "PROVIDER_API_URL"):
+        self.assertEqual(ns["MODEL_COMMITTER_NAME"], "alice-bot")
+        self.assertEqual(ns["MODEL_COMMITTER_EMAIL"], "123+alice-bot@users.noreply.github.com")
+        for k in ("MODEL_AUTHOR", "RECORDS_COMMITTER", "PROVIDER_MODEL", "PROVIDER_API_URL", "MODEL_COMMITTER"):
             os.environ.pop(k, None)
 
 if __name__ == "__main__":

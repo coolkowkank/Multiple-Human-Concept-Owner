@@ -15,6 +15,7 @@ Everything in this repo is Python 3 stdlib + git + HTTPS API calls. No Instinct 
    - `PROVIDER_API_URL` (default Groq), `PROVIDER_MODEL` (default openai/gpt-oss-120b)
    - `MODEL_AUTHOR` - per-model name + the shared bot's account-linked noreply, e.g. `"Kimi (k2 model) <350571665+coolkowkank-bot@users.noreply.github.com>"`
    - `RECORDS_COMMITTER` - operator identity for checkpoint commits on the records branch
+   - `MODEL_COMMITTER` - committer identity for model-issued commits (default: the shared bot's account-linked noreply); set it to the token account's noreply so author/committer/pusher stay honest
    - `RECORDS_DIR` - required; worktree of the operator records branch
    - `MAX_CALLS` - remaining provider-call budget (counted before issuing, failures count, no retries)
 
