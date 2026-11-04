@@ -150,17 +150,18 @@ CER, RQY = (455, 1084, 48), (979, 1084, 48)
 node(*CER, icon="Ce")
 node(*RQY, icon="Rq")
 text(CER[0], CER[1]+CER[2]+12, "Cerebras (standby)", 16, INK, "bold")
-text(CER[0], CER[1]+CER[2]+40, "gpt-oss-120b", 13.5, GRAY, style="italic")
+text(CER[0], CER[1]+CER[2]+40, "Builder route: gpt-oss-120b", 13.5, GRAY, style="italic")
 text(CER[0], CER[1]+CER[2]+66, "free trial 5 RPM / 1M tokens-day", 12.5)
 text(CER[0], CER[1]+CER[2]+90, "tool calls verified 2026-11-04", 12.5)
 text(RQY[0], RQY[1]+RQY[2]+12, "Requesty (standby)", 16, INK, "bold")
-text(RQY[0], RQY[1]+RQY[2]+40, "router: free models, 200 requests-day", 13.5, GRAY, style="italic")
-text(RQY[0], RQY[1]+RQY[2]+66, "tool calls verified on google/gemma-4-31b-it", 12.5)
-text(RQY[0], RQY[1]+RQY[2]+90, "2026-11-04", 12.5)
+text(RQY[0], RQY[1]+RQY[2]+40, "Builder route via router: free models", 13.5, GRAY, style="italic")
+text(RQY[0], RQY[1]+RQY[2]+66, "200 requests-day; tool calls verified", 12.5)
+text(RQY[0], RQY[1]+RQY[2]+90, "on google/gemma-4-31b-it, 2026-11-04", 12.5)
 # one dashed standby link to the band: the Coordinator manages every delivery
-# seat, active or standby; standby routes activate only on the owner's go
+# seat, active or standby, and activates standby routes by assigning scoped
+# work within verified free budgets - no separate owner gate per routine task
 arrow((COR[0]+20, 905), (335, 958), rad=0.08, style=(0, (5, 4)), shrink=40)
-text(186, 916, "activates only on owner go", 13, ARROW, ha="left")
+text(186, 916, "Coordinator assigns scoped work", 13, ARROW, ha="left")
 
 # Footer: shared machine account is infrastructure, not a team member
 text(40, H-64, "@coolkowkank-bot is the shared machine account the Builder acts through:", 13, GRAY, ha="left")

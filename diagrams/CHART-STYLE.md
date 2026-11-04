@@ -47,8 +47,11 @@ a separate artifact with its own style.
   inactive provider routes sit in a separate dashed "Qualified backup routes" band below
   the team row - never as active seats. Each standby node states only verified facts
   (model or route, free-tier limit, what was probe-verified, and the date) plus the word
-  "standby". One dashed connector from the Coordinator to the band shows who would manage
-  them; label it "activates only on owner go".
+  "standby". One dashed connector from the Coordinator to the band, labeled "Coordinator
+  assigns scoped work": the Coordinator activates a standby route by assigning
+  scoped work within verified free budgets and existing task authority - there
+  is no separate owner approval gate per routine task. Never mark a standby
+  route active until real assigned execution has run.
 
 ## Update rules
 
