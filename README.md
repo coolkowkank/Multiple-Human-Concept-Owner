@@ -16,6 +16,9 @@
 
 *As of 2026-11-04 15:58 EET. [Scrollable full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/legacy-members/) (sideways and down, header and first column stay put). Full table with instance IDs, blueprints and rules: [registry](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/registry.md). `*` marks an instance with repo evidence of work. A vacant role has no active member.*
 
+<details>
+<summary><b>Legacy Members</b> - 5 active, 2 vacant roles, 3 reference-project contributors with unknown status (click to expand)</summary>
+
 | Role | Member | Status | Assignment | Model / provider | Blueprint | Parallels |
 | --- | --- | --- | --- | --- | --- | --- |
 | Coordinator | Telkomsel | active | coordination, assignments, acceptance | not project-configured | - | 1* |
@@ -26,6 +29,8 @@
 | Team Resources | Maya | vacant | none until qualified | unassigned | [team-resources](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/team-resources.md) | - |
 | Coordinator Assistant | unassigned | vacant | none until assigned | unassigned | [coordinator-assistant](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/coordinator-assistant.md) | - |
 | Reference-project members (Bill-QC, joe-agent, Claude) | - | unknown | none here | - | leads only, see registry | - |
+
+</details>
 
 ### Project progress
 
