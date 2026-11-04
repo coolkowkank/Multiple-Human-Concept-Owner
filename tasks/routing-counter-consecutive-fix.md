@@ -57,3 +57,21 @@ nonexistent seat, which deadlocks silently (no process consumes it).
 Flagged for the reviewer to assess per the task's open question; no
 fallback built here. Verification method: offline read of
 origin/live/builder-deadlock-fix supervisor.py + cli.py, no execution.
+
+## F3 status correction + resolution (2026-11-04, post independent review)
+- CORRECTION to the section above: "deadlocks silently" overstated the
+  proven effect. At the pre-fix pin, the coordinator-less reissue was
+  DEGRADED/MISROUTED until the generic stall timeout fired; a permanent
+  silent deadlock was not proven. (Independent reviewer finding.)
+- RESOLUTION: F3 is fixed at 26ff4bce5666afd6a3dbefbce7fe0d3d4a36e341
+  (live/builder-f3-roster-fix): roster check before the reissue; absent
+  coordinator seat -> the existing escalation gate, no dead turn written.
+  Independent review PASSed base cd7f32c (F1/F2/F4 + regressions) and the
+  F3 delta (contract, placement, test intent; 167/167 reproduced).
+  Acceptance is NARROW: the four findings' fixes only - no merge, no
+  deploy, no live autonomy.
+- OPEN FOLLOW-UP (from independent review, NOT fixed): a repeated null
+  poll while a gate is unanswered opens a NEW gate + commit per poll
+  (pre-existing for count>=2; the F3 guard extends this to count==1 with
+  an absent seat). Needs a separate bounded dedup / escalate-once latch
+  task - do not assume it is covered here.
