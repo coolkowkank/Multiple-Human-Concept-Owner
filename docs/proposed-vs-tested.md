@@ -109,8 +109,8 @@ No sustained unattended run has happened; nothing here claims one.
 - Peer-reviewed: capture mechanics cleared in scoped static review;
   MAX_CALLS enforcement not independently reproduced by the reviewer.
 
-## Live-verified 2026-11-04: token-only GitHub push transport
+## Token-only GitHub push transport (2026-11-04)
 
 - Capability: token-only GitHub push transport for standalone runs (tools/setup_push_auth.py + repo-local git credential helper reading a 0600 token file; no GitHub password involved).
-- Status: LIVE-VERIFIED 2026-11-04. Evidence: the setup tool verified the token's account via the GitHub API and confirmed its push permission on this repository; commit e056ae9 on live/groq-dev-4 was pushed by the model's own tool calls over that transport, with the shared bot account as the authenticated pusher.
+- Status: developer-reported live verification on 2026-11-04: setup checks identified the token account and its repo push permission; the developer reports model-issued commit/push using the bot-token helper, with e056ae9 and ac295a9 present remotely. Public Git confirms the commits and their content, not the authenticated pusher; the independent reviewer did not execute the setup or witness the pushes.
 - Limits: token scopes are the capability ceiling; human project authorization is the operating boundary. Author (per-model name), committer and pusher identities stay separate (docs/design-decisions.md D14).
