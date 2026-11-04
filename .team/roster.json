@@ -3,9 +3,8 @@
     "builder": {
       "role": "builder",
       "allowed_paths": [
-        "launcher/prompts.py",
-        "launcher/cli.py",
-        "tests/test_prompt_budget.py"
+        "launcher/token_est.py",
+        "tests/test_token_est.py"
       ],
       "adapter": {
         "type": "http",
