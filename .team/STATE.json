@@ -1,8 +1,8 @@
 {
-  "turn": null,
+  "turn": "coordinator",
   "turn_seq": 0,
   "turn_since": null,
-  "status": "forming",
-  "status_line": "team forming",
+  "status": "active",
+  "status_line": "i2i-2 configured; awaiting peer read-only check + joint GO",
   "leases": {}
 }
