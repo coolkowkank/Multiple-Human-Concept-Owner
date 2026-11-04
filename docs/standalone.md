@@ -38,3 +38,18 @@ python3 tools/loop_runner.py --repo MODEL_WT --records RECORDS_WT \
 
 ## Honest status
 Offline-proven: executor guards (12 tests), loop-runner state transitions (4 tests), env-configurable identities. Not yet proven: a full standalone run using the bot account's own push credential (needs the credential to exist and be authorized).
+
+## GitHub access: token-only (no passwords)
+
+The launcher never asks for a GitHub password. You create a personal access token on the account that should push (your own or a shared bot), keep it in a local file, and the runner uses it as the push/pull transport for operations the model requests:
+
+1. Create a classic PAT at https://github.com/settings/tokens. Minimum scope: `public_repo` (public repos) or `repo` (private). Set an expiration - GitHub strongly recommends one; a no-expiry token stays valid until revoked.
+   Fine-grained PATs cannot write repos where the account is only a collaborator (docs.github.com: "Fine-grained personal access tokens limitations"), so use a classic PAT for a shared bot on someone else's repo.
+2. `install -m 600 /dev/null ~/.mhco/push-token && $EDITOR ~/.mhco/push-token` (token only, one line).
+3. `python3 tools/setup_push_auth.py --repo PATH --owner OWNER --name REPO` - verifies the token's account and push permission (clear errors for 401 invalid token / 404 no access / no push permission), then sets a repo-local credential helper that reads the file at push time. The token is never printed, logged, committed, or stored in git config.
+
+Two limits always apply:
+- The token's scopes are the CAPABILITY ceiling: nothing it doesn't permit can happen.
+- The human's project authorization is the OPERATING boundary: a broad token does not authorize every action it technically allows. Human control gates (no auto-merge, budget, review loop) are unchanged.
+
+The model never sees the token. Author names stay per-model (`MODEL_AUTHOR`); committer and pusher identities stay separate and honest (docs/design-decisions.md D14).
