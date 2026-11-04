@@ -189,7 +189,7 @@
                 "type": "function",
                 "function": {
                   "name": "write_file",
-                  "arguments": "{\"content\":\"# placeholder\",\"path\":\"launcher/supervisor.py\"}"
+                  "arguments": "{\"path\": \"launcher/supervisor.py\", \"content\": \"[written to launcher/supervisor.py: 13 bytes; full content in the run transcript]\"}"
                 }
               }
             ]
@@ -227,6 +227,12 @@
     },
     "result": {
       "ok": true,
+      "path": "launcher/supervisor.py",
+      "bytes": 13
+    }
+  },
+  {
+    "history_elided": {
       "path": "launcher/supervisor.py",
       "bytes": 13
     }
