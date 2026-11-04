@@ -485,3 +485,59 @@ class FreshCloneAdopterTests(unittest.TestCase):
         # not flagged; http seats without call_budget would be)
         from launcher.cli import unbounded_http_seats
         self.assertEqual(unbounded_http_seats(target, "team-work"), [])
+
+
+class FreshTargetFullCycleTests(unittest.TestCase):
+    """A REAL runtime cycle on a fresh adopter target: init via the CLI,
+    scripted roster installed up front (rehearsal seats, not manual
+    per-turn injection), then `launcher launch` runs the supervisor,
+    which spawns the seat processes itself, to DONE. Offline, no keys.
+    This closes the mechanism half of the clone->brief->launch->DONE
+    path; the live-model half stays the bounded proposal."""
+
+    def test_supervised_cycle_reaches_done(self):
+        import json as J
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        blueprint_src = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        target = os.path.join(d, "target")
+        subprocess.run(["git", "init", "--quiet", target], check=True,
+                       capture_output=True)
+        subprocess.run(["git", "-C", target, "-c", "user.name=t",
+                        "-c", "user.email=t@t", "commit", "--quiet",
+                        "--allow-empty", "-m", "init"], check=True,
+                       capture_output=True)
+        brief = os.path.join(d, "brief.md")
+        with open(brief, "w") as fh:
+            fh.write("# Concept\n\nProvide add(a,b) with a passing test.\n")
+        env = dict(os.environ, PYTHONPATH=blueprint_src)
+        def launcher(*args, timeout=120):
+            return subprocess.run(
+                [sys.executable, "-m", "launcher"] + list(args),
+                cwd=blueprint_src, env=env, capture_output=True, text=True,
+                timeout=timeout)
+        r = launcher("init", "--repo", target, "--branch", "team-work",
+                     "--default-roster", "--brief", brief)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        # scripted rehearsal roster installed UP FRONT - no per-turn injection
+        from launcher.demo import _scripts
+        roster_path = os.path.join(target, ".team", "roster.json")
+        roster = J.load(open(roster_path))
+        scripts = _scripts()
+        for name, spec in roster["seats"].items():
+            spec["adapter"] = {"type": "mock", "script": scripts[name]}
+        with open(roster_path, "w") as fh:
+            J.dump(roster, fh, indent=2)
+        r = launcher("launch", "--repo", target, "--branch", "team-work",
+                     "--poll", "1", "--stall-timeout", "30",
+                     "--max-seconds", "60", timeout=90)
+        self.assertEqual(r.returncode, 0, r.stderr[-500:] if r.stderr else "")
+        state = J.load(open(os.path.join(target, ".team", "STATE.json")))
+        self.assertEqual(state["status"], "done", state.get("status_line"))
+        self.assertIsNone(state["turn"])
+        self.assertTrue(open(os.path.join(target, ".team", "STATE.json")).read())
+        self.assertTrue(os.path.exists(os.path.join(target, "src", "app.py")))
+        self.assertTrue(os.path.exists(
+            os.path.join(target, "review", "qc-verdict-1.md")))
+        self.assertTrue(os.path.exists(
+            os.path.join(target, "records", "archive-1.md")))

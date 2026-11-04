@@ -222,7 +222,19 @@ request, 429 retries consume budget, usage lines record every attempt,
 roster spec wiring. Not yet exercised: a live unattended run under a
 budget. The fresh-clone adopter command path (clone -> init into a
 separate target repo -> layout/guard/brief installed -> status) is
-covered offline by FreshCloneAdopterTests; a scripted/offline fixture is
-NOT a real adopter-AI test. The bounded free-only live proposal is
-docs/proposals/live-cerebras-cycle.md (not run; owner review first). Legacy behavior is unchanged when the keys are absent - existing
+covered offline by FreshCloneAdopterTests, and a REAL supervised runtime
+cycle on a fresh target (FreshTargetFullCycleTests: init via CLI,
+scripted rehearsal roster installed up front - no per-turn injection -
+then `launcher launch` spawns the seat processes to DONE with the guard
+hook active) now passes; it is rehearsal seats, NOT a real adopter-AI
+test. One adopter-path gap was found and fixed doing this: `launch` never
+issued the first turn token (the demo seeded it by hand); the supervisor
+now issues the first turn to the coordinator when the brief is present
+and the state is still forming, and stays forming (with a gate) when the
+brief is empty. The bounded free-only live proposal is
+docs/proposals/live-cerebras-cycle.md (not run): disposable LOCAL-ONLY
+target repo (no remote writes), five gpt-oss-120b seats on the Cerebras
+free tier, 20-request global cap split per seat and persisted across
+restarts via the usage logs, 1800s wall stop, DONE/ESCALATE/wall-kill
+stop conditions, read-only peer review of the record afterward. Legacy behavior is unchanged when the keys are absent - existing
 rosters keep working, but unattended autonomous runs should set budgets.

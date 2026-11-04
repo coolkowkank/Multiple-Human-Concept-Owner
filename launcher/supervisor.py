@@ -13,6 +13,7 @@ stalled interactive seat becomes a gate for the humans instead.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import time
@@ -59,6 +60,7 @@ class Supervisor:
 
     def run(self, max_seconds=None):
         start = time.time()
+        self._seed_first_turn()
         for name in self.automated_seats():
             self.start_seat(name)
         while True:
@@ -73,6 +75,32 @@ class Supervisor:
             self._check_stall(state)
             self._report_gates()
             time.sleep(self.poll)
+
+    def _seed_first_turn(self):
+        """Issue the first turn token when the brief is in and nobody has.
+
+        The adopter path is clone -> init -> brief -> launch: with the
+        concept already in .team/brief.md and the state still "forming",
+        the coordinator reads its orders from the brief - no separate
+        start command, matching the demo's manual seed. Without a brief
+        the team stays forming and the owner gets a gate, not a guess."""
+        state = self.bus.state()
+        if state.get("status") != "forming" or state.get("turn"):
+            return
+        brief_path = os.path.join(self.bus.repo, ".team", "brief.md")
+        try:
+            brief = open(brief_path).read().strip()
+        except OSError:
+            brief = ""
+        roster = self.bus.roster().get("seats", {})
+        if not brief or "coordinator" not in roster:
+            return
+        state["turn"] = "coordinator"
+        state["status"] = "running"
+        self.bus.write_state(state)
+        self.bus.append_log("supervisor", "seed",
+                            "brief present; first turn issued to coordinator")
+        self.bus.commit_all("supervisor: brief present, first turn issued")
 
     # -- internals -------------------------------------------------------
 

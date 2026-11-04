@@ -1,48 +1,85 @@
 # Proposal: first live adopter-AI cycle (bounded, free-only)
 
-Status: PROPOSED 2026-11-04, not run. Requires owner review before execution.
+Status: PROPOSED 2026-11-04, not run. Awaiting main's bounded GO.
 
-## Purpose
-First evidence toward the acceptance target (D18): one real batch cycle
-driven by a model API through the real seat path - init in a fresh target
-repo, brief in, coordinator assigns, builder implements with a real
-verify command, reviewer re-runs it, QC verdict, records archive, DONE -
-with no per-round human steering.
+## Exact concept and target
+- Concept (the whole .team/brief.md content): "Build a tiny Python
+  library providing add(a, b) with one passing pytest-style test, in a
+  fresh repository." Deliberately small: the run tests the TEAM
+  MECHANISM with a live model, not model coding strength.
+- Target: a DISPOSABLE local-only git repo under /tmp (no GitHub
+  remote, no pushes, no remote writes of any kind). Everything the
+  team produces stays in that repo's .team record and working tree.
+- No operator content fixes mid-run: if the model's output is wrong,
+  the run records the failure; humans do not repair files for it.
+- No Instinct-specific glue: seats run only via the repo's own
+  `launcher` CLI with http adapters; the operator sets env (API key
+  from the vault into the process env, never into files/logs) and
+  starts the supervisor.
 
-## Route and limits
-- Provider: Cerebras free trial, model gpt-oss-120b (qualified
-  2026-11-04: key valid, tool calls work; tier limits 5 RPM, 30K
-  uncached TPM, 1M TPD).
-- Seats via `http` adapters; EVERY seat gets `call_budget` +
-  `usage_log` in the roster. Proposed global cap: 20 provider requests
-  total (coordinator 6, builder 6, reviewer 4, qc 2, records 2),
-  enforced per seat; any seat hitting its cap fails closed and the
-  supervisor escalates. This is a REQUEST cap, not a token/money cap;
-  token use is read from the usage record afterward.
-- `max_tokens` 4096 and `reasoning_effort: low` per seat (token
-  discipline from the executor measurements, 2026-11-04).
-- Supervisor `--max-seconds 1800` wall-clock stop; stall-timeout 300s.
+## Seat -> model mapping (all on Cerebras free trial, gpt-oss-120b)
+coordinator, builder, reviewer, qc, records: each an `http` adapter
+with base_url https://api.cerebras.ai, model gpt-oss-120b,
+api_key_env CEREBRAS_API_KEY, max_tokens 4096 (OUTPUT cap per response
+only - NOT an input cap and NOT a spend cap), reasoning_effort low,
+call_budget per below, usage_log .team/usage/<seat>.jsonl.
+
+## Request caps (request count, not dollars)
+Per seat: coordinator 6, builder 6, reviewer 4, qc 2, records 2 = 20
+provider requests total. Why 20 is expected sufficient: the scripted
+rehearsal cycle completes in exactly 6 seat responses (1 coordinator
+draft + 1 builder + 1 reviewer + 1 qc + 1 records + 1 coordinator
+close). Recorded live runs of the standalone executor showed 1-3
+responses per seat task on this model family; the caps allow every
+seat one retry/format-correction round plus headroom for one
+coordinator re-assignment, roughly 3x the scripted minimum. If caps
+prove insufficient, that is itself a recorded finding (ESCALATE),
+never a silent top-up.
+Persistence: the cap is derived from each seat's usage log at adapter
+startup, so supervisor restarts, seat crashes and resumes do not reset
+it (tested offline); a seat at cap fails closed and the supervisor
+escalates instead of completing.
+
+## Rate coordination
+Cerebras free trial: 5 requests/min PER MODEL at the organization
+level - all five seats share one model, so the global rate is 5 RPM
+across the whole team, not per seat. Mitigation: the adapter already
+honors 429 + Retry-After with backoff (each retry consumes the
+budget), and the turn token naturally serializes seat work (one seat
+acts at a time), so expected request rate is well under 5 RPM.
 
 ## Stop conditions (whichever first)
-1. DONE with QC PASS at a named commit (success artifact).
-2. Any seat budget exhausted or supervisor escalation (failure artifact:
-   the bus record and usage logs show exactly where).
-3. Wall-clock stop.
+1. DONE: coordinator closes with QC PASS at a named commit (success).
+2. ESCALATE: any seat budget exhausted, supervisor stall escalation,
+   or restart limit hit (failure artifact preserved as-is).
+3. Wall kill: supervisor --max-seconds 1800; stall-timeout 300s.
+
+## Cost verification (no paid fallback)
+- Vendor docs (inference-docs.cerebras.ai/support/rate-limits): the
+  Free Trial tier is hard rate-limited (5 RPM / 30K TPM / 1M TPD per
+  model); pay-as-you-go is a separate Developer tier.
+- The proposal uses ONLY the existing free account/key already in the
+  vault - no new account, no access changes, no payment method added.
+  If the account were on a paid tier, the same 20-request cap still
+  bounds requests; expected token volume (<20 responses x ~1-2K
+  tokens) is far inside free-tier limits. Residual check at GO time:
+  confirm in the Cerebras console that no payment method is attached
+  (cannot be debited). Requesty standby routes are NOT used here.
 
 ## Final artifact
-The target repo's `.team/` record: LOG.jsonl, STATE.json, gate history,
-usage/*.jsonl per seat, plus the batch commit SHAs. Published as
-evidence in docs/proposed-vs-tested.md with the honest outcome either
-way; a PASS is one cycle, not proof of generality.
+The disposable repo's .team record: LOG.jsonl, STATE.json, gates,
+usage/*.jsonl per seat, batch commit SHAs - plus a summary appended to
+docs/proposed-vs-tested.md stating the outcome either way. A PASS is
+one cycle, not proof of generality.
 
-## Review
-Independent reviewer (Christina's Instinct, per the roster chart):
-scoped static review of the run RECORD after the stop - turn-token
-order, one handoff per turn, verify exit codes runtime-executed, budget
-never exceeded, usage totals vs the 20-request cap. Verdict VERIFIED /
-FIX_NEEDED / ESCALATE on the peer branch pattern from docs/review-loop.md.
+## Review (post-run, read-only)
+Independent reviewer: Christina's Instinct, scoped static review of
+the run RECORD only - turn-token order, one handoff per turn, verify
+commands runtime-executed with real exit codes, budget never exceeded,
+usage totals vs the 20-request cap, no human content edits. Verdict
+VERIFIED / FIX_NEEDED / ESCALATE via the docs/review-loop.md pattern.
 
 ## Explicitly not in scope
-No paid routes, no retries beyond the adapter 429 policy, no main merge,
-no access changes, no history rewrite. Legacy unbounded rosters are not
-used. Secrets stay in env, never in git or logs.
+No paid routes, no remote pushes, no main merge, no access changes, no
+history rewrite, no retries beyond the adapter 429 policy, no
+Instinct-specific model glue, no operator content repair.
