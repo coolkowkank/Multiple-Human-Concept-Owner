@@ -63,7 +63,7 @@ def render(here, updated):
     labels(REV,"Bill - Independent reviewer","@instinct-christina","Reviews the Builder's pinned commits","Model: not project-configured")
     labels(EVA,"Eva - Evidence verifier","Uses @coolkowkank","shared research token",("Gemma 4 31B (free), trialed","Rq"),"runtime integration pending")
     labels(RES,"Nora - Researcher","Uses @coolkowkank","shared research token",("Nemotron-3 Ultra 550B (free)","Rq"),"synthesis; citations reviewed")
-    labels(RYN,"Ryan - Team Resources","active, coordination-run","Route checks + replacement proposals (free only)","Status-draft backup qualified (narrow); code, research: GAP","Model: not project-configured")
+    labels(RYN,"Ryan - Team Resources","active, coordination-run","Route research + policy drafts; no model assignment","Status-draft backup qualified (narrow); code, research: GAP","Setup PAUSED; no model assigned")
     labels(AST,"Sam - Coordinator Assistant","active, status drafts only",("Model: gemma-4-31b-it (free)","Rq"),"Coordinator reviews every draft","Publication stays coordination-run")
     # hierarchy: owner > coordinator > others (plain lines, no arrowheads)
     HL="#b4b8c6"
@@ -83,8 +83,8 @@ def render(here, updated):
     # Dedicated support belongs to Ryan, not a serial layer in the team trunk.
     SR=(120,780,32); SV=(370,780,32); REC=(760,1300,38)
     for c,mark in [(SR,"Rs"),(SV,"V"),(REC,"B2")]: node(c[0],c[1],c[2],icon=mark,bg="#626b7b",fs=18)
-    labels(SR,"Ryan's Researcher","requested / pending staffing","Model not configured","Continuous model setup pending")
-    labels(SV,"Ryan's Verifier","requested / pending staffing","Model not configured","Continuous model setup pending")
+    labels(SR,"Ryan's Researcher","requested / pending staffing","Model not configured","Setup PAUSED; no assignment")
+    labels(SV,"Ryan's Verifier","requested / pending staffing","Model not configured","Setup PAUSED; no assignment")
     ax.plot([RYN[0],RYN[0]],[690,718],color=HL,lw=1.5)
     ax.plot([SR[0],SV[0]],[718,718],color=HL,lw=1.5)
     for c in (SR,SV): ax.plot([c[0],c[0]],[718,c[1]-c[2]],color=HL,lw=1.5)

@@ -67,6 +67,9 @@ trig("63de5d0","18:12","WP4/WP9 execution transferred","Recovery Executor operat
 trig("561f2e5","18:10","Latch v5 published; narrow offline review accepted at 18:14","Operator-authored lifecycle delta. Independent 36-case review and adversarial probes accepted. 203-case full suite developer-reported. Not remote delivery, live concurrency or autonomy certification.")
 trig("ac42a04","18:20","WP9 audit error-semantics follow-up","Independently accepted at 18:25: 18 focused and 214 full-suite tests reproduced. Offline opt-in, unwired, no savings or WP9 completion.",lane=TD)
 trig("9a0dc94","18:30","WP4 pure completion predicate hardening","Independent acceptance: 21 focused tests and three probes. Pure fail-closed predicate only, unwired; no runtime provenance, manifest integration or unattended Reviewer proof.",lane=TD)
+trig("95b68b1","19:40","Ryan runner: offline review accepted","233 full and37 focused tests independently passed; no actual model-cycle completion.",branch="ryan-continuous-offline",lane=TD)
+trig("2c4799d","19:41","Ryan first live allocation: PAUSED","One allocation request returned unknown transport. One consumed reserve, no assignments or running roles, no usage/cost returned. No retry; no charge inference.",branch="ryan-continuous-offline",lane=TD)
+trig("2f0e722","19:44","Ryan allocation disabled; operator assignment restored","Ryan cannot assign or change models. Operator manual assignment and structural-only diagnostics prepared offline, review pending. Existing transport pause unchanged.",branch="ryan-continuous-offline",lane=TD)
 OVERRIDE={"trg-2024e2d":"Finding published 16:39. Addressed by candidate 26ff4bc (17:19), which an independent review accepted. Earlier text superseded: the stall was an escalation gap, fixed offline.","trg-91e928d":"Closed failed (batch closeout 16:20): no commit or push, remote unchanged, guard unbuilt. Earlier status 'running' is superseded."}
 ev=[old.get(e["id"],e) for e in ev]
 for k,v in old.items():
@@ -74,5 +77,5 @@ for k,v in old.items():
 for e in ev:
     if e["id"] in OVERRIDE: e["status"]=OVERRIDE[e["id"]]
 ev.sort(key=lambda e:(e["day"],e["time"]))
-json.dump(dict(asOf="2026-11-04T18:50",timezone="Europe/Helsinki",note="Recorded events use commit times. Planned items are not events. A check that finds no change leaves no record.",events=ev),open(out,"w"),indent=1)
+json.dump(dict(asOf="2026-11-04T19:52",timezone="Europe/Helsinki",note="Recorded events use commit times. Planned items are not events. A check that finds no change leaves no record.",events=ev),open(out,"w"),indent=1)
 print(len(ev),"events")

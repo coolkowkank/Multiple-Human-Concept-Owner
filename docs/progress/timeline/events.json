@@ -1,5 +1,5 @@
 {
- "asOf": "2026-11-04T18:50",
+ "asOf": "2026-11-04T19:52",
  "timezone": "Europe/Helsinki",
  "note": "Recorded events use commit times. Planned items are not events. A check that finds no change leaves no record.",
  "events": [
@@ -1564,6 +1564,135 @@
     {
      "label": "Commit 02b38e6",
      "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/02b38e6"
+    }
+   ]
+  },
+  {
+   "id": "pub-a0f9d3a",
+   "day": "2026-11-04",
+   "time": "18:51",
+   "kind": "publication",
+   "title": "Record hourly check and accepted offline reviews; integration still blocked, no credit change",
+   "status": "Published on main. Recorded commit time.",
+   "evidence": [
+    {
+     "label": "Commit a0f9d3a",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/a0f9d3a"
+    }
+   ]
+  },
+  {
+   "id": "pub-76d9eca",
+   "day": "2026-11-04",
+   "time": "19:02",
+   "kind": "publication",
+   "title": "One Gantt for WP, RW and individual jobs; show Recovery and Ryan support in team diagram",
+   "status": "Published on main. Recorded commit time.",
+   "evidence": [
+    {
+     "label": "Commit 76d9eca",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/76d9eca"
+    }
+   ]
+  },
+  {
+   "id": "pub-4b6849d",
+   "day": "2026-11-04",
+   "time": "19:11",
+   "kind": "publication",
+   "title": "Show Builder 2 with bounded Bill review loop, preserve recovery history; fix mobile detail wrapping",
+   "status": "Published on main. Recorded commit time.",
+   "evidence": [
+    {
+     "label": "Commit 4b6849d",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/4b6849d"
+    }
+   ]
+  },
+  {
+   "id": "pub-2bb58e0",
+   "day": "2026-11-04",
+   "time": "19:11",
+   "kind": "publication",
+   "title": "Pin Builder 2 chart images and refresh current team summary",
+   "status": "Published on main. Recorded commit time.",
+   "evidence": [
+    {
+     "label": "Commit 2bb58e0",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/2bb58e0"
+    }
+   ]
+  },
+  {
+   "id": "pub-7a89050",
+   "day": "2026-11-04",
+   "time": "19:12",
+   "kind": "publication",
+   "title": "Show Ryan research to reference verification to review pipeline; configuration pending",
+   "status": "Published on main. Recorded commit time.",
+   "evidence": [
+    {
+     "label": "Commit 7a89050",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/7a89050"
+    }
+   ]
+  },
+  {
+   "id": "pub-c3e3174",
+   "day": "2026-11-04",
+   "time": "19:13",
+   "kind": "publication",
+   "title": "Keep Ryan verification path clear of labels; correct unverified Groq plan claim",
+   "status": "Published on main. Recorded commit time.",
+   "evidence": [
+    {
+     "label": "Commit c3e3174",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/c3e3174"
+    }
+   ]
+  },
+  {
+   "id": "trg-95b68b1",
+   "day": "2026-11-04",
+   "time": "19:40",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Ryan runner: offline review accepted",
+   "status": "233 full and37 focused tests independently passed; no actual model-cycle completion.",
+   "evidence": [
+    {
+     "label": "Commit 95b68b1",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/95b68b1"
+    }
+   ]
+  },
+  {
+   "id": "trg-2c4799d",
+   "day": "2026-11-04",
+   "time": "19:41",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Ryan first live allocation: PAUSED",
+   "status": "One allocation request returned unknown transport. One consumed reserve, no assignments or running roles, no usage/cost returned. No retry; no charge inference.",
+   "evidence": [
+    {
+     "label": "Commit 2c4799d",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/2c4799d"
+    }
+   ]
+  },
+  {
+   "id": "trg-2f0e722",
+   "day": "2026-11-04",
+   "time": "19:44",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Ryan allocation disabled; operator assignment restored",
+   "status": "Ryan cannot assign or change models. Operator manual assignment and structural-only diagnostics prepared offline, review pending. Existing transport pause unchanged.",
+   "evidence": [
+    {
+     "label": "Commit 2f0e722",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/2f0e722"
     }
    ]
   }

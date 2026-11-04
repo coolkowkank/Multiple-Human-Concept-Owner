@@ -9,7 +9,7 @@
 
 ### Current Project Team
 
-*Latest update: 2026-11-04 19:12 EET. [Static full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/team/) (selectable text, responsive cards; picture below is the fallback). Builder 2 carries the former Recovery Executor WP4/WP9 work, with no model configured. Bill accepts individually scoped read-only review requests and returns verdicts. No second Coordinator Assistant. Ryan's Researcher produces findings, his Verifier checks references, then Ryan reviews verified output. All three continuous model setups are pending, not running. Sam remains beside the Coordinator; Ryan is a side branch, not a serial manager.*
+*Latest update: 2026-11-04 19:52 EET. [Static full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/team/) (selectable text, responsive cards; picture below is the fallback). Builder 2 carries the former Recovery Executor WP4/WP9 work, with no model configured. Bill accepts individually scoped read-only review requests and returns verdicts. No second Coordinator Assistant. Ryan's Researcher produces findings, his Verifier checks references, then Ryan reviews verified output. All three setups are PAUSED after an unknown transport outcome, with no assignment or running model. The Coordinator selects and assigns models; Ryan does not. Sam remains beside the Coordinator; Ryan is a side branch, not a serial manager.*
 
 ![Current Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/c3e3174a8e39d8e7a8806deabd905cec3647db9b/docs/progress/team.png)
 
@@ -17,11 +17,11 @@
 
 **[Open the interactive timeline](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/timeline/)** (hosted on GitHub Pages; [same page as a File](https://files.instinct.com/9ikwv5puwqvj-coordinator-work-timeline)) - time on the X-axis, pick a day, zoom, filter by kind of work, and click an event for its status and evidence links.
 
-*Snapshot as of 2026-11-04 18:16 EET, not a live feed. Markers are recorded commit times on `main`, `Research_lab` and project branches. A check that finds no change leaves no record, so it is not drawn. The chart publications lane lists recorded publications only, not proof of scheduled checks. Triggered work has no schedule. Each day's picture is posted at the end of the day and kept in [the archive](docs/progress/archive/README.md). Data: [events.json](docs/progress/timeline/events.json).*
+*Snapshot as of 2026-11-04 19:52 EET, not a live feed. Markers are recorded commit times on `main`, `Research_lab` and project branches. A check that finds no change leaves no record, so it is not drawn. The chart publications lane lists recorded publications only, not proof of scheduled checks. Triggered work has no schedule. Each day's picture is posted at the end of the day and kept in [the archive](docs/progress/archive/README.md). Data: [events.json](docs/progress/timeline/events.json).*
 
 ### Legacy Members
 
-*As of 2026-11-04 19:00 EET. [Scrollable full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/legacy-members/) (sideways and down, header and first column stay put). Full table with instance IDs, blueprints and rules: [registry](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/registry.md). `*` marks an instance with repo evidence of work. Backup coverage for model failures is a known gap.*
+*As of 2026-11-04 19:52 EET. [Scrollable full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/legacy-members/) (sideways and down, header and first column stay put). Full table with instance IDs, blueprints and rules: [registry](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/registry.md). `*` marks an instance with repo evidence of work. Backup coverage for model failures is a known gap.*
 
 | Role | Member | Status | Assignment | Model / provider | Blueprint | Parallels |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -36,7 +36,7 @@
 
 ### Project progress
 
-*As of 2026-11-04 19:00 EET. Weighted milestone progress is **62.5%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
+*As of 2026-11-04 19:52 EET. Weighted milestone progress is **62.5%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
 
 **Research work packages: RW1-RW6**. RW1-RW6 are rows in the same Gantt, after the WPs; research dependencies/details below do not add milestone credit. Dates are evidenced publications/replays, not continuous work time; no RW deadlines were specified. [Plan](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/Research_lab/research/PLAN.md) · [Status and dependencies](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/charts/)
 

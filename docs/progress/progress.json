@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04T19:12:11+02:00",
+ "as_of": "2026-11-04T19:52:29+02:00",
  "timezone": "EET (UTC+2), same as commit timestamps",
  "rules": "Weighted milestone progress, not independently verified completion. Milestone done = 100% of weight (tests pass or an independent review passed). Partial = 50%. In progress / not started = 0%. Weights are judgment calls. Commits alone never count.",
  "packages": [
@@ -588,6 +588,31 @@
    "links_to": "Supplemental work only; no extra milestone credit",
    "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner",
    "approved": "Scope/status shown only; no live execution authority"
+  },
+  {
+   "id": "AJ2",
+   "name": "Ryan continuous setup and incident",
+   "owner": "Project operator; Ryan models not configured",
+   "state": "PAUSED: unknown transport",
+   "markers": [
+    {
+     "at": "2026-11-04T19:40",
+     "label": "Offline runner review accepted"
+    },
+    {
+     "at": "2026-11-04T19:41",
+     "label": "First allocation unknown; paused"
+    },
+    {
+     "at": "2026-11-04T19:44",
+     "label": "Operator model assignment restored"
+    }
+   ],
+   "evidence": "Independent offline runner review passed233full/37focused at95b68b1. First live allocation had one consumed reserve and unknown transport, no assignments or completed cycle, no usage/cost returned. Diagnostic and operator-owned manual assignment follow-up2f0e722 remains under review. Ryan cannot select, assign or change models. Researcher reference verification before Ryan review remains required.",
+   "dependencies": "Provider route remains paused; no retry or model qualification implied. Research question on model choice under fixed harness queued; no result yet.",
+   "links_to": "Supplemental individual job; no extra milestone credit",
+   "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/ryan-continuous-offline/docs/team/ryan/incident-1.md",
+   "approved": "Status only; no provider call or retry authority"
   }
  ]
 }
