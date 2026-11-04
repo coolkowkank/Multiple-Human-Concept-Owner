@@ -21,7 +21,7 @@
                 "type": "function",
                 "function": {
                   "name": "write_file",
-                  "arguments": "{\"content\":\"import os, time, unittest\\nfrom unittest.mock import MagicMock, patch\\n\\n# Import Supervisor after adjusting sys.path if needed\\nfrom launcher.supervisor import Supervisor\\n\\nclass DummyBus:\\n    def __init__(self):\\n        self.state_data = {}\\n        self.logs = []\\n        self.gates = []\\n    def state(self):\\n        return self.state_data.copy()\\n    def write_state(self, state):\\n        self.state_data = state.copy()\\n    def append_log(self, src, kind, msg):\\n        self.logs.append((src, kind, msg))\\n    def commit_all(self, msg):\\n        pass\\n    def open_gate(self, src, text, **kwargs):\\n        self.gates.append((src, text))\\n    def roster(self):\\n        return {\\\"seats\\\": {\\\"coordinator\\\": {}}}\\n\\nclass TestSupervisorFix(unittest.TestCase):\\n    def setUp(self):\\n        self.bus = DummyBus()\\n        self.sup = Supervisor(repo=\\\".\\\")\\n        self.sup.bus = self.bus\\n        self.sup.procs = {}\\n        self.sup._stalled_seats = set()\\n        self.sup._notified_gates = set()\\n        self.sup.restart_limit = 5\\n        self.sup.stall_timeout = 5\\n    def test_utc_parse_no_stall(self):\\n        # turn_since 5 seconds ago UTC\\n        ts = time.time() - 5\\n        utc = time.strftime(\\\"%Y-%m-%dT%H:%M:%SZ\\\", time.gmtime(ts))\\n        self.bus.state_data = {\\\"turn\\\":\\\"coordinator\\\",\\\"status\\\":\\\"running\\\",\\\"turn_since\\\":utc}\\n        # set TZ to UTC+2\\n        os.environ[\\\"TZ\\\"] = \\\"Europe/Berlin\\\"\\n        time.tzset()\\n        self.sup._check_stall(self.bus.state())\\n        self.assertNotIn(\\\"stall\\\", [k for _,k,_ in self.bus.logs])\\n    def test_routing_failure_reissue(self):\\n        self.bus.state_data = {\\\"status\\\":\\\"running\\\"}\\n        self.sup._check_stall(self.bus.state())\\n        self.assertEqual(self.bus.state_data.get(\\\"turn\\\"), \\\"coordinator\\\")\\n        self.assertIn((\\\"supervisor\\\",\\\"routing-failure\\\",\\\"routing failure detected; state: \\\"), [(src,kind,msg[:21]) for src,kind,msg in self.bus.logs])\\n    def test_routing_failure_escalate(self):\\n        # first occurrence\\n        self.bus.state_data = {\\\"status\\\":\\\"running\\\"}\\n        self.sup._check_stall(self.bus.state())\\n        # second occurrence should trigger escalation gate\\n        self.sup._check_stall(self.bus.state())\\n        self.assertTrue(any(\\\"escalating\\\" in txt for _,txt in self.bus.gates))\\n    def test_done_status_no_action(self):\\n        self.bus.state_data = {\\\"status\\\":\\\"done\\\",\\\"turn\\\":None}\\n        self.sup._check_stall(self.bus.state())\\n        self.assertEqual(len(self.bus.logs),0)\\n        self.assertNotIn(\\\"routing-failure\\\", [k for _,k,_ in self.bus.logs])\\n\\nif __name__ == '__main__':\\n    unittest.main()\\n\",\"path\":\"tests/test_deadlock_fix.py\"}"
+                  "arguments": "{\"path\": \"tests/test_deadlock_fix.py\", \"content\": \"[written to tests/test_deadlock_fix.py: 2555 bytes; full content in the run transcript]\"}"
                 }
               }
             ]
@@ -59,6 +59,12 @@
     },
     "result": {
       "ok": true,
+      "path": "tests/test_deadlock_fix.py",
+      "bytes": 2555
+    }
+  },
+  {
+    "history_elided": {
       "path": "tests/test_deadlock_fix.py",
       "bytes": 2555
     }
