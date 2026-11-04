@@ -339,14 +339,73 @@ class ExecutorCase(unittest.TestCase):
         self.assertIsNone(ns["_retry_hint_s"]({"message": "other"}))
 
 
-    def test_push_gate_blocks_until_operator_opens(self):
+    # -- strong push gate: bound to exact HEAD + tested tree content --
+
+    def _committed_repo(self):
+        for d in ("docs", "tasks", "launcher", "tests"):
+            os.makedirs(os.path.join(self.repo, d), exist_ok=True)
+        open(os.path.join(self.repo, "launcher", "a.py"), "w").write("x = 1\n")
+        git("-c", "user.name=t", "-c", "user.email=t@t", "add", "-A", cwd=self.repo)
+        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-m", "c", cwd=self.repo)
+
+    def test_push_gate_fail_closed_when_unconfigured(self):
         ns = self.load()
-        gate = os.path.join(self.tmp, "push-gate")
+        os.environ.pop("PUSH_GATE_FILE", None)
+        os.environ.pop("ALLOW_UNGATED_PUSH", None)
+        err = ns["_push_gate_check"](self.repo)
+        self.assertIn("fail-closed", err)
+
+    def test_push_gate_absent_then_written_then_accepted_after_restart(self):
+        self._committed_repo()
+        ns = self.load()
+        gate = os.path.join(self.tmp, "gate.json")
         os.environ["PUSH_GATE_FILE"] = gate
         self.addCleanup(lambda: os.environ.pop("PUSH_GATE_FILE", None))
-        r = ns["run_tool"]("git_push", {})
-        self.assertFalse(r["ok"])
-        self.assertIn("gated", r["error"])
+        self.assertIn("gated", ns["_push_gate_check"](self.repo))
+        # operator writes approval via the CLI path (same code), then a
+        # RESTARTED run (fresh namespace) accepts it
+        subprocess.run([sys.executable, EXECUTOR, "--write-gate", gate, self.repo],
+                       check=True, capture_output=True)
+        ns2 = self.load()
+        self.assertIsNone(ns2["_push_gate_check"](self.repo))
+
+    def test_push_gate_stale_on_new_commit_and_on_edit(self):
+        self._committed_repo()
+        ns = self.load()
+        gate = os.path.join(self.tmp, "gate.json")
+        os.environ["PUSH_GATE_FILE"] = gate
+        self.addCleanup(lambda: os.environ.pop("PUSH_GATE_FILE", None))
+        subprocess.run([sys.executable, EXECUTOR, "--write-gate", gate, self.repo],
+                       check=True, capture_output=True)
+        # edit after approval invalidates
+        open(os.path.join(self.repo, "launcher", "a.py"), "a").write("y = 2\n")
+        self.assertIn("STALE", ns["_push_gate_check"](self.repo))
+        # committing the edit also invalidates (head moved)
+        git("-c", "user.name=t", "-c", "user.email=t@t", "add", "-A", cwd=self.repo)
+        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-m", "c2", cwd=self.repo)
+        self.assertIn("STALE", ns["_push_gate_check"](self.repo))
+
+    def test_push_gate_unreadable_fails_closed(self):
+        self._committed_repo()
+        ns = self.load()
+        gate = os.path.join(self.tmp, "gate.json")
+        open(gate, "w").write("{not json")
+        os.environ["PUSH_GATE_FILE"] = gate
+        self.addCleanup(lambda: os.environ.pop("PUSH_GATE_FILE", None))
+        self.assertIn("fail-closed", ns["_push_gate_check"](self.repo))
+
+    def test_push_gate_pycache_does_not_invalidate(self):
+        self._committed_repo()
+        ns = self.load()
+        gate = os.path.join(self.tmp, "gate.json")
+        os.environ["PUSH_GATE_FILE"] = gate
+        self.addCleanup(lambda: os.environ.pop("PUSH_GATE_FILE", None))
+        subprocess.run([sys.executable, EXECUTOR, "--write-gate", gate, self.repo],
+                       check=True, capture_output=True)
+        cache = os.path.join(self.repo, "launcher", "__pycache__")
+        os.makedirs(cache)
+        open(os.path.join(cache, "a.cpython-310.pyc"), "w").write("x")
+        self.assertIsNone(ns["_push_gate_check"](self.repo))
 
     def test_precommit_compile_guard_blocks_broken_python(self):
         ns = self.load()
