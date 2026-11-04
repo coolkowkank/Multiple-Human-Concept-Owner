@@ -219,5 +219,13 @@
       },
       "service_tier": "on_demand"
     }
+  },
+  {
+    "tool_call": "git_push",
+    "args": {},
+    "result": {
+      "ok": false,
+      "error": "push fail-closed: gate /tmp/push-gate-b9 absent or unreadable; do other work or retry git_push in a later round"
+    }
   }
 ]
