@@ -21,7 +21,7 @@ import uuid
 
 from . import prompts
 from .adapters import AdapterError, build_adapter
-from .bus import Bus
+from .bus import Bus, BusError, LOG
 
 
 class SeatError(Exception):
@@ -178,7 +178,19 @@ class Seat:
                 acted = self.act_once()
             except SeatError as exc:
                 self.bus.append_log(self.name, "error", str(exc))
-                self.bus.commit_all(f"seat {self.name}: error recorded")
+                # Record the error WITHOUT sweeping the worktree (second
+                # review N1): only the LOG enters this commit, the
+                # message carries the seat's TURN token so the commit
+                # guard accepts it (the turn still belongs to this seat
+                # and .team/ is always allowed), and a recording
+                # failure must neither mask the original error nor
+                # leave staged residue that blocks `respond`.
+                try:
+                    self.bus.commit_paths(
+                        f"TURN: {self.name} error recorded "
+                        "(turn not taken)", [LOG])
+                except BusError:
+                    pass
                 raise
             if acted and self.relay:
                 self._signal()

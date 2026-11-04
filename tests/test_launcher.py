@@ -1318,3 +1318,57 @@ class SupervisorRestartSemanticsTests(unittest.TestCase):
         gates = [g for g in bus.pending_gates()
                  if "worker" in g.get("question", "")]
         self.assertTrue(gates)
+
+
+class LoopErrorPathTests(unittest.TestCase):
+    """N1 (second independent review): in loop mode (no --once), an
+    R4-style refusal must be recorded without sweeping the worktree,
+    without tripping the installed hook, without masking the original
+    error, and without leaving staged residue that blocks respond."""
+
+    def test_loop_error_records_log_only_and_keeps_original_error(self):
+        seats = {
+            "builder": {"role": "builder", "allowed_paths": ["src/"],
+                        "adapter": {"type": "queue",
+                                    "path": ".team/queues/builder.jsonl"}},
+        }
+        repo, bus = make_repo(seats=seats)
+        self.addCleanup(shutil.rmtree, repo, True)
+        from launcher.cli import _hook_text, main as cli_main
+        hook = os.path.join(repo, ".git", "hooks", "commit-msg")
+        with open(hook, "w") as fh:
+            fh.write(_hook_text())
+        os.chmod(hook, 0o755)
+        state = bus.state()
+        state["turn"] = "builder"
+        state["status"] = "running"
+        bus.write_state(state)
+        bus.commit_all("operator: turn to builder")
+        scratch = tempfile.mkdtemp(prefix="launcher-scratch-")
+        self.addCleanup(shutil.rmtree, scratch, True)
+        with open(os.path.join(scratch, "r.json"), "w") as fh:
+            json.dump({"summary": "work", "writes": {}, "handoff": None,
+                       "status_line": "s"}, fh)
+        cli_main(["respond", "builder", "--repo", repo, "--branch",
+                  "team-work", "--file", os.path.join(scratch, "r.json")])
+        # outside-domain dirt triggers the R4 preflight refusal
+        with open(os.path.join(repo, "stray.py"), "w") as fh:
+            fh.write("outside any allowed path")
+        with self.assertRaises(SeatError) as ctx:
+            Seat(bus, "builder").run(max_passes=1)
+        # original error is the preflight refusal, not a masked BusError
+        self.assertIn("refuses to start", str(ctx.exception))
+        # error recorded: HEAD commit touches ONLY the LOG, with a
+        # guard-accepted message
+        show = git(repo, "show", "--name-only", "--format=%s",
+                   "HEAD").stdout.splitlines()
+        self.assertIn("TURN: builder error recorded", show[0])
+        self.assertEqual([p for p in show[1:] if p],
+                         [".team/LOG.jsonl"])
+        # dirt stays untracked and unstaged: respond is not blocked
+        status = git(repo, "status", "--porcelain").stdout
+        self.assertIn("?? stray.py", status)
+        self.assertNotIn("A ", status)
+        cli_main(["respond", "builder", "--repo", repo, "--branch",
+                  "team-work", "--file", os.path.join(scratch, "r.json"),
+                  "--discard-stale"])

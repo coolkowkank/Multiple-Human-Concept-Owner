@@ -39,14 +39,21 @@ overall PASS.
 | P2 | Head binding incomplete: only turn/seq compared | verified (`dbeb842`) |
 | P3 | `commit_paths` committed the whole pre-staged index | verified (`dbeb842`); residual R3 |
 | P4 | `init` and gate-answer routes used `git add -A` | init verified (`dbeb842`); answer broken (R2) |
-| R1 | `respond` stale scan checked only turn/seq, not head; `--discard-stale` could not drop a head-stale line | fixed-unverified (`37eb735`: one shared staleness definition for seat and respond; refuse -> discard -> fresh-apply regression) |
-| R2 | Gate-answer message lacked the required prefix; the installed hook rejected it, leaving ANSWERS staged | fixed-unverified (`37eb735`: operator: prefix, hook-installed regression, index unstaged on commit failure) |
-| R3 | Pre-staged refusal ran after the queue append: uncommitted residue, duplicate on retry | fixed-unverified (`37eb735`: check before append, rollback on commit failure) |
-| R4 | Outside-domain dirt failed the guard only after mutation, leaving advanced uncommitted state | fixed-unverified (`37eb735`: pre-mutation refusal; in-domain dirt remains the seat's own business) |
+| R1 | `respond` stale scan checked only turn/seq, not head; `--discard-stale` could not drop a head-stale line | verified (`a0b1b699` review, scoped to the reproduced interactions) |
+| R2 | Gate-answer message lacked the required prefix; the installed hook rejected it, leaving ANSWERS staged | verified (`a0b1b699` review, scoped; hook-installed CLI reproduced) |
+| R3 | Pre-staged refusal ran after the queue append: uncommitted residue, duplicate on retry | verified (`a0b1b699` review, scoped) |
+| R4 | Outside-domain dirt failed the guard only after mutation, leaving advanced uncommitted state | verified (`a0b1b699` review, scoped; in-domain dirt is intentionally swept, not isolated) |
 
-R1-R4 fixes landed at `37eb735` (76/76 tests, including
-hook-installed, head-stale recovery, and failure-atomicity cases).
-States move to `verified` only on independent review of `37eb735`.
+R1-R4 **verified (scoped)** by the independent review of `a0b1b699`
+(76 tests, installed-hook CLI). The same review found N1, now fixed:
+
+| ID | Finding | State |
+| --- | --- | --- |
+| N1 | Loop mode (no `--once`): the error-record commit used `commit_all` with a guard-rejected message - swept dirt, masked the original SeatError behind a BusError, left staged residue blocking `respond`. `--once` was unaffected | fixed-unverified (LOG-only `commit_paths` + `TURN:` token message + original error re-raised; regression covers hook, index cleanliness, and respond not blocked) |
+
+Not a clean pass: the review confirms scoped fixes only. Remote
+provider runs, loop-mode endurance, and crash/restart cycles remain
+unproven.
 
 ## Provider routes (credential-level validation only)
 
@@ -73,9 +80,8 @@ autonomy.
 
 ## Next actions
 
-1. Independent read-only review of the R1-R4 fixes (`37eb735`).
-2. Independent review of the R1-R4 fixes (this section).
-3. Then, under a fresh explicit go-ahead: bounded live cycle on the
+1. Independent review of the N1 fix (later head).
+2. Then, under a fresh explicit go-ahead: bounded live cycle on the
    fixed head, live-1 protocol, hard stop.
 3. Open gaps before any unattended claim: cooperative local leases;
    best-effort relay; models may not close cycles; unsandboxed
