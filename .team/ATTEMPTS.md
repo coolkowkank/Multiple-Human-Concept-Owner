@@ -21,3 +21,12 @@ Operator decision: narrow the brief to NEW files only (full-content
 writes cannot drift existing code): launcher/token_est.py +
 tests/test_token_est.py. --measure CLI wiring deferred to a reviewed
 follow-up.
+- attempt 7: generation complete but seat path guard rejected the
+  batch (model wrote launcher/prompts.py, outside allowed paths).
+  Guard worked as designed; brief amended with explicit allowed keys.
+- attempt 8: provider HTTP 400 - gpt-oss-20b emitted a tool call
+  (container.exec) though no tools are offered; model does not hold
+  the JSON-only seat contract on this brief.
+Operator decision: stay on the Groq free route but switch seat model
+to llama-3.3-70b-versatile (same key/plan; non-reasoning, strong
+JSON-contract adherence, no reasoning-token burn).
