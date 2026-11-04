@@ -5,6 +5,12 @@ B = f"https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/{sha}/doc
 lines = [l for l in open(src).read().splitlines() if l.startswith("|")]
 rows = [[c.strip() for c in l.strip().strip("|").split("|")] for l in lines]
 head, body = rows[0], [r for r in rows[2:]]
+# The registry's Model/provider cell for Coordinator and Reviewer says "human-operated account". The project does not
+# document how those accounts are operated, so the page shows the neutral label until the registry is corrected.
+mi = head.index("Model / provider")
+for r in body:
+    if "human-operated" in r[mi]:
+        r[mi] = "not project-configured"
 def cell(c):
     out = html.escape(c)
     out = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", lambda m: f'<a href="{html.escape(B + m.group(2))}">{m.group(1)}</a>' if not m.group(2).startswith("http") else f'<a href="{m.group(2)}">{m.group(1)}</a>', html.unescape(out).replace("&", "&amp;").replace("<", "&lt;")) if "](" in c else out
