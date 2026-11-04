@@ -49,6 +49,7 @@ class Base(unittest.TestCase):
     def setUp(self):
         self.d = tempfile.mkdtemp()
         self.calls = []
+        self.efforts = []
         self.t = T0
         self.store = rc.Store(self.d)
 
@@ -63,7 +64,8 @@ class Base(unittest.TestCase):
     def run_step(self, replies, listing=FRESH, record=None):
         it = iter(replies)
 
-        def post(model, system, prompt, mt):
+        def post(model, system, prompt, mt, effort=None):
+            self.efforts.append(effort)
             self.calls.append((model, prompt))
             return next(it)
         self.t += 20
@@ -71,6 +73,12 @@ class Base(unittest.TestCase):
 
 
 class Pipeline(Base):
+    def test_per_role_effort_and_ceilings(self):
+        self.assertEqual(rc.EFFORT, {"researcher": "low", "verifier": "none",
+                                     "ryan": "low"})
+        self.assertEqual(rc.CEILINGS, {"researcher": 2048, "verifier": 1536,
+                                       "ryan": 2048})
+
     def test_clean_cycle_three_calls_in_order(self):
         self.seed()
         self.assertEqual(self.run_step([ok(R_OK)])["action"], "done-researcher")
@@ -81,6 +89,7 @@ class Pipeline(Base):
         self.assertEqual([c[0] for c in self.calls], [
             ASSIGN["models"]["researcher"], ASSIGN["models"]["verifier"],
             ASSIGN["models"]["ryan"]])
+        self.assertEqual(self.efforts, ["low", "none", "low"])
         self.assertEqual(self.run_step([])["action"], "idle")
         self.assertEqual(len([e for e in self.store.ledger()
                               if e["phase"] == "reserved"]), 3)
@@ -457,7 +466,7 @@ class Review3(Base):
     def test_queue_deleted_midflight_fails_closed(self):
         self.seed()
 
-        def post(*a):
+        def post(*a, **k):
             self.store.save_queue({"questions": []})
             return ok(R_OK)
         with self.assertRaises(rc.Halt):
@@ -668,6 +677,36 @@ class Diag(Base):
                     "content-type": "application/json"}, io.BytesIO(raw))
             return self.Resp(raw)
         return self.call(uo)
+
+    def test_effort_in_body_and_validated(self):
+        import json as J
+        seen = {}
+
+        def uo(req, timeout=None):
+            seen["b"] = J.loads(req.data)
+            return self.Resp(J.dumps({"choices": [{"message": {
+                "content": "x"}, "finish_reason": "stop"}]}).encode())
+        from unittest import mock
+        os.environ["REQUESTY_API_KEY"] = self.KEY
+        try:
+            with mock.patch("urllib.request.urlopen", uo):
+                rc.http_post_factory()("m", "s", "p", 5, effort="none")
+                self.assertEqual(seen["b"]["reasoning_effort"], "none")
+                seen.clear()
+                with self.assertRaises(rc.Halt):
+                    rc.http_post_factory()("m", "s", "p", 5, effort="max")
+                self.assertEqual(seen, {})   # nothing was sent
+        finally:
+            os.environ.pop("REQUESTY_API_KEY", None)
+
+    def test_http_400_halts_no_fallback(self):
+        for code in (400, 404, 422):
+            self.setUp()
+            self.seed()
+            with self.assertRaises(rc.Halt):
+                self.run_step([{"kind": "http", "code": code, "usage": None,
+                                "content": ""}])
+            self.assertEqual(self.store.ledger()[-1]["phase"], "halt")
 
     def test_finish_reason_enum_only(self):
         for fr, want in (("stop", "stop"), ("length", "length"),

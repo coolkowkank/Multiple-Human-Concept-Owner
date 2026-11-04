@@ -55,6 +55,11 @@ CANDIDATES = {
 BLOCKED_STATUS = ("not-qualified", "uncallable", "capped", "cooldown")
 ROLES = ("researcher", "verifier", "ryan")
 CEILINGS = {"researcher": 2048, "verifier": 1536, "ryan": 2048}
+# per-role reasoning_effort (docs.requesty.ai/features/reasoning lists
+# none|min|low|medium|high; whether a given route accepts a value is
+# unknown until used - an unsupported field halts, there is no fallback).
+EFFORT = {"researcher": "low", "verifier": "none", "ryan": "low"}
+EFFORT_VALUES = ("none", "min", "low", "medium", "high")
 ROLE_CAP = {"researcher": 2, "verifier": 2, "ryan": 2}  # per question
 QUESTION_BUDGET = 5  # <= 5 requests per question; clean path = 3
 DAILY_CAP = 24      # 4 cycles x 6 requests, all three roles combined
@@ -378,7 +383,7 @@ def settle(store, rid, qid, role, model, res, now):
     if res["kind"] == "http":
         done["outcome"] = "http_%d" % res["code"]
         store.append(done)
-        if res["code"] in (401, 403, 429):
+        if res["code"] in (400, 401, 403, 404, 422, 429):
             store.append({"phase": "halt", "ts": iso(now),
                           "reason": "http %d on %s" % (res["code"], rid)})
             raise Halt("paused on http %d" % res["code"])
@@ -590,7 +595,7 @@ def step(root, post, list_models, now, record):
         q["attempts"][role] = q["attempts"].get(role, 0) + 1
         store.save_queue(queue)
         n = q["attempts"][role]
-    res = post(model, system, prompt, CEILINGS[role])
+    res = post(model, system, prompt, CEILINGS[role], effort=EFFORT[role])
     with store.lock():
         out = settle(store, rid, qid, role, model, res, now)
         if out:
@@ -914,7 +919,9 @@ def raw_usage(raw):
 
 
 def http_post_factory(env="REQUESTY_API_KEY"):
-    def post(model, system, prompt, max_tokens):
+    def post(model, system, prompt, max_tokens, effort="low"):
+        if effort not in EFFORT_VALUES:
+            raise Halt("invalid reasoning_effort")
         key = os.environ.get(env)
         if not key:
             raise Halt("missing key env " + env)
@@ -937,9 +944,9 @@ def http_post_factory(env="REQUESTY_API_KEY"):
             "model": model, "temperature": 0,
             # documented chat-completions fields (docs.requesty.ai):
             # max_tokens (reasoning tokens count against it) and
-            # reasoning_effort "low"; never raised silently.
+            # reasoning_effort per role (EFFORT); budgets never raised silently.
             "max_tokens": max_tokens,
-            "reasoning_effort": "low",
+            "reasoning_effort": effort,
             "messages": [{"role": "system", "content": system},
                          {"role": "user", "content": prompt}]}).encode()
         req = urllib.request.Request(
