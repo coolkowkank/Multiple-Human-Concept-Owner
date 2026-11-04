@@ -8,4 +8,4 @@ Earlier days stay here and in the event data. They are not overwritten. A mistak
 
 | Day | Picture | Status |
 | --- | --- | --- |
-| 2026-11-04 | pending, day in progress | the first picture is exported after 2026-11-04 ends |
+| 2026-11-04 | [Full-day timeline PNG](2026-11-04-coordinator-timeline.png) | Completed day, cutoff23:59 EET; includes later publications and21:03 offline acceptance; [event data](2026-11-04-coordinator-timeline.json) |
