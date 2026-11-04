@@ -15,7 +15,8 @@ class DummyBus:
     def commit_all(self, msg):
         pass
     def roster(self):
-        return {"seats":{}}
+        # default roster includes a coordinator seat for reissue-path tests
+        return {"seats":{"coordinator":{}}}
     def open_gate(self, *a, **kw):
         self.opened_gates.append((a, kw))
 
@@ -97,6 +98,20 @@ class TestDeadlockFix(unittest.TestCase):
         self.assertFalse(any(k=='routing-failure' for _,k,_ in self.bus.logs))
         self.assertEqual(getattr(self.sup,'_routing_failure_count',0),0)
         self.assertEqual(len(self.bus.opened_gates),0)
+    def test_routing_failure_no_coordinator_escalates(self):
+        # F3: coordinator-less roster - reissue must not write a dead turn
+        class NoCoordBus(DummyBus):
+            def roster(self):
+                return {"seats":{}}
+        bus = NoCoordBus()
+        sup = Supervisor(repo='.', stall_timeout=3600)
+        sup.bus = bus
+        sup._routing_failure_count = 0
+        bus.state_data.update({'status':'running','turn':None})
+        sup._check_stall(bus.state())
+        self.assertIn(('supervisor','routing-failure'), [(s,k) for s,k,_ in bus.logs])
+        self.assertIsNone(bus.state_data.get('turn'))
+        self.assertGreaterEqual(len(bus.opened_gates), 1)
 
 if __name__=='__main__':
     unittest.main()

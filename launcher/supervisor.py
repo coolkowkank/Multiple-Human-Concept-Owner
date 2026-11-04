@@ -138,7 +138,11 @@ class Supervisor:
             if count >= 2:
                 self._escalate("consecutive routing failures")
                 return
-            # re-issue turn to coordinator
+            # re-issue turn to coordinator, but only if a coordinator seat exists
+            roster = self.bus.roster().get("seats", {})
+            if "coordinator" not in roster:
+                self._escalate("routing failure and no coordinator seat in roster")
+                return
             state["turn"] = "coordinator"
             state["turn_since"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             self.bus.write_state(state)
