@@ -68,5 +68,53 @@
       "path": "tests/test_deadlock_fix.py",
       "bytes": 2555
     }
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-04090ae3-9cf4-4180-a605-4380dd607ac7",
+      "object": "chat.completion",
+      "created": 1793793116,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "Now commit.",
+            "tool_calls": [
+              {
+                "id": "fc_7ec65173-8578-41f2-8f25-17e1a02b85c3",
+                "type": "function",
+                "function": {
+                  "name": "git_commit",
+                  "arguments": "{\"message\":\"Fix UTC parsing and routing failure handling\\n\\nAdded tests for stall parsing and routing failure logic.\\n\\nTURN: builder\"}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.115404098,
+        "prompt_tokens": 3445,
+        "prompt_time": 0.156763225,
+        "completion_tokens": 50,
+        "completion_time": 0.10627268,
+        "total_tokens": 3495,
+        "total_time": 0.263035905,
+        "completion_tokens_details": {
+          "reasoning_tokens": 4
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_b1dd3e7a63",
+      "x_groq": {
+        "id": "req_01m6k6dhkqeabstgs5yktgywxm",
+        "seed": 1245388600
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
