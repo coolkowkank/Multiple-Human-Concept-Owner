@@ -1,89 +1,114 @@
-# Current team roster chart for coolkowkank/Multiple-Human-Concept-Owner.
-# Style matches diagrams/formation-chart.py. Regenerate: python3 diagrams/team-roster.py > docs/team-roster.svg
-D='#2b2523'; G='#a39a93'; T='#3f7a73'; DG='#8f857d'; MUT='#6a615c'
-W,H=1044,985
-o=[]; a=o.append
-a(f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" font-family="Noto Sans, DejaVu Sans, sans-serif">')
-a(f'<rect width="{W}" height="{H}" fill="#f4efec"/><rect x="13" y="13" width="{W-26}" height="{H-26}" rx="26" fill="#fff"/>')
-def t(x,y,s,size=12.5,fill=MUT,w='400',anchor='start',extra=''):
-    a(f'<text x="{x}" y="{y}" font-size="{size}" fill="{fill}" font-weight="{w}" text-anchor="{anchor}" {extra}>{s}</text>')
-def human(cx,cy,r=30,col=D):
-    a(f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="#fff" stroke="{col}" stroke-width="2.6"/>')
-    k=r/33
-    a(f'<g stroke="{col}" stroke-width="2.2" fill="none"><circle cx="{cx}" cy="{cy-8*k}" r="{8*k}"/><path d="M{cx-14*k} {cy+15*k} Q{cx-14*k} {cy+3*k} {cx} {cy+3*k} Q{cx+14*k} {cy+3*k} {cx+14*k} {cy+15*k}"/></g>')
-def robot(cx,cy,r=26,col=D,dash=False):
-    ds=' stroke-dasharray="6 4"' if dash else ''
-    a(f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="#fff" stroke="{col}" stroke-width="2.6"{ds}/>')
-    k=r/33
-    a(f'<g stroke="{col}" stroke-width="{2.2*max(k,.6)}" fill="none"><rect x="{cx-12*k}" y="{cy-8*k}" width="{24*k}" height="{19*k}" rx="{5*k}"/><line x1="{cx}" y1="{cy-8*k}" x2="{cx}" y2="{cy-14*k}"/></g><circle cx="{cx}" cy="{cy-14*k}" r="{2*max(k,.7)}" fill="{col}"/><circle cx="{cx-5*k}" cy="{cy+1.5*k}" r="{2*max(k,.7)}" fill="{col}"/><circle cx="{cx+5*k}" cy="{cy+1.5*k}" r="{2*max(k,.7)}" fill="{col}"/>')
-def card(x,y,w,h,fill='#faf6f3',stroke='#e6d9d2'):
-    a(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="20" fill="{fill}" stroke="{stroke}" stroke-width="2"/>')
+# Current-team chart for coolkowkank/Multiple-Human-Concept-Owner.
+# Visual grammar: the owner's reference team-chart style (see diagrams/CHART-STYLE.md) -
+# white background, circular GitHub avatars, bold role names + italic handles below each
+# node, thin curved labeled hand-off arrows, legend box. Models are icon nodes, never
+# GitHub accounts; shared machine accounts are infrastructure, not team members.
+# Regenerate: python3 diagrams/team-roster.py  (writes docs/team-roster.png)
+import os
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from matplotlib.patches import Circle, FancyArrowPatch, FancyBboxPatch
+import urllib.request
+from PIL import Image
+import numpy as np
 
-t(522,56,'Multiple Human Concept Owner - team roster',30,D,'400','middle','font-family="Noto Serif, DejaVu Serif, serif"')
-t(522,86,'As tested 4 Nov 2026 - github.com/coolkowkank/Multiple-Human-Concept-Owner',12.5,MUT,'400','middle')
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+AV = os.path.join(HERE, ".avatars")  # cached GitHub avatars (gitignored)
+os.makedirs(AV, exist_ok=True)
 
-# Owner
-card(52,110,940,108)
-human(120,164)
-t(170,150,'Project owner - @coolkowkank (human)',15,D,'700')
-t(170,172,'Decision authority: GO/no-GO gates, merges to default branch, spend, provider choices, access changes.',12.5)
-t(170,192,'Everything below operates inside owner-set boundaries.',11.5,DG)
+INK = "#1a1a2e"; GRAY = "#5a6272"; ARROW = "#8a8fa3"; PURPLE = "#8b7ec8"
 
-# Active delivery team
-card(52,238,940,372)
-t(72,264,'ACTIVE DELIVERY TEAM - exercised in live runs today',13,D,'700',extra='letter-spacing="0.6"')
-# Coordinator
-robot(150,340)
-t(200,322,'Coordinator - @instinct-telkomsel',14,D,'700')
-t(200,342,'Personal-assistant seat. Assigns scoped tasks, keeps',12)
-t(200,359,'reviews independent, implements the launcher, sole writer',12)
-t(200,376,'on working branches (team-launcher, live/*).',12)
-t(200,396,'Never decides merge/spend/access.',11.5,DG)
-# Reviewer
-robot(150,455)
-t(200,437,'Independent reviewer (QC) - @instinct-christina',14,D,'700')
-t(200,457,'Personal-assistant seat. Peer-verifies pinned commits;',12)
-t(200,474,'verdicts become "verified" only on her reproduction.',12)
-t(200,491,'VERIFIED the Groq fix loop today (documentation scope).',12)
-t(200,511,'Independent: takes no task assignments from the Coordinator.',11.5,DG)
-# Builder model - right column
-robot(640,340,26,T)
-t(690,322,'Builder - Groq openai/gpt-oss-120b',14,D,'700')
-t(690,342,'Model seat (free tier). PROVEN today: edits,',12)
-t(690,359,'commits and pushes via its own tool calls.',12)
-t(690,379,'Every commit author-labelled with the model name;',12)
-t(690,396,'transcripts are the evidence.',12)
-t(690,416,'A model is not a GitHub account and never',11.5,DG)
-t(690,433,'appears in the contributors graph.',11.5,DG)
-# Shared identity - right column
-a(f'<circle cx="640" cy="500" r="26" fill="#fff" stroke="{G}" stroke-width="2.6"/>')
-t(640,506,'GH',13,G,'700','middle')
-t(690,482,'Shared GitHub identity',14,D,'700')
-t(690,500,'@coolkowkank-bot',12.5,D,'700')
-t(690,520,'Machine account, not a seat: links per-model',12)
-t(690,537,'author names into one contributor entry and',12)
-t(690,554,'authenticates model pushes (public_repo token;',12)
-t(690,571,'models never see it).',12)
-t(690,591,'Author, committer and pusher stay three',11.5,DG)
-t(690,608,'separate facts.',11.5,DG)
+def avatar(login):
+    p = os.path.join(AV, login + ".png")
+    if not os.path.exists(p):
+        urllib.request.urlretrieve(f"https://github.com/{login}.png?size=200", p)
+    im = Image.open(p).convert("RGBA").resize((200, 200))
+    # circular alpha mask - the chart style clips avatars to circles
+    mask = Image.new("L", (200, 200), 0)
+    from PIL import ImageDraw
+    ImageDraw.Draw(mask).ellipse((0, 0, 200, 200), fill=255)
+    im.putalpha(mask)
+    return np.asarray(im)
 
-# Configured seats
-card(52,630,940,170)
-t(72,656,'CONFIGURED SEATS - solid = occupied today, dashed = available',13,D,'700',extra='letter-spacing="0.6"')
-seats=[('Coordinator',True),('Builder',True),('Independent QC',True),('Reviewer',False),('Records',False),('Architect',False)]
-x=140
-for name,on in seats:
-    robot(x,722,22,D,not on)
-    t(x,766,name,11.5,D if on else DG,'700' if on else '400','middle')
-    x+=152
-t(72,792,'Seat adapters: mock - queue - cli - http - interactive. Any platform that can run a CLI or answer an HTTP prompt can occupy a seat.',11.5,DG)
+W, H = 1434, 1394
+fig = plt.figure(figsize=(W/100, H/100), dpi=100)
+ax = fig.add_axes([0, 0, 1, 1]); ax.set_xlim(0, W); ax.set_ylim(H, 0); ax.axis("off")
+ax.add_patch(plt.Rectangle((0, 0), W, H, color="white"))
 
-# History
-card(52,820,940,120)
-t(72,846,'HISTORY (closed)',13,D,'700',extra='letter-spacing="0.6"')
-t(72,868,'Rehearsal participants Bill-QC and joe-agent (evaluation docs on main, 3 Nov 2026); Claude authored legacy evaluation docs (4 Nov 2026).',12)
-t(72,888,'Rehearsal branches archived as tags after 4 Nov cleanup. Conditional model fallbacks (free tiers, unused): Cerebras, Requesty.',12)
-t(72,908,'Grounded in commit history and accepted review work only - see developers.md.',11.5,DG)
+def text(x, y, s, size=15, color=GRAY, weight="normal", style="normal", ha="center"):
+    ax.text(x, y, s, fontsize=size, color=color, fontweight=weight, fontstyle=style, ha=ha, va="top")
 
-open('docs/team-roster.svg','w').write('\n'.join(o)+'\n</svg>')
-print('svg written')
+def node(cx, cy, r, img=None, icon=None, icon_bg=PURPLE):
+    if img is not None:
+        ax.imshow(img, extent=(cx-r, cx+r, cy+r, cy-r), zorder=3)
+        ax.add_patch(Circle((cx, cy), r, fill=False, ec="#5b8ac4", lw=2.5, zorder=4))
+    else:
+        ax.add_patch(Circle((cx, cy), r, fc=icon_bg, ec="none"))
+        ax.text(cx, cy+12, icon, fontsize=34, color="white", fontweight="bold", ha="center", va="center")
+
+def arrow(p1, p2, rad=0.0, style="-", color=ARROW, shrink=72):
+    ax.add_patch(FancyArrowPatch(p1, p2, connectionstyle=f"arc3,rad={rad}", arrowstyle="-|>",
+                                 mutation_scale=22, lw=1.6, ls=style, color=color,
+                                 shrinkA=shrink, shrinkB=shrink))
+
+# Title
+text(W/2, 22, "Multiple-Human-Concept-Owner - current team (2026-11-04)", 27, INK, "bold")
+
+# Legend (top-left)
+lb = FancyBboxPatch((22, 62), 356, 116, boxstyle="round,pad=6,rounding_size=12",
+                    fc="white", ec="#c9ccd4", lw=1.4)
+ax.add_patch(lb)
+text(44, 78, "Legend", 17, INK, "bold", ha="left")
+ax.plot([44, 100], [130, 130], color=ARROW, lw=1.6, solid_capstyle="round")
+ax.add_patch(FancyArrowPatch((100, 130), (120, 130), arrowstyle="-|>", mutation_scale=18, lw=1.6, color=ARROW))
+text(140, 118, "labeled hand-off between roles", 13.5, GRAY, ha="left")
+ax.plot([44, 120], [162, 162], color=ARROW, lw=1.6, ls=(0, (4, 3)))
+text(140, 150, "model work product", 13.5, GRAY, ha="left")
+
+# Nodes: owner top-center, coordinator left, reviewer right, builder bottom-center
+OWN, COR, REV, BLD = (717, 282, 74), (310, 715, 74), (1124, 715, 74), (717, 1130, 66)
+node(*OWN, img=avatar("coolkowkank"))
+node(*COR, img=avatar("instinct-telkomsel"))
+node(*REV, img=avatar("instinct-christina"))
+node(*BLD, icon="AI")
+
+# Owner labels
+text(OWN[0], OWN[1]+OWN[2]+18, "Project owner", 21, INK, "bold")
+text(OWN[0], OWN[1]+OWN[2]+50, "@coolkowkank", 16.5, GRAY, style="italic")
+text(OWN[0], OWN[1]+OWN[2]+82, "Decision authority: merges, spend, access", 15)
+# Coordinator labels
+text(COR[0], COR[1]+COR[2]+18, "Coordinator", 21, INK, "bold")
+text(COR[0], COR[1]+COR[2]+50, "@instinct-telkomsel", 16.5, GRAY, style="italic")
+text(COR[0], COR[1]+COR[2]+82, "Coordination + implementation oversight", 15)
+# Reviewer labels
+text(REV[0], REV[1]+REV[2]+18, "Independent reviewer", 21, INK, "bold")
+text(REV[0], REV[1]+REV[2]+50, "@instinct-christina", 16.5, GRAY, style="italic")
+text(REV[0], REV[1]+REV[2]+82, "Peer verification (F/P/R/N)", 15)
+# Builder labels
+text(BLD[0], BLD[1]+BLD[2]+18, "Builder", 21, INK, "bold")
+text(BLD[0], BLD[1]+BLD[2]+50, "Groq gpt-oss-120b (free plan)", 16.5, GRAY, style="italic")
+text(BLD[0], BLD[1]+BLD[2]+82, "Scoped tasks - edits, commits, pushes", 15)
+text(BLD[0], BLD[1]+BLD[2]+110, "via its own tool calls - NOT a GitHub account", 15)
+
+# Arrows
+arrow((OWN[0]-60, OWN[1]+40), (COR[0]+30, COR[1]-60), rad=0.25, shrink=78)
+text(330, 556, "direction + GO gates", 14.5, ARROW)
+arrow((OWN[0]+60, OWN[1]+40), (REV[0]-30, REV[1]-60), rad=-0.25, shrink=78)
+text(1090, 556, "direction + gates", 14.5, ARROW)
+arrow((COR[0]+80, COR[1]-10), (REV[0]-80, REV[1]-10), rad=0.22, shrink=80)
+text(717, 648, "review requests (pinned commit)", 14.5, ARROW)
+arrow((REV[0]-80, REV[1]+30), (COR[0]+80, COR[1]+30), rad=0.22, shrink=80)
+text(717, 810, "verdicts: verified / new findings", 14.5, ARROW)
+arrow((COR[0]+40, COR[1]+66), (BLD[0]-60, BLD[1]-40), rad=0.2, style=(0, (4, 3)), shrink=76)
+text(560, 905, "scoped tasks", 14.5, ARROW)
+text(560, 932, "<-> reviewed output", 14.5, ARROW)
+
+# Footer: shared machine account is infrastructure, not a team member
+text(W-40, H-58, "Shared machine account @coolkowkank-bot authenticates model pushes and is", 13, GRAY, ha="right")
+text(W-40, H-34, "the committer identity on model commits - infrastructure, not a team member.", 13, GRAY, ha="right")
+
+out = os.path.join(ROOT, "docs", "team-roster.png")
+fig.savefig(out, dpi=100)
+print("wrote", out)
