@@ -17,27 +17,39 @@ main{max-width:1100px;margin:0 auto}h1{font-size:24px;margin:0 0 4px}h2{font-siz
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px 40px;width:100%;position:relative;padding-top:14px;border-top:2px solid var(--line);margin-top:0}
 .pair{display:grid;grid-template-columns:1fr 1fr;gap:10px;position:relative}
 .pair .loop{grid-column:1/-1;text-align:center;font-size:12px;color:#8a8fa3}
-.pairs>.pair:nth-child(3){grid-column:1/-1}.pairs{display:grid;grid-template-columns:1fr 1fr;gap:18px;width:100%;border-top:2px solid var(--line);padding-top:14px}
+.pairs{display:grid;grid-template-columns:1fr 1fr;gap:18px;width:100%;border-top:2px solid var(--line);padding-top:14px}
 .b{display:inline-block;min-width:22px;height:18px;line-height:18px;border-radius:9px;color:#fff;font-size:10px;font-weight:700;text-align:center;padding:0 5px;margin-right:4px;vertical-align:middle}
 .Gq{background:#e8553d}.Ce{background:#1d6fb8}.Rq{background:#8b7ec8}
 .vac{border-style:dashed;background:#faf9f6;text-align:left}
 .vacs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .tag{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;margin-left:6px}
 .act{background:#e3f1e6;color:#1f6b33}.vc{background:#eee;color:#555}
+.org{display:grid;grid-template-columns:1fr 90px 320px 90px 1fr;grid-template-rows:auto 40px auto 30px auto 30px;align-items:start;justify-items:center;max-width:1000px;margin:0 auto}
+.org .card.top{width:100%}.org em{display:block;font-size:11px;color:#8a8fa3;font-style:normal}.org .o-ov span,.org .o-sh span,.org .o-rh span{font-size:22px;color:#6b7080;line-height:1}.o-rh .m{display:none}.o-cor{align-self:stretch}.o-cor .card{height:100%}.o-rh{grid-column:2/4!important;justify-self:start!important;width:calc(90px + 160px)}.o-rh .bar{display:flex;align-items:center;width:100%}.o-rh .bar:before{content:"\25C2";color:#6b7080}.o-rh .bar:after{content:"\25B8";color:#6b7080}.o-rh .bar i{flex:1;height:2px;background:#6b7080}.o-rh .mar{display:none}
+.o-owner{grid-column:3;grid-row:1;width:100%}.o-ov{grid-column:3;grid-row:2;text-align:center}.o-cor{grid-column:3;grid-row:3;width:100%}
+.o-sh{grid-column:4;grid-row:3;text-align:center;align-self:center}.o-sam{grid-column:5;grid-row:3;width:100%}
+.o-trunk{grid-column:3;grid-row:4/8;width:100%;display:flex;justify-content:center;align-self:stretch}.o-trunk i{width:2px;background:var(--line)}
+.o-ryan{grid-column:1;grid-row:5;width:100%}.o-rh{grid-column:2;grid-row:5;text-align:center;justify-self:stretch;align-self:center}
+@media(max-width:900px){.org{grid-template-columns:1fr;grid-template-rows:none;gap:6px}.org>*{grid-column:1!important;grid-row:auto!important;max-width:380px}.o-trunk{display:none}.o-owner{order:1}.o-ov{order:2}.o-cor{order:3}.o-sh{order:4}.o-sam{order:5}.o-rh{order:6}.o-ryan{order:7}.o-sh span,.o-ov span,.o-rh span{display:inline-block}.o-sh span{transform:rotate(90deg)}.o-cor .card{height:auto}.o-rh{width:auto;justify-self:center!important}.o-rh .d{display:none!important}.o-rh .m{display:block}.o-rh .mar{display:inline-block}.o-rh{order:6}}
 @media(max-width:700px){.pairs,.vacs,.pair{grid-template-columns:1fr}}
 a{color:#1a5fb4}
 </style><link rel="stylesheet" href="../nav.css"><script src="../nav.js"></script></head><body><main>
 <h1>Current Project Team</h1>
 <p class="mut">Static page, updated when the team changes. Large avatar = role holder. "Not project-configured" means the project does not document a model or provider. Active members and vacant roles are listed separately.</p>
 
+<div class="org">
+ <div class="o-owner"><div class="card top"><img class="av" src="../avatars/coolkowkank.png" alt=""><div class="role">Project owner</div><div class="handle">@coolkowkank</div><div class="ln">Decision authority: merges, spend, access</div></div></div>
+ <div class="o-ov" aria-label="Owner and Coordinator, two-way"><span>&#8661;</span><em>direction + gates</em></div>
+ <div class="o-cor"><div class="card top"><img class="av" src="../avatars/instinct-telkomsel.png" alt=""><div class="role">Telkomsel - Coordinator <span class="tag act">active</span></div><div class="handle">@instinct-telkomsel</div><div class="ln">Plans, assigns work, tracks progress</div><div class="ln">Model: not project-configured</div></div></div>
+ <div class="o-sh" aria-label="Coordinator and Sam, two-way"><span>&#8644;</span><em>status drafts / review</em></div>
+ <div class="o-sam"><div class="card top"><div class="av" style="background:#b0702a;color:#fff;font-size:30px;line-height:60px;font-weight:700;text-align:center" aria-hidden="true">S</div><div class="role">Sam - Coordinator Assistant <span class="tag act">active</span></div><div class="handle">status drafts only</div><div class="ln"><span class="b Rq">Rq</span>Model: google/gemma-4-31b-it (free)</div><div class="ln">Coordinator reviews every draft</div><div class="ln">Publication stays coordination-run</div></div></div>
+ <div class="o-trunk"><i></i></div>
+ <div class="o-ryan"><div class="card top"><div class="av" style="background:#4a6fa5;color:#fff;font-size:30px;line-height:60px;font-weight:700;text-align:center" aria-hidden="true">R</div><div class="role">Ryan - Team Resources <span class="tag act">active</span></div><div class="handle">coordination-run</div><div class="ln">Checks model routes (working / capped) from evidence and proposes replacements from free resources only</div><div class="ln">Status-draft backup: Groq gpt-oss-120b, narrow, fixed template, every draft reviewed. Code and research backup: gap</div><div class="ln">Model: not project-configured</div></div></div>
+ <div class="o-rh" aria-label="Ryan and the Coordinator line, two-way"><span class="mar">&#8644;</span><div class="bar d"><i></i></div><em class="d">route checks / proposals</em><em class="m">Ryan is a side branch of the Coordinator line (two-way): route checks / proposals</em></div>
+</div>
+<p class="ln" style="text-align:center;margin:0">&#8595; Coordinator line to the teams. Ryan is a side branch of this line, not a step in it.</p>
 <div class="tier">
- <div class="card top"><img class="av" src="../avatars/coolkowkank.png" alt=""><div class="role">Project owner</div><div class="handle">@coolkowkank</div><div class="ln">Decision authority: merges, spend, access</div></div>
- <div class="link"><span>direction + gates</span></div>
- <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center"><div style="flex:1 1 260px;max-width:340px"><div class="card top"><img class="av" src="../avatars/instinct-telkomsel.png" alt=""><div class="role">Telkomsel - Coordinator <span class="tag act">active</span></div><div class="handle">@instinct-telkomsel</div><div class="ln">Plans, assigns work, tracks progress</div><div class="ln">Model: not project-configured</div></div></div><div style="flex:1 1 260px;max-width:340px"><div class="card top"><div class="av" style="background:#b0702a;color:#fff;font-size:30px;line-height:60px;font-weight:700;text-align:center" aria-hidden="true">S</div><div class="role">Sam - Coordinator Assistant <span class="tag act">active</span></div><div class="handle">status drafts only</div><div class="ln"><span class="b Rq">Rq</span>Model: google/gemma-4-31b-it (free)</div><div class="ln">Coordinator reviews every draft</div><div class="ln">Publication stays coordination-run</div></div></div></div>
- <div class="loop">Sam: status drafts, reviewed by the Coordinator</div>
- <div class="link"><span>coordination</span></div>
- <div class="card top"><div class="av" style="background:#4a6fa5;color:#fff;font-size:30px;line-height:60px;font-weight:700;text-align:center" aria-hidden="true">R</div><div class="role">Ryan - Team Resources <span class="tag act">active</span></div><div class="handle">coordination-run</div><div class="ln">Checks model routes (working / capped) from evidence and proposes replacements from free resources only</div><div class="ln">Status-draft backup: Groq gpt-oss-120b, narrow, fixed template, every draft reviewed. Code and research backup: gap</div><div class="ln">Model: not project-configured</div></div>
- <div class="link"></div>
+ <div class="link" style="height:14px"></div>
  <div class="pairs">
   <div class="pair">
    <div class="card"><img class="av" src="../avatars/researcher-role.png" alt=""><div class="role">Nora - Researcher <span class="tag act">active</span></div><div class="handle">Uses @coolkowkank</div><div class="ln">shared research token</div><div class="ln"><span class="b Rq">Rq</span>Nemotron-3 Ultra 550B (free)</div><div class="ln">synthesis; citations reviewed</div></div>
