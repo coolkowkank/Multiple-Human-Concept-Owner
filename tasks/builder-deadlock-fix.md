@@ -51,6 +51,18 @@ re-issue to coordinator and logs "routing-failure"; a second consecutive
 occurrence escalates; status "done" + turn=None does nothing. Follow the
 existing suite's style (plain unittest, temp dirs, no network).
 
+## CRITICAL tool-call format rules (read twice)
+
+- Tool arguments must be STRICTLY VALID JSON: every newline inside a
+  string MUST be escaped as \n, every quote as \", never emit a raw
+  line break inside a JSON string value. A previous attempt failed
+  because the file content contained unescaped newlines.
+- Write ONE file per round, and only ONE tool call per round. Plan:
+  round 1 write_file launcher/supervisor.py; round 2 write_file
+  tests/test_deadlock_fix.py; round 3 git_commit; round 4 git_push.
+- Keep code lines short and the test file compact (aim under 150 lines):
+  a few focused tests beat a long file.
+
 ## Bounds
 
 - Only write launcher/supervisor.py and tests/test_deadlock_fix.py.
