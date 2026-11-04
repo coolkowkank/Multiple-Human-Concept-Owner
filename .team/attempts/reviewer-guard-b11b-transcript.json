@@ -13,5 +13,56 @@
       "x-ratelimit-reset-tokens": "10.275s"
     },
     "call": 4
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-3553af4f-1923-4a9a-8949-14f5c72f7c36",
+      "object": "chat.completion",
+      "created": 1793798398,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "We need to edit launcher/runtime.py to implement logic. Let's inspect repo.",
+            "tool_calls": [
+              {
+                "id": "fc_dad65399-7df9-4ef7-a908-1c8625479b53",
+                "type": "function",
+                "function": {
+                  "name": "edit_file",
+                  "arguments": "{\"new_string\":\"\",\"old_string\":\"\",\"path\":\"launcher/runtime.py\"}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.16980683,
+        "prompt_tokens": 1007,
+        "prompt_time": 0.016912621,
+        "completion_tokens": 57,
+        "completion_time": 0.119366283,
+        "total_tokens": 1064,
+        "total_time": 0.136278904,
+        "prompt_tokens_details": {
+          "cached_tokens": 768
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 16
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_c3da0d4bb9",
+      "x_groq": {
+        "id": "req_01m6kbeqvmek6tcv19rmjan2yp",
+        "seed": 381346545
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
