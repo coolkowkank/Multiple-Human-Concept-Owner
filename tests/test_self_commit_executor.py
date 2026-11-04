@@ -742,3 +742,87 @@ class ExecutorHardeningCase(ExecutorCase):
         ns["record"]({"round": 1, "kind": "x"})
         self.assertTrue(ns["PERSIST"]["halt"])
         self.assertEqual(len(pushes), 2)  # initial + single retry, then fail-closed
+
+
+class ExecutorHardeningV2Case(ExecutorHardeningCase):
+    """Offline tests for hardening v2 (batch reviewer-guard-b13 failure modes):
+    destructive placeholder edits refused client-side, and provider
+    schema-validation rejections recovered within the same bounded cap."""
+
+    @staticmethod
+    def _schema_payload():
+        err = {"message": "Tool call validation failed: parameters for tool "
+                          "edit_file did not match schema: errors: "
+                          "[missing properties: 'old_string', 'new_string']",
+               "type": "invalid_request_error", "code": "tool_use_failed",
+               "failed_generation": json.dumps({"name": "edit_file", "arguments":
+                   {"path": "launcher/runtime.py", "line_start": 1, "line_end": 200}})}
+        return json.dumps({"error": err}) + "\n400"
+
+    def test_placeholder_edit_refused_free_and_file_untouched(self):
+        ns = self.load()
+        target = os.path.join(self.repo, "launcher", "runtime.py")
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        before = 'if response.get("status_line", "").startswith("DONE"):\n    pass\n'
+        open(target, "w").write(before)
+        r = ns["run_tool"]("edit_file", {"path": "launcher/runtime.py",
+                                         "old_string": 'if response.get("status_line", "").startswith("DONE"):',
+                                         "new_string": "# placeholder"})
+        self.assertFalse(r["ok"])
+        self.assertIn("placeholder", r["error"])
+        self.assertEqual(open(target).read(), before)  # no corruption landed
+
+    def test_noop_edit_refused(self):
+        ns = self.load()
+        target = os.path.join(self.repo, "launcher", "mod.py")
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        open(target, "w").write("# placeholder\nreal()\n")
+        r = ns["run_tool"]("edit_file", {"path": "launcher/mod.py",
+                                         "old_string": "# placeholder",
+                                         "new_string": "# placeholder"})
+        self.assertFalse(r["ok"])
+        self.assertIn("no-op", r["error"])
+
+    def test_placeholder_write_refused(self):
+        ns = self.load()
+        r = ns["run_tool"]("write_file", {"path": "docs/x.md", "content": "..."})
+        self.assertFalse(r["ok"])
+        self.assertIn("placeholder", r["error"])
+
+    def test_schema_rejection_recovered_with_exact_feedback(self):
+        ns = self.load(max_calls=10)
+        sends = self._fake_curl(ns, [
+            self._schema_payload(),
+            json.dumps(self.msg(tool_calls=[self.tc("write_file", json.dumps({"path": "docs/x.md", "content": "hi"}))])) + "\n200",
+            json.dumps(self.msg(content="thinking")) + "\n200",
+            json.dumps(self.msg(content="still thinking")) + "\n200",
+            json.dumps(self.msg(content="more prose")) + "\n200",
+        ])
+        ns["main"]()
+        self.assertEqual(len(sends), 5)
+        rec = [e["tool_recovery"] for e in ns["transcript"] if isinstance(e, dict) and "tool_recovery" in e]
+        self.assertEqual(len(rec), 1)
+        self.assertEqual(rec[0]["kind"], "schema_violation")
+        conv = sends.payloads[1]["messages"]
+        note = [m["content"] for m in conv if m["role"] == "user" and "harness note" in m["content"]]
+        self.assertEqual(len(note), 1)
+        self.assertIn("schema validation", note[0])
+        self.assertIn("no line numbers", note[0])
+        self.assertTrue(os.path.exists(os.path.join(self.repo, "docs", "x.md")))
+
+    def test_schema_rejection_aborts_after_cap(self):
+        ns = self.load(max_calls=10)
+        sends = self._fake_curl(ns, [self._schema_payload()] * 4)
+        ns["main"]()
+        self.assertEqual(len(sends), 3)
+        rec = [e for e in ns["transcript"] if isinstance(e, dict) and "tool_recovery" in e]
+        self.assertEqual(len(rec), 3)
+
+    def test_mixed_recoveries_share_one_cap(self):
+        # unknown_tool then schema then unknown_tool: cap is shared, 3 sends, abort.
+        ns = self.load(max_calls=10)
+        sends = self._fake_curl(ns, [
+            self._unknown_tool_payload(), self._schema_payload(), self._unknown_tool_payload(), self._schema_payload(),
+        ])
+        ns["main"]()
+        self.assertEqual(len(sends), 3)

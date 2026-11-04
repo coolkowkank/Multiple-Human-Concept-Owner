@@ -198,6 +198,9 @@ SYSTEM = (f"You are the builder on repo Multiple-Human-Concept-Owner, branch {BR
           "small files only), edit_file (exact-match edits to existing files), "
           "git_commit, git_push. ONLY these four tools exist; a tool call with "
           "any other name is rejected by the provider and wastes budget. "
+          "edit_file takes exactly path, old_string, new_string - there are no "
+          "line numbers. Never emit placeholder or stub text; every edit must "
+          "be complete, compilable code. "
           "Be honest in commit messages: say you are Groq "
           "gpt-oss-120b committing via your own tool calls. The repo's local "
           "commit-msg hook REQUIRES your message to contain a line exactly like "
@@ -217,23 +220,35 @@ TOOLS = [
 # evidence on the NEXT real attempt - no inference probes). Nothing else
 # is captured; request-side auth material is outbound-only and never
 # recorded.
+# Destructive-placeholder guard (observed live 2026-11-04, batches
+# reviewer-guard-b11 and b13: the model replaced a real code line with the
+# literal text "# placeholder", then edited from its own stub). Refused
+# client-side before the worktree is corrupted - costs no provider call.
+PLACEHOLDER_RE = re.compile(r"^(#|//|--)?\s*placeholder\s*$|^\.\.\.$|^<placeholder>$", re.I)
+
 RATE_HEADER_ALLOWLIST = {
     "x-ratelimit-limit-requests", "x-ratelimit-limit-tokens",
     "x-ratelimit-remaining-requests", "x-ratelimit-remaining-tokens",
     "x-ratelimit-reset-requests", "x-ratelimit-reset-tokens",
     "retry-after"}
 
-def _is_unknown_tool_rejection(err):
-    """True ONLY for the provider's 'model named an undeclared tool' rejection
-    (observed live 2026-11-04, batch reviewer-guard-b11b: code tool_use_failed,
-    message 'attempted to call tool ... which was not in request.tools').
-    Auth faults, schema faults, other 400s stay fatal."""
+def _classify_tool_rejection(err):
+    """'unknown_tool' | 'schema_violation' | None. Narrow: ONLY the provider's
+    rejections of the model's own malformed tool output, observed live
+    2026-11-04 - b11b: 'attempted to call tool ... not in request.tools';
+    b13: 'parameters for tool edit_file did not match schema' (invented
+    line_start/line_end). Auth faults, context errors, every other 400 stay
+    fatal."""
     if not isinstance(err, dict):
-        return False
+        return None
     msg = err.get("message") or ""
-    if err.get("code") == "tool_use_failed" and "not in request.tools" in msg:
-        return True
-    return err.get("type") == "invalid_request_error" and "not in request.tools" in msg
+    if err.get("code") != "tool_use_failed" and err.get("type") != "invalid_request_error":
+        return None
+    if "not in request.tools" in msg:
+        return "unknown_tool"
+    if "did not match schema" in msg:
+        return "schema_violation"
+    return None
 
 
 def _rate_headers(header_text):
@@ -366,12 +381,12 @@ def api(messages):
             _store_reset_hint(_retry_hint_s(r["error"]))
         record({"api_error": {"kind": "api", "status": status.strip(), "detail": r["error"],
                               "rate_headers": rate_headers}})
-        if _is_unknown_tool_rejection(r.get("error")):
-            # Recoverable: the provider rejected the model's own generation for
-            # naming a tool outside the declared set. The raw failure is
-            # recorded above; main() decides the bounded recovery. Every retry
-            # is a fresh reserved+counted request.
-            return {"_unknown_tool_rejection": r["error"]}
+        kind = _classify_tool_rejection(r.get("error"))
+        if kind:
+            # Recoverable: the provider rejected the model's own malformed tool
+            # output. The raw failure is recorded above; main() decides the
+            # bounded recovery. Every retry is a fresh reserved+counted request.
+            return {"_tool_rejection": {"kind": kind, "error": r["error"]}}
         raise RuntimeError(f"API error: {r['error']}")
     if REQUIRE_ZERO_COST:
         cost = (r.get("usage") or {}).get("cost")
@@ -475,6 +490,7 @@ def run_tool(name, args):
             err = safe_path(path)
             if err: return {"ok": False, "error": err}
             if CRED.search(content): return {"ok": False, "error": "credential-pattern content refused"}
+            if PLACEHOLDER_RE.match(content.strip()): return {"ok": False, "error": "placeholder/stub content refused; write the complete file"}
             if len(content.encode()) > MAX_BYTES: return {"ok": False, "error": f"content exceeds {MAX_BYTES}-byte write cap; use edit_file anchored edits for existing files or split the work"}
             full = os.path.join(REPO, path)
             os.makedirs(os.path.dirname(full), exist_ok=True)
@@ -486,6 +502,8 @@ def run_tool(name, args):
             err = safe_path(path)
             if err: return {"ok": False, "error": err}
             if not old: return {"ok": False, "error": "old_string must be non-empty"}
+            if old == new: return {"ok": False, "error": "no-op edit refused (old_string == new_string); nothing would change"}
+            if PLACEHOLDER_RE.match(new.strip()): return {"ok": False, "error": "placeholder/stub content refused; emit the complete replacement code, never a placeholder"}
             if CRED.search(new): return {"ok": False, "error": "credential-pattern content refused"}
             if len(old.encode()) > EDIT_MAX_BYTES or len(new.encode()) > EDIT_MAX_BYTES:
                 return {"ok": False, "error": f"edit strings exceed {EDIT_MAX_BYTES}-byte cap; split into smaller anchored edits"}
@@ -567,21 +585,29 @@ def main():
             print("HALT: transcript persistence failed; refusing further API calls (fail-closed)")
             return
         resp = api(messages)
-        if isinstance(resp, dict) and "_unknown_tool_rejection" in resp:
-            err = resp["_unknown_tool_rejection"]
+        if isinstance(resp, dict) and "_tool_rejection" in resp:
+            rej = resp["_tool_rejection"]
+            err = rej["error"]
             tool_recoveries += 1
-            record({"tool_recovery": {"n": tool_recoveries,
+            record({"tool_recovery": {"n": tool_recoveries, "kind": rej["kind"],
                                       "provider_code": err.get("code"),
+                                      "provider_message_head": str(err.get("message"))[:200],
                                       "failed_generation_head": str(err.get("failed_generation"))[:200]}})
             if tool_recoveries > MAX_TOOL_RECOVERIES:
-                print(f"abort: provider rejected {tool_recoveries} generations for unknown tool names; "
+                print(f"abort: provider rejected {tool_recoveries} generations for malformed tool calls; "
                       f"budget spent, failing closed")
                 return
+            if rej["kind"] == "unknown_tool":
+                why = ("it called a tool that does not exist. ONLY these tools exist: "
+                       "write_file, edit_file, git_commit, git_push.")
+            else:
+                why = ("its arguments failed schema validation (" +
+                       str(err.get("message"))[:150] + "). edit_file takes exactly "
+                       "path, old_string, new_string - there are no line numbers.")
             messages.append({"role": "user", "content":
                 "[harness note - provider rejection, not model output] Your previous "
-                "generation was rejected because it called a tool that does not exist. "
-                "ONLY these tools exist: write_file, edit_file, git_commit, git_push. "
-                "Re-issue your intended action using one of them."})
+                "generation was rejected because " + why + " Re-issue your intended "
+                "action correctly."})
             continue
         record({"api_response": resp})
         msg = resp["choices"][0]["message"]
