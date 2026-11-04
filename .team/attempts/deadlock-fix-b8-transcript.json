@@ -13,5 +13,53 @@
       "x-ratelimit-reset-tokens": "23.52s"
     },
     "call": 1
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-4d323f54-332a-4f9b-b55f-2cca8ad4b0d0",
+      "object": "chat.completion",
+      "created": 1793795167,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "We need first edit import.",
+            "tool_calls": [
+              {
+                "id": "fc_5e136055-8c57-41db-adda-b2e856751d3f",
+                "type": "function",
+                "function": {
+                  "name": "edit_file",
+                  "arguments": "{\"new_string\":\"import calendar\\nimport os\\nimport subprocess\\nimport sys\\nimport time\",\"old_string\":\"import os\\nimport subprocess\\nimport sys\\nimport time\",\"path\":\"launcher/supervisor.py\"}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.169838584,
+        "prompt_tokens": 2731,
+        "prompt_time": 0.13918426,
+        "completion_tokens": 77,
+        "completion_time": 0.164975711,
+        "total_tokens": 2808,
+        "total_time": 0.304159971,
+        "completion_tokens_details": {
+          "reasoning_tokens": 7
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_a655021f7d",
+      "x_groq": {
+        "id": "req_01m6k8c4g4e4yt7sfw6yj8v3k6",
+        "seed": 335091856
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
