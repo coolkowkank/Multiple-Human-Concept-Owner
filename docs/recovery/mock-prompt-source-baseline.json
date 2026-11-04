@@ -1,0 +1,457 @@
+{
+  "scope": "one_mock_fixture_not_token_savings",
+  "result": {
+    "result": "done",
+    "turns": 5,
+    "scope": "mock_only_offline",
+    "runtime_pin": "launcher-source-sha256:22e4758e3c818e0fa29fc01a181943b0c5998a76afde3cf905eca047655f413a"
+  },
+  "provider_tokens": null,
+  "observations": [
+    {
+      "schema": "prompt-source-audit/v1",
+      "measurement": "offline_exact_render_not_provider_observation",
+      "provider_tokens": null,
+      "token_note": "characters/4 is a heuristic; source token counts are not additive",
+      "system": {
+        "chars": 1062,
+        "utf8_bytes": 1062,
+        "sha256": "694f6bdc019dc6b1d43824303c58e806e59b274b61bd9e4f7e17395019f2e26a",
+        "est_tokens_chars_div_4": 266,
+        "sources": [
+          {
+            "source": "role",
+            "start_char": 0,
+            "end_char": 406,
+            "chars": 406,
+            "utf8_bytes": 406,
+            "sha256": "e699dbbba51afe52fedae485d1b0571943bb9fb3363f84b0997707b014240dcd"
+          },
+          {
+            "source": "response_contract",
+            "start_char": 406,
+            "end_char": 1062,
+            "chars": 656,
+            "utf8_bytes": 656,
+            "sha256": "cf5948a38be82740e464a22f393feef32d58fbe02142ef8ddfd94b477714404f"
+          }
+        ]
+      },
+      "task": {
+        "chars": 248,
+        "utf8_bytes": 248,
+        "sha256": "38ee524b6f73d4569f440cf2d774d9b5aeee17aceca104ddac31e13383bfe6b9",
+        "est_tokens_chars_div_4": 62,
+        "sources": [
+          {
+            "source": "state_and_labels",
+            "start_char": 0,
+            "end_char": 87,
+            "chars": 87,
+            "utf8_bytes": 87,
+            "sha256": "035f5bfb1b521fdf85ab0be51e23ba0b8e5234c9ac7c9edc57c48e43beda655c"
+          },
+          {
+            "source": "brief",
+            "start_char": 87,
+            "end_char": 138,
+            "chars": 51,
+            "utf8_bytes": 51,
+            "sha256": "63e979a92720119e20427c984d97e2e09e3abcedf97246896be6c8aec597b0da"
+          },
+          {
+            "source": "history_label",
+            "start_char": 138,
+            "end_char": 165,
+            "chars": 27,
+            "utf8_bytes": 27,
+            "sha256": "de1b8dda9247d2dbb2ef64fc78ff703f216371806038ad3ff0026f1a3a1918b9"
+          },
+          {
+            "source": "history_entry",
+            "start_char": 165,
+            "end_char": 248,
+            "chars": 83,
+            "utf8_bytes": 83,
+            "sha256": "ffedc9059644ab0ce8b3014ff68bde1794a6df2e215bd29fa3e369b6a20babe1"
+          }
+        ]
+      },
+      "seat": "coordinator",
+      "invocation": 1,
+      "outcome": "mock_adapter_returned"
+    },
+    {
+      "schema": "prompt-source-audit/v1",
+      "measurement": "offline_exact_render_not_provider_observation",
+      "provider_tokens": null,
+      "token_note": "characters/4 is a heuristic; source token counts are not additive",
+      "system": {
+        "chars": 910,
+        "utf8_bytes": 910,
+        "sha256": "6e8c72e4cb13227424cb16f5400ede4608fee58bb811eab61a2129f6d1e34b87",
+        "est_tokens_chars_div_4": 228,
+        "sources": [
+          {
+            "source": "role",
+            "start_char": 0,
+            "end_char": 254,
+            "chars": 254,
+            "utf8_bytes": 254,
+            "sha256": "9cc880819c31f0988984bb1f4f9506a46bc1ed84810256f628547d1921660ef3"
+          },
+          {
+            "source": "response_contract",
+            "start_char": 254,
+            "end_char": 910,
+            "chars": 656,
+            "utf8_bytes": 656,
+            "sha256": "cf5948a38be82740e464a22f393feef32d58fbe02142ef8ddfd94b477714404f"
+          }
+        ]
+      },
+      "task": {
+        "chars": 295,
+        "utf8_bytes": 295,
+        "sha256": "b34037a7ef669e13316fd2dda8481a121bace41a43b1f9dbb5d8824ab06f36d6",
+        "est_tokens_chars_div_4": 74,
+        "sources": [
+          {
+            "source": "state_and_labels",
+            "start_char": 0,
+            "end_char": 79,
+            "chars": 79,
+            "utf8_bytes": 79,
+            "sha256": "bc7be1acd8e0b101c47a65b7221803ac4ac4d016d29cb8c43e9144935e3b5a3e"
+          },
+          {
+            "source": "brief",
+            "start_char": 79,
+            "end_char": 130,
+            "chars": 51,
+            "utf8_bytes": 51,
+            "sha256": "63e979a92720119e20427c984d97e2e09e3abcedf97246896be6c8aec597b0da"
+          },
+          {
+            "source": "history_label",
+            "start_char": 130,
+            "end_char": 157,
+            "chars": 27,
+            "utf8_bytes": 27,
+            "sha256": "de1b8dda9247d2dbb2ef64fc78ff703f216371806038ad3ff0026f1a3a1918b9"
+          },
+          {
+            "source": "history_entry",
+            "start_char": 157,
+            "end_char": 240,
+            "chars": 83,
+            "utf8_bytes": 83,
+            "sha256": "ffedc9059644ab0ce8b3014ff68bde1794a6df2e215bd29fa3e369b6a20babe1"
+          },
+          {
+            "source": "history_entry",
+            "start_char": 240,
+            "end_char": 295,
+            "chars": 55,
+            "utf8_bytes": 55,
+            "sha256": "046934053f86fde6b75d2a8e7a700e5451ee33fdbac78038d260aae4f9da164b"
+          }
+        ]
+      },
+      "seat": "builder",
+      "invocation": 2,
+      "outcome": "mock_adapter_returned"
+    },
+    {
+      "schema": "prompt-source-audit/v1",
+      "measurement": "offline_exact_render_not_provider_observation",
+      "provider_tokens": null,
+      "token_note": "characters/4 is a heuristic; source token counts are not additive",
+      "system": {
+        "chars": 960,
+        "utf8_bytes": 960,
+        "sha256": "18a35835f6e6d3427887428427a8379da53e62ffcfed61e3eb9eadefdb6c9a59",
+        "est_tokens_chars_div_4": 240,
+        "sources": [
+          {
+            "source": "role",
+            "start_char": 0,
+            "end_char": 304,
+            "chars": 304,
+            "utf8_bytes": 304,
+            "sha256": "b370134a01c15e5aa6fec142a9cd265871ee9ba7dd221737f15af014f535939f"
+          },
+          {
+            "source": "response_contract",
+            "start_char": 304,
+            "end_char": 960,
+            "chars": 656,
+            "utf8_bytes": 656,
+            "sha256": "cf5948a38be82740e464a22f393feef32d58fbe02142ef8ddfd94b477714404f"
+          }
+        ]
+      },
+      "task": {
+        "chars": 351,
+        "utf8_bytes": 351,
+        "sha256": "a0729d3c918c9a73f340701608d847d85f928651c042c62c0e2de00fcf529c7f",
+        "est_tokens_chars_div_4": 88,
+        "sources": [
+          {
+            "source": "state_and_labels",
+            "start_char": 0,
+            "end_char": 81,
+            "chars": 81,
+            "utf8_bytes": 81,
+            "sha256": "be98dbcea40fd1ded761d6390afb5479c6260ff0c461e992932f582dbc5c20a7"
+          },
+          {
+            "source": "brief",
+            "start_char": 81,
+            "end_char": 132,
+            "chars": 51,
+            "utf8_bytes": 51,
+            "sha256": "63e979a92720119e20427c984d97e2e09e3abcedf97246896be6c8aec597b0da"
+          },
+          {
+            "source": "history_label",
+            "start_char": 132,
+            "end_char": 159,
+            "chars": 27,
+            "utf8_bytes": 27,
+            "sha256": "de1b8dda9247d2dbb2ef64fc78ff703f216371806038ad3ff0026f1a3a1918b9"
+          },
+          {
+            "source": "history_entry",
+            "start_char": 159,
+            "end_char": 242,
+            "chars": 83,
+            "utf8_bytes": 83,
+            "sha256": "ffedc9059644ab0ce8b3014ff68bde1794a6df2e215bd29fa3e369b6a20babe1"
+          },
+          {
+            "source": "history_entry",
+            "start_char": 242,
+            "end_char": 297,
+            "chars": 55,
+            "utf8_bytes": 55,
+            "sha256": "046934053f86fde6b75d2a8e7a700e5451ee33fdbac78038d260aae4f9da164b"
+          },
+          {
+            "source": "history_entry",
+            "start_char": 297,
+            "end_char": 351,
+            "chars": 54,
+            "utf8_bytes": 54,
+            "sha256": "c6d19cd93d239d4785a676dc97f99507d7658eaea0cef6a9eb07f2b656f4bb1f"
+          }
+        ]
+      },
+      "seat": "reviewer",
+      "invocation": 3,
+      "outcome": "mock_adapter_returned"
+    },
+    {
+      "schema": "prompt-source-audit/v1",
+      "measurement": "offline_exact_render_not_provider_observation",
+      "provider_tokens": null,
+      "token_note": "characters/4 is a heuristic; source token counts are not additive",
+      "system": {
+        "chars": 1015,
+        "utf8_bytes": 1015,
+        "sha256": "052bca5bef800e5f1ec42653f7d7843347ec3d326e15bd934d28c8bd4c3b6ba6",
+        "est_tokens_chars_div_4": 254,
+        "sources": [
+          {
+            "source": "role",
+            "start_char": 0,
+            "end_char": 359,
+            "chars": 359,
+            "utf8_bytes": 359,
+            "sha256": "38755328479eea1f2a1ebf4a336f0afe4794f3064fae42ed1939507a916657ae"
+          },
+          {
+            "source": "response_contract",
+            "start_char": 359,
+            "end_char": 1015,
+            "chars": 656,
+            "utf8_bytes": 656,
+            "sha256": "cf5948a38be82740e464a22f393feef32d58fbe02142ef8ddfd94b477714404f"
+          }
+        ]
+      },
+      "task": {
+        "chars": 391,
+        "utf8_bytes": 391,
+        "sha256": "fbb497ffdda193cc46de7fc92cc3c19d256fc0d093f649d0ab0f0c10bf475355",
+        "est_tokens_chars_div_4": 98,
+        "sources": [
+          {
+            "source": "state_and_labels",
+            "start_char": 0,
+            "end_char": 69,
+            "chars": 69,
+            "utf8_bytes": 69,
+            "sha256": "650cd4a59dd52a2b44e321e40d14fb29cfe4f418c26369692c5219f7cd2ebfd1"
+          },
+          {
+            "source": "brief",
+            "start_char": 69,
+            "end_char": 120,
+            "chars": 51,
+            "utf8_bytes": 51,
+            "sha256": "63e979a92720119e20427c984d97e2e09e3abcedf97246896be6c8aec597b0da"
+          },
+          {
+            "source": "history_label",
+            "start_char": 120,
+            "end_char": 147,
+            "chars": 27,
+            "utf8_bytes": 27,
+            "sha256": "de1b8dda9247d2dbb2ef64fc78ff703f216371806038ad3ff0026f1a3a1918b9"
+          },
+          {
+            "source": "history_entry",
+            "start_char": 147,
+            "end_char": 230,
+            "chars": 83,
+            "utf8_bytes": 83,
+            "sha256": "ffedc9059644ab0ce8b3014ff68bde1794a6df2e215bd29fa3e369b6a20babe1"
+          },
+          {
+            "source": "history_entry",
+            "start_char": 230,
+            "end_char": 285,
+            "chars": 55,
+            "utf8_bytes": 55,
+            "sha256": "046934053f86fde6b75d2a8e7a700e5451ee33fdbac78038d260aae4f9da164b"
+          },
+          {
+            "source": "history_entry",
+            "start_char": 285,
+            "end_char": 339,
+            "chars": 54,
+            "utf8_bytes": 54,
+            "sha256": "c6d19cd93d239d4785a676dc97f99507d7658eaea0cef6a9eb07f2b656f4bb1f"
+          },
+          {
+            "source": "history_entry",
+            "start_char": 339,
+            "end_char": 391,
+            "chars": 52,
+            "utf8_bytes": 52,
+            "sha256": "2db1981ea3e4df3dc0da3911843c262a3ee573e64d216f26ea120d19fdb16af1"
+          }
+        ]
+      },
+      "seat": "qc",
+      "invocation": 4,
+      "outcome": "mock_adapter_returned"
+    },
+    {
+      "schema": "prompt-source-audit/v1",
+      "measurement": "offline_exact_render_not_provider_observation",
+      "provider_tokens": null,
+      "token_note": "characters/4 is a heuristic; source token counts are not additive",
+      "system": {
+        "chars": 1062,
+        "utf8_bytes": 1062,
+        "sha256": "694f6bdc019dc6b1d43824303c58e806e59b274b61bd9e4f7e17395019f2e26a",
+        "est_tokens_chars_div_4": 266,
+        "sources": [
+          {
+            "source": "role",
+            "start_char": 0,
+            "end_char": 406,
+            "chars": 406,
+            "utf8_bytes": 406,
+            "sha256": "e699dbbba51afe52fedae485d1b0571943bb9fb3363f84b0997707b014240dcd"
+          },
+          {
+            "source": "response_contract",
+            "start_char": 406,
+            "end_char": 1062,
+            "chars": 656,
+            "utf8_bytes": 656,
+            "sha256": "cf5948a38be82740e464a22f393feef32d58fbe02142ef8ddfd94b477714404f"
+          }
+        ]
+      },
+      "task": {
+        "chars": 451,
+        "utf8_bytes": 451,
+        "sha256": "ed927f6cf871f3521a97bd509335b32103eae6998f39f62e96dd5569601087ba",
+        "est_tokens_chars_div_4": 113,
+        "sources": [
+          {
+            "source": "state_and_labels",
+            "start_char": 0,
+            "end_char": 87,
+            "chars": 87,
+            "utf8_bytes": 87,
+            "sha256": "072b94470e9db727effc6b21240b65f551518cbaeed841b3d0d448b7e80f4350"
+          },
+          {
+            "source": "brief",
+            "start_char": 87,
+            "end_char": 138,
+            "chars": 51,
+            "utf8_bytes": 51,
+            "sha256": "63e979a92720119e20427c984d97e2e09e3abcedf97246896be6c8aec597b0da"
+          },
+          {
+            "source": "history_label",
+            "start_char": 138,
+            "end_char": 165,
+            "chars": 27,
+            "utf8_bytes": 27,
+            "sha256": "de1b8dda9247d2dbb2ef64fc78ff703f216371806038ad3ff0026f1a3a1918b9"
+          },
+          {
+            "source": "history_entry",
+            "start_char": 165,
+            "end_char": 248,
+            "chars": 83,
+            "utf8_bytes": 83,
+            "sha256": "ffedc9059644ab0ce8b3014ff68bde1794a6df2e215bd29fa3e369b6a20babe1"
+          },
+          {
+            "source": "history_entry",
+            "start_char": 248,
+            "end_char": 303,
+            "chars": 55,
+            "utf8_bytes": 55,
+            "sha256": "046934053f86fde6b75d2a8e7a700e5451ee33fdbac78038d260aae4f9da164b"
+          },
+          {
+            "source": "history_entry",
+            "start_char": 303,
+            "end_char": 357,
+            "chars": 54,
+            "utf8_bytes": 54,
+            "sha256": "c6d19cd93d239d4785a676dc97f99507d7658eaea0cef6a9eb07f2b656f4bb1f"
+          },
+          {
+            "source": "history_entry",
+            "start_char": 357,
+            "end_char": 409,
+            "chars": 52,
+            "utf8_bytes": 52,
+            "sha256": "2db1981ea3e4df3dc0da3911843c262a3ee573e64d216f26ea120d19fdb16af1"
+          },
+          {
+            "source": "history_entry",
+            "start_char": 409,
+            "end_char": 451,
+            "chars": 42,
+            "utf8_bytes": 42,
+            "sha256": "7610c6e7f9db681a3e925ea80c5a92433cb0e8bd055a49d5548706dcd4e6ce64"
+          }
+        ]
+      },
+      "seat": "coordinator",
+      "invocation": 5,
+      "outcome": "mock_adapter_returned"
+    }
+  ]
+}
