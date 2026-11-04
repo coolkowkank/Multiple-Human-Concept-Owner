@@ -314,5 +314,15 @@
       },
       "service_tier": "on_demand"
     }
+  },
+  {
+    "tool_call": "git_commit",
+    "args": {
+      "message": "Fix UTC parsing and add routing-failure handling in supervisor.\n\n- Imported calendar for UTC timestamp parsing.\n- Updated _check_stall to use calendar.timegm and handle unparsable timestamps.\n- Added detection of falsy turn with running status, logging routing-failure and re\u2011issuing turn to coordinator.\n- Implemented consecutive occurrence tracking and escalation.\n\nTURN: builder"
+    },
+    "result": {
+      "ok": true,
+      "head": "0fa083a0585f6d8bb4ee9f1e7c82fa8efe06a0e0"
+    }
   }
 ]
