@@ -70,6 +70,13 @@ trig("9a0dc94","18:30","WP4 pure completion predicate hardening","Independent ac
 trig("95b68b1","19:40","Ryan runner: offline review accepted","233 full and37 focused tests independently passed; no actual model-cycle completion.",branch="ryan-continuous-offline",lane=TD)
 trig("2c4799d","19:41","Ryan first live allocation: PAUSED","One allocation request returned unknown transport. One consumed reserve, no assignments or running roles, no usage/cost returned. No retry; no charge inference.",branch="ryan-continuous-offline",lane=TD)
 trig("2f0e722","19:44","Ryan allocation disabled; operator assignment restored","Ryan cannot assign or change models. Operator manual assignment and structural-only diagnostics prepared offline, review pending. Existing transport pause unchanged.",branch="ryan-continuous-offline",lane=TD)
+trig("818df6f","20:05","Builder 2: mock prompt-source baseline published","Independent offline acceptance at20:10:261full/14focused. N=1 five-turn mock; system5009chars/task1736 includes943history. Provider usage null, no savings; matched provider comparison blocked.",lane=TD)
+trig("870e86a","20:09","Researcher diagnostic: actual draft, unverified","One Nemotron draft, provider-reported cost0. C6 incorrectly equates16%rerun variation with model swapping. No accepted findings, no qualified cycle.",lane=TD)
+trig("6e58f24","20:11","Verifier diagnostic: empty content, halted","Ling HTTP200,1536 output ceiling, empty content, no verdict. Provider-reported cost0; third lifetime reserve. Not qualified.",lane=TD)
+trig("f5dd8da","20:23","Verifier retry: format failure, halted","Ling HTTP200,1536 output ceiling, non-JSON. No verdict or Ryan review. Four lifetime reserves/6; Verifier cap2 reached. Raw model working-out not published.",lane=TD)
+trig("1b6c4fc","20:27","Eva intake and format-only support tooling","Independent262full/66focused offline tests accepted. Held intake stays inert; not Eva runtime qualification. Numerical matcher caveat corrected later.",lane=TD)
+trig("193d735","20:33","Eva offline execution contract: blocking source review","273full/77focused pass independently, but nonstring source passages could be certified after coercion. Changes required, no runtime qualification or call clearance.",lane=TD)
+trig("66a12f4","20:38","Source-schema and claim-lineage hardening published","Strict text/type gates and lineage binding published. Independent review pending at this snapshot. Eva remains blocked; no call, qualification or progress credit.",lane=TD)
 OVERRIDE={"trg-2024e2d":"Finding published 16:39. Addressed by candidate 26ff4bc (17:19), which an independent review accepted. Earlier text superseded: the stall was an escalation gap, fixed offline.","trg-91e928d":"Closed failed (batch closeout 16:20): no commit or push, remote unchanged, guard unbuilt. Earlier status 'running' is superseded."}
 ev=[old.get(e["id"],e) for e in ev]
 for k,v in old.items():
@@ -77,5 +84,5 @@ for k,v in old.items():
 for e in ev:
     if e["id"] in OVERRIDE: e["status"]=OVERRIDE[e["id"]]
 ev.sort(key=lambda e:(e["day"],e["time"]))
-json.dump(dict(asOf="2026-11-04T19:52",timezone="Europe/Helsinki",note="Recorded events use commit times. Planned items are not events. A check that finds no change leaves no record.",events=ev),open(out,"w"),indent=1)
+json.dump(dict(asOf="2026-11-04T20:57",timezone="Europe/Helsinki",note="Recorded events use commit times. Planned items are not events. A check that finds no change leaves no record.",events=ev),open(out,"w"),indent=1)
 print(len(ev),"events")

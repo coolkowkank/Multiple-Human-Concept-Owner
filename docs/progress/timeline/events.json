@@ -1,5 +1,5 @@
 {
- "asOf": "2026-11-04T19:52",
+ "asOf": "2026-11-04T20:57",
  "timezone": "Europe/Helsinki",
  "note": "Recorded events use commit times. Planned items are not events. A check that finds no change leaves no record.",
  "events": [
@@ -1693,6 +1693,153 @@
     {
      "label": "Commit 2f0e722",
      "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/2f0e722"
+    }
+   ]
+  },
+  {
+   "id": "pub-41e2383",
+   "day": "2026-11-04",
+   "time": "19:54",
+   "kind": "publication",
+   "title": "Record Ryan paused first attempt, operator assignment, current Legacy and hourly check",
+   "status": "Published on main. Recorded commit time.",
+   "evidence": [
+    {
+     "label": "Commit 41e2383",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/41e2383"
+    }
+   ]
+  },
+  {
+   "id": "pub-26f7472",
+   "day": "2026-11-04",
+   "time": "20:02",
+   "kind": "publication",
+   "title": "Update provisional Ryan team models and unified Gantt research, preserve pause and review blockers",
+   "status": "Published on main. Recorded commit time.",
+   "evidence": [
+    {
+     "label": "Commit 26f7472",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/26f7472"
+    }
+   ]
+  },
+  {
+   "id": "trg-818df6f",
+   "day": "2026-11-04",
+   "time": "20:05",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Builder 2: mock prompt-source baseline published",
+   "status": "Independent offline acceptance at20:10:261full/14focused. N=1 five-turn mock; system5009chars/task1736 includes943history. Provider usage null, no savings; matched provider comparison blocked.",
+   "evidence": [
+    {
+     "label": "Commit 818df6f",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/818df6f"
+    }
+   ]
+  },
+  {
+   "id": "pub-e037bf1",
+   "day": "2026-11-04",
+   "time": "20:09",
+   "kind": "publication",
+   "title": "Correct Eva blocked status and distinguish assigned roles from running models",
+   "status": "Published on main. Recorded commit time.",
+   "evidence": [
+    {
+     "label": "Commit e037bf1",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/e037bf1"
+    }
+   ]
+  },
+  {
+   "id": "trg-870e86a",
+   "day": "2026-11-04",
+   "time": "20:09",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Researcher diagnostic: actual draft, unverified",
+   "status": "One Nemotron draft, provider-reported cost0. C6 incorrectly equates16%rerun variation with model swapping. No accepted findings, no qualified cycle.",
+   "evidence": [
+    {
+     "label": "Commit 870e86a",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/870e86a"
+    }
+   ]
+  },
+  {
+   "id": "trg-6e58f24",
+   "day": "2026-11-04",
+   "time": "20:11",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Verifier diagnostic: empty content, halted",
+   "status": "Ling HTTP200,1536 output ceiling, empty content, no verdict. Provider-reported cost0; third lifetime reserve. Not qualified.",
+   "evidence": [
+    {
+     "label": "Commit 6e58f24",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/6e58f24"
+    }
+   ]
+  },
+  {
+   "id": "trg-f5dd8da",
+   "day": "2026-11-04",
+   "time": "20:23",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Verifier retry: format failure, halted",
+   "status": "Ling HTTP200,1536 output ceiling, non-JSON. No verdict or Ryan review. Four lifetime reserves/6; Verifier cap2 reached. Raw model working-out not published.",
+   "evidence": [
+    {
+     "label": "Commit f5dd8da",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/f5dd8da"
+    }
+   ]
+  },
+  {
+   "id": "trg-1b6c4fc",
+   "day": "2026-11-04",
+   "time": "20:27",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Eva intake and format-only support tooling",
+   "status": "Independent262full/66focused offline tests accepted. Held intake stays inert; not Eva runtime qualification. Numerical matcher caveat corrected later.",
+   "evidence": [
+    {
+     "label": "Commit 1b6c4fc",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/1b6c4fc"
+    }
+   ]
+  },
+  {
+   "id": "trg-193d735",
+   "day": "2026-11-04",
+   "time": "20:33",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Eva offline execution contract: blocking source review",
+   "status": "273full/77focused pass independently, but nonstring source passages could be certified after coercion. Changes required, no runtime qualification or call clearance.",
+   "evidence": [
+    {
+     "label": "Commit 193d735",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/193d735"
+    }
+   ]
+  },
+  {
+   "id": "trg-66a12f4",
+   "day": "2026-11-04",
+   "time": "20:38",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Source-schema and claim-lineage hardening published",
+   "status": "Strict text/type gates and lineage binding published. Independent review pending at this snapshot. Eva remains blocked; no call, qualification or progress credit.",
+   "evidence": [
+    {
+     "label": "Commit 66a12f4",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/66a12f4"
     }
    ]
   }

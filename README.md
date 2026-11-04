@@ -9,7 +9,7 @@
 
 ### Current Project Team
 
-*Latest update: 2026-11-04 20:01 EET. [Static full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/team/) (selectable text, responsive cards; picture below is the fallback). Builder 2 carries the former Recovery Executor WP4/WP9 work, with no model configured. Bill accepts individually scoped read-only review requests and returns verdicts. No second Coordinator Assistant. Ryan's Researcher produces findings, his Verifier checks references, then Ryan reviews verified output. Researcher provisionally uses Nemotron-3 Ultra, Ryan and his Verifier provisionally use Ling 3.1 Flash in separate executions. All are UNQUALIFIED / PAUSED, not running. The Coordinator selects and assigns models; Ryan does not. Sam remains beside the Coordinator; Ryan is a side branch, not a serial manager.*
+*Latest update: 2026-11-04 20:57 EET. [Static full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/team/) (selectable text, responsive cards; picture below is the fallback). Builder 2 carries the former Recovery Executor WP4/WP9 work, with no model configured. Bill accepts individually scoped read-only review requests and returns verdicts. No second Coordinator Assistant. Ryan's Researcher produces findings, his Verifier checks references, then Ryan reviews verified output. Researcher provisionally uses Nemotron-3 Ultra, Ryan and his Verifier provisionally use Ling 3.1 Flash in separate executions. All are UNQUALIFIED / PAUSED, not running. The Coordinator selects and assigns models; Ryan does not. One Researcher diagnostic produced an unverified draft with an incorrect claim. Two Verifier attempts failed; no verdict or Ryan review, no qualified cycle. Eva remains blocked pending integration acceptance and a qualified route. Sam remains beside the Coordinator; Ryan is a side branch, not a serial manager.*
 
 ![Current Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/e037bf10f07f368efec6a1276791a60953675bd5/docs/progress/team.png)
 
@@ -17,7 +17,7 @@
 
 **[Open the interactive timeline](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/timeline/)** (hosted on GitHub Pages; [same page as a File](https://files.instinct.com/9ikwv5puwqvj-coordinator-work-timeline)) - time on the X-axis, pick a day, zoom, filter by kind of work, and click an event for its status and evidence links.
 
-*Snapshot as of 2026-11-04 19:52 EET, not a live feed. Markers are recorded commit times on `main`, `Research_lab` and project branches. A check that finds no change leaves no record, so it is not drawn. The chart publications lane lists recorded publications only, not proof of scheduled checks. Triggered work has no schedule. Each day's picture is posted at the end of the day and kept in [the archive](docs/progress/archive/README.md). Data: [events.json](docs/progress/timeline/events.json).*
+*Snapshot as of 2026-11-04 20:57 EET, not a live feed. Markers are recorded commit times on `main`, `Research_lab` and project branches. A check that finds no change leaves no record, so it is not drawn. The chart publications lane lists recorded publications only, not proof of scheduled checks. Triggered work has no schedule. Each day's picture is posted at the end of the day and kept in [the archive](docs/progress/archive/README.md). Data: [events.json](docs/progress/timeline/events.json).*
 
 ### Legacy Members
 
@@ -29,14 +29,14 @@
 | Builder | Alex | active | reviewer-skip guard attempt closed, not delivered | gpt-oss-120b, Groq free | [builder](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/builder.md) | 1* |
 | Independent reviewer | Bill | active | pinned-commit review | not project-configured | - | 1* |
 | Researcher | Nora | active | sourced findings on Research_lab | Nemotron-3 Ultra 550B, Requesty free | [researcher](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/researcher.md) | 1* |
-| Evidence verifier | Eva | active | citation and evidence review | Gemma 4 31B, Requesty free | [evidence-verifier](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/evidence-verifier.md) | 1* |
+| Evidence verifier | Eva | blocked | integration review pending; not running | Gemma historical trial, cooldown | [evidence-verifier](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/evidence-verifier.md) | 1* |
 | Team Resources | Ryan | active | model route checks, replacement proposals (free resources only) | not project-configured | [team-resources](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/team-resources.md) | 1* |
 | Coordinator Assistant | Sam (status drafts) | active | status drafts only, every draft reviewed, publication separate | google/gemma-4-31b-it, Requesty free | [coordinator-assistant](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/coordinator-assistant.md) | 1* |
 | Reference-project members (Bill-QC, joe-agent, Claude) | - | unknown | none here | - | leads only, see registry | - |
 
 ### Project progress
 
-*As of 2026-11-04 19:52 EET. Weighted milestone progress is **62.5%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
+*As of 2026-11-04 20:57 EET. Weighted milestone progress is **62.5%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
 
 **Research work packages: RW1-RW6**. RW1-RW6 are rows in the same Gantt, after the WPs; research dependencies/details below do not add milestone credit. Dates are evidenced publications/replays, not continuous work time; no RW deadlines were specified. [Plan](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/Research_lab/research/PLAN.md) · [Status and dependencies](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/charts/)
 
