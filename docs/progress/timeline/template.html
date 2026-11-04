@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Coordinator work timeline</title>
+<style>
+:root{--page:#fbfaf8;--ink:#1f1c1b;--ink2:#5d5855;--hair:#ddd9d3}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1000px;margin:0 auto;padding:32px 20px 64px}
+h1{font-size:34px;margin:0 0 4px;font-weight:600}h2{font-size:20px;margin:32px 0 10px;font-weight:600}
+a{color:#1d5fb8}
+.fact{color:var(--ink2);margin:0 0 12px}
+.callout{border-left:3px solid var(--hair);padding:6px 14px;margin:18px 0;background:#f6f5f2}
+.callout b{display:block}
+.controls{display:grid;gap:12px}.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{font:inherit;font-size:14px;padding:8px 14px;min-height:44px;border-radius:999px;border:1px solid var(--hair);background:var(--page);color:var(--ink2);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--page);border-color:var(--ink)}
+.note{font-size:14px;color:var(--ink2);margin:0}
+.wrap{display:flex;border:1px solid var(--hair);border-radius:12px;overflow:hidden}
+.labels{position:relative;flex:0 0 104px;border-right:1px solid var(--hair);background:var(--page)}
+.lab{position:absolute;left:0;right:0;display:flex;align-items:center;padding:0 8px;font-size:12px;font-weight:600;line-height:1.25}
+.scroll{flex:1;min-width:0;overflow-x:auto;-webkit-overflow-scrolling:touch}.scroll svg{display:block}
+.tick{font-size:11px;fill:var(--ink2)}.bold{font-weight:600;fill:var(--ink)}
+.lane{fill:#f6f6f4;stroke:var(--hair)}
+.marker{cursor:pointer;outline:none}.marker circle{stroke:#fff;stroke-width:1.5}
+.marker text{font-size:11px;font-weight:600;fill:#fff;pointer-events:none}
+.m-pub circle{fill:#5a6272}.m-bld circle{fill:#1d5fb8}.m-res circle{fill:#6a4fb3}
+.marker:focus-visible circle,.marker.sel circle{stroke:var(--ink);stroke-width:3}
+.detail p{margin:6px 0}.dtitle{font-weight:600;font-size:17px}
+.dn{display:inline-flex;width:24px;height:24px;border-radius:50%;background:var(--ink);color:var(--page);align-items:center;justify-content:center;font-size:12px;margin-right:6px}
+.dmeta{color:var(--ink2);font-size:14px}.links{display:flex;flex-wrap:wrap;gap:16px}
+ol.list{list-style:none;padding:0;margin:0;display:grid;gap:2px}
+.item{display:grid;grid-template-columns:52px 28px 1fr;gap:8px;width:100%;text-align:left;font:inherit;font-size:14px;padding:10px 8px;min-height:44px;border:0;border-radius:8px;background:transparent;color:var(--ink);cursor:pointer;align-items:baseline}
+.item:hover{background:#f1f1ee}.item.sel{background:#eceae4}.item .t0,.item .n{color:var(--ink2)}
+footer{margin-top:32px;color:var(--ink2);font-size:14px}
+</style></head><body><main>
+<h1>Coordinator work timeline</h1>
+<p class="fact" id="fact"></p>
+<p>Time runs left to right. Each marker is something recorded in the project repository, placed at its commit time. Tap a marker for its status and evidence.</p>
+<div class="callout"><b>A snapshot, not a live feed</b>This page shows what was recorded up to the time above. The latest state is in the project README. A check that finds no change leaves no record, so it is not drawn. Chart publications are recorded publications only, not proof of scheduled checks. Triggered work has no schedule.</div>
+<h2>View</h2>
+<div class="controls">
+ <div class="row" id="days" role="group" aria-label="Day"></div>
+ <div class="row" id="shows" role="group" aria-label="Show"></div>
+ <div class="row" id="zooms" role="group" aria-label="Zoom"></div>
+</div>
+<h2 id="dayh"></h2>
+<div class="wrap"><div class="labels" id="labels"></div><div class="scroll" id="scroll" tabindex="0" aria-label="Timeline, scrolls sideways"></div></div>
+<h2>Selected event</h2><div class="detail" id="detail" aria-live="polite"></div>
+<h2 id="listh"></h2><ol class="list" id="list"></ol>
+<footer id="foot"></footer>
+</main>
+<script>
+const DATA=__DATA__;
+const events=DATA.events,asOf=DATA.asOf,asOfDay=asOf.slice(0,10),asOfTime=asOf.slice(11,16);
+const mins=t=>+t.slice(0,2)*60+ +t.slice(3,5);
+const hhmm=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+const days=[...new Set(events.map(e=>e.day))].sort();
+const dayLabel=d=>new Date(d+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'});
+const LANES=[{key:'pub',label:'Chart publications',test:e=>e.kind==='publication'},
+{key:'bld',label:'Triggered: Builder and review',test:e=>e.kind==='trigger'&&e.lane==='Builder and review'},
+{key:'res',label:'Triggered: Research and Eva',test:e=>e.kind==='trigger'&&e.lane==='Research and Eva'}];
+const ZOOMS=[{label:'Overview',ppm:5.5},{label:'Zoom 2x',ppm:14},{label:'Zoom 4x',ppm:28},{label:'Zoom 8x',ppm:56}];
+const R=11,ROW=28,LEFT=40,RPAD=220,NS='http://www.w3.org/2000/svg';
+const S={day:days[days.length-1],show:{pub:1,bld:1,res:1,plan:1},zoom:0,sel:null};
+const $=id=>document.getElementById(id);
+const el=(tag,attrs,txt)=>{const n=document.createElementNS(NS,tag);for(const k in attrs)n.setAttribute(k,attrs[k]);if(txt!=null)n.textContent=txt;return n};
+const h=(tag,cls,txt)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(txt!=null)n.textContent=txt;return n};
+const short=t=>{const c=t.indexOf(' - ');const u=c>0&&c<70?t.slice(0,c)+': '+t.slice(c+3):t;return u.length>90?u.slice(0,88)+'\u2026':u};
+function chips(host,items,pressed,fn,extra){host.textContent='';items.forEach(([k,l])=>{const b=h('button','chip',l);b.setAttribute('aria-pressed',pressed(k));b.onclick=()=>fn(k);host.appendChild(b)});if(extra)host.appendChild(extra)}
+function render(scrollMode){
+ const dayEvents=events.filter(e=>e.day===S.day);
+ const numbered=dayEvents.map((e,i)=>({...e,title:short(e.title),n:i+1}));
+ const isAs=S.day===asOfDay;
+ const t0=Math.floor((Math.min(...dayEvents.map(e=>mins(e.time)))-10)/10)*10;
+ const t1=Math.ceil((Math.max(...dayEvents.map(e=>mins(e.time)),isAs?mins(asOfTime)+15:0)+10)/10)*10;
+ const ppm=ZOOMS[S.zoom].ppm,x=m=>LEFT+(m-t0)*ppm,width=LEFT*2+(t1-t0)*ppm+RPAD,axisW=width-RPAD;
+ const laid=LANES.map(l=>{const list=numbered.filter(l.test),rowEnd=[];
+  const placed=list.map(e=>{const px=x(mins(e.time));let r=rowEnd.findIndex(end=>px-end>=R*2+3);if(r<0){r=rowEnd.length;rowEnd.push(-1e9)}rowEnd[r]=px;return{e,px,r}});
+  return{lane:l,placed,rows:Math.max(1,rowEnd.length)}});
+ const laneH=r=>r*ROW+16;let yy=28;const laneY=[];laid.forEach(l=>{laneY.push(yy);yy+=laneH(l.rows)+8});
+ const planY=yy;yy+=48;const axisY=yy,height=axisY+34;
+ const selected=numbered.find(e=>e.id===S.sel)||null;
+ $('fact').textContent='Snapshot as of '+asOfTime+' EET, '+dayLabel(asOfDay);
+ chips($('days'),days.map(d=>[d,dayLabel(d)]),k=>k===S.day,k=>{S.day=k;S.sel=null;render(1)},(()=>{const p=h('span','note','Earlier days are archived in the repository as one picture per day, see docs/progress/archive.');return p})());
+ chips($('shows'),[['pub','Chart publications'],['bld','Builder and review'],['res','Research and Eva'],['plan','Planned']],k=>!!S.show[k],k=>{S.show[k]=S.show[k]?0:1;render()});
+ chips($('zooms'),ZOOMS.map((z,i)=>[i,z.label]),k=>k===S.zoom,k=>{S.zoom=k;render(1)});
+ $('dayh').textContent=dayLabel(S.day)+', time of day in EET';
+ const lb=$('labels');lb.style.height=height+'px';lb.textContent='';
+ laid.forEach((l,i)=>{if(S.show[l.lane.key]){const d=h('div','lab',l.lane.label);d.style.top=laneY[i]+'px';d.style.height=laneH(l.rows)+'px';lb.appendChild(d)}});
+ if(S.show.plan&&isAs){const d=h('div','lab','Planned');d.style.top=planY+'px';d.style.height='40px';lb.appendChild(d)}
+ const sc=$('scroll'),prev=sc.scrollLeft;sc.textContent='';
+ const svg=el('svg',{width,height,viewBox:`0 0 ${width} ${height}`,role:'group','aria-label':'Coordinator work timeline'});
+ const step=ppm>=28?5:ppm>=14?10:30;
+ for(let m=Math.ceil(t0/step)*step;m<=t1;m+=step){svg.appendChild(el('line',{x1:x(m),x2:x(m),y1:14,y2:axisY,stroke:'#ddd9d3'}));svg.appendChild(el('text',{x:x(m),y:axisY+18,'text-anchor':'middle','class':'tick'},hhmm(m)))}
+ svg.appendChild(el('line',{x1:LEFT,x2:axisW-LEFT,y1:axisY,y2:axisY,stroke:'#5d5855'}));
+ laid.forEach((l,i)=>{if(!S.show[l.lane.key])return;
+  svg.appendChild(el('rect',{x:0,y:laneY[i],width:width-2,height:laneH(l.rows),rx:8,'class':'lane'}));
+  l.placed.forEach(({e,px,r})=>{const g=el('g',{role:'button',tabindex:0,'aria-label':e.n+'. '+e.time+' '+e.title,'aria-pressed':e.id===S.sel,'class':'marker m-'+l.lane.key+(e.id===S.sel?' sel':'')});
+   g.appendChild(el('circle',{cx:px,cy:laneY[i]+8+r*ROW+ROW/2+6,r:R}));g.appendChild(el('text',{x:px,y:laneY[i]+8+r*ROW+ROW/2+10,'text-anchor':'middle'},String(e.n)));
+   const pick=()=>{S.sel=e.id;render()};g.onclick=pick;g.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();pick()}};svg.appendChild(g)})});
+ const defs=el('defs',{});const pat=el('pattern',{id:'hatch',width:6,height:6,patternUnits:'userSpaceOnUse',patternTransform:'rotate(45)'});pat.appendChild(el('rect',{width:6,height:6,fill:'#fff'}));pat.appendChild(el('line',{x1:0,y1:0,x2:0,y2:6,stroke:'#5d5855','stroke-width':2}));defs.appendChild(pat);svg.appendChild(defs);
+ if(S.show.plan&&isAs){svg.appendChild(el('rect',{x:0,y:planY,width:width-2,height:40,rx:8,'class':'lane'}));
+  const w=Math.max(14,6*ppm);svg.appendChild(el('rect',{x:x(mins(asOfTime)),y:planY+9,width:w,height:22,fill:'url(#hatch)',stroke:'#5d5855'}));
+  svg.appendChild(el('text',{x:x(mins(asOfTime))+w+8,y:planY+24,'class':'tick','text-anchor':'start'},'Next check about every 30 min, time not fixed'))}
+ if(isAs){const ax=x(mins(asOfTime));svg.appendChild(el('line',{x1:ax,x2:ax,y1:14,y2:axisY,stroke:'#1f1c1b','stroke-dasharray':'4 3'}));svg.appendChild(el('text',{x:ax,y:10,'text-anchor':'middle','class':'tick bold'},'snapshot '+asOfTime))}
+ if(S.day==='2026-11-04'){const bx=x(mins('14:40'));svg.appendChild(el('line',{x1:bx,x2:bx,y1:14,y2:axisY,stroke:'#b23b3b','stroke-dasharray':'4 3'}));svg.appendChild(el('text',{x:bx,y:10,'text-anchor':'middle','class':'tick',fill:'#b23b3b'},'baseline frozen 14:40'))}
+ sc.appendChild(svg);
+ if(scrollMode){const target=selected?x(mins(selected.time)):isAs?x(mins(asOfTime)):0;sc.scrollLeft=S.zoom===0&&!selected?0:Math.max(0,target-sc.clientWidth/2)}else sc.scrollLeft=prev;
+ const d=$('detail');d.textContent='';
+ if(selected){const p1=h('p','dtitle');p1.appendChild(h('span','dn',String(selected.n)));p1.appendChild(document.createTextNode(' '+selected.title));d.appendChild(p1);
+  d.appendChild(h('p','dmeta',selected.time+' EET, '+dayLabel(selected.day)+'. Time is the commit time. Duration is not recorded. '+(selected.kind==='publication'?'Chart publication.':'Triggered work: '+selected.lane+'.')));
+  const p3=h('p');const b=h('strong',null,'Status:');p3.appendChild(b);p3.appendChild(document.createTextNode(' '+selected.status));d.appendChild(p3);
+  const p4=h('p','links');selected.evidence.forEach(ev=>{const a=h('a',null,ev.label);a.href=ev.url;p4.appendChild(a)});d.appendChild(p4)}
+ else d.appendChild(h('p','note','Tap a numbered marker, or an item in the list below.'));
+ const listed=numbered.filter(e=>e.kind==='publication'?S.show.pub:e.lane==='Builder and review'?S.show.bld:S.show.res);
+ $('listh').textContent='All events this day ('+listed.length+')';
+ const ol=$('list');ol.textContent='';
+ listed.forEach(e=>{const li=h('li');const b=h('button','item'+(e.id===S.sel?' sel':''));b.appendChild(h('span','t0',e.time));b.appendChild(h('span','n',String(e.n)));b.appendChild(h('span','t',e.title));
+  b.onclick=()=>{S.sel=e.id;render();const s=$('scroll');s.scrollLeft=Math.max(0,x(mins(e.time))-s.clientWidth/2)};li.appendChild(b);ol.appendChild(li)});
+ $('foot').textContent='Snapshot as of '+asOfTime+' EET on '+dayLabel(asOfDay)+'. One closed review loop is process evidence, not a standing pass, and earns no milestone credit.';
+}
+render(1);
+</script></body></html>
