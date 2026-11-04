@@ -32,7 +32,7 @@ No plan or schedule existed before 2026-11-04 14:40 EET, so there is no planned-
 
 Team chart levels: owner on top, Coordinator one level below, all other roles one level below the Coordinator. The Builder and reviewer feedback loop is drawn as workflow arrows, separate from the levels.
 
-Eva - Evidence verifier is a planned role for checking Nora's sources (existence, metadata, and whether the cited passage supports the claim, with uncertainty) before publication. It is not operational and has no model assigned yet. It has no GitHub account or token and earns no milestone credit. The Coordinator keeps responsibility for accepting reviewed work.
+Eva - Evidence verifier is a planned role for checking Nora's sources (existence, metadata, and whether the cited passage supports the claim, with uncertainty) before publication. Model: Gemma 4 31B on the Requesty free route, trial-tested on 2 calls at zero reported cost with 7 of 7 fixture verdicts correct (executor report; role doc at team-launcher 06479b3). It is a manual review workflow only. Runtime roster wiring and a mechanical gate are not implemented, so it is not automated or fully operational. It has no GitHub account or token, and the document and trial alone earn no milestone credit. The Coordinator keeps responsibility for accepting reviewed work.
 
 Project aliases: Telkomsel (Coordinator), Alex (Builder), Nora (Researcher), Bill (Independent reviewer, Christina's existing project name). They are display names only; account, model and status facts are unchanged.
 

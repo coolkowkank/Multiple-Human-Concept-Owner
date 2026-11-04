@@ -47,7 +47,7 @@ def render(here, updated):
     labels(COR,"Telkomsel - Coordinator","@instinct-telkomsel","Plans, assigns work, tracks progress")
     labels(BLD,"Alex - Builder","@coolkowkank-bot","Groq gpt-oss-120b (free plan)","via shared bot account")
     labels(REV,"Bill - Independent reviewer","@instinct-christina","Reviews the Builder's pinned commits")
-    labels(EVA,"Eva - Evidence verifier","role only; no account","Planned, not operational","model not assigned")
+    labels(EVA,"Eva - Evidence verifier","role only; no account","Gemma 4 31B (free), trial-tested","runtime integration pending")
     labels(RES,"Nora - Researcher","Uses @coolkowkank","dedicated Researcher token","Nemotron-3 Ultra 550B (Requesty free)","verified-source synthesis; citations reviewed")
     # hierarchy: owner > coordinator > others (plain lines, no arrowheads)
     HL="#b4b8c6"
