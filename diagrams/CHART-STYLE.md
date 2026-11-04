@@ -43,6 +43,12 @@ a separate artifact with its own style.
   reporting line.
 - Arrow check: after rendering, read each arrowhead on the actual image and confirm it
   matches its label.
+- Standby routes (owner request 2026-11-04, Slack 1793788648.701489): qualified but
+  inactive provider routes sit in a separate dashed "Qualified backup routes" band below
+  the team row - never as active seats. Each standby node states only verified facts
+  (model or route, free-tier limit, what was probe-verified, and the date) plus the word
+  "standby". One dashed connector from the Coordinator to the band shows who would manage
+  them; label it "activates only on owner go".
 
 ## Update rules
 

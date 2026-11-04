@@ -220,6 +220,48 @@ class ExecutorCase(unittest.TestCase):
         for k in ("MODEL_AUTHOR", "RECORDS_COMMITTER", "PROVIDER_MODEL", "PROVIDER_API_URL", "MODEL_COMMITTER"):
             os.environ.pop(k, None)
 
+    # 9. successful git_push ENDS the run: no trailing summary round is requested
+    def test_run_ends_after_successful_push(self):
+        ns = self.load()
+        seq = [self.msg(tool_calls=[self.tc("write_file", json.dumps({"path": "docs/x.md", "content": "hi"}), "c1")]),
+               self.msg(tool_calls=[self.tc("git_commit", json.dumps({"message": "m\n\nTURN: builder"}), "c2")]),
+               self.msg(tool_calls=[self.tc("git_push", "{}", "c3")]),
+               self.msg(content="summary that must never be requested")]
+        calls = []
+        ns["api"] = lambda m: calls.append(1) or seq.pop(0)
+        orig = ns["run_tool"]  # scratch repo has no origin remote; stub a successful push
+        ns["run_tool"] = lambda n, a: ({"ok": True, "output": "pushed"} if n == "git_push" else orig(n, a))
+        ns["main"]()
+        self.assertEqual(len(calls), 3)  # the 4th (summary) response was never fetched
+        self.assertTrue(any("run_complete" in e for e in ns["transcript"] if isinstance(e, dict)))
+
+    # 10. written content is elided from later prompts, preserved in the transcript
+    def test_write_content_elided_from_history(self):
+        ns = self.load()
+        big = "x" * 4000
+        seq = [self.msg(tool_calls=[self.tc("write_file", json.dumps({"path": "docs/x.md", "content": big}), "c1")]),
+               self.msg(content="done")]
+        seen = []
+        ns["api"] = lambda m: seen.append(m) or seq.pop(0)
+        ns["main"]()
+        second_prompt = json.dumps(seen[1])
+        self.assertNotIn(big, second_prompt)
+        self.assertIn("[written to docs/x.md", second_prompt)
+        self.assertTrue(any("history_elided" in e for e in ns["transcript"] if isinstance(e, dict)))
+        full = [e for e in ns["transcript"] if isinstance(e, dict) and e.get("tool_call") == "write_file"]
+        self.assertEqual(full[0]["args"]["content"], big)  # transcript keeps the full content
+
+    # 11. a FAILED push does not end the run early; the model may still act
+    def test_failed_push_does_not_end_run(self):
+        ns = self.load()
+        seq = [self.msg(tool_calls=[self.tc("git_push", "{}", "c1")]),
+               self.msg(content="gave up")]
+        ns["api"] = lambda m: seq.pop(0)
+        orig = ns["run_tool"]
+        ns["run_tool"] = lambda n, a: ({"ok": False, "error": "push refused"} if n == "git_push" else orig(n, a))
+        ns["main"]()
+        self.assertFalse(any("run_complete" in e for e in ns["transcript"] if isinstance(e, dict)))
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -13,6 +13,17 @@ Tools offered: write_file (docs/*.md only), git_commit (verbatim message
 + provenance trailer, local commit-msg hook enforced), git_push (fixed
 branch only).
 
+Token discipline (owner request 2026-11-04, "optimize the communication
+with groq"): the run ENDS automatically on a successful git_push - no
+trailing summary round is requested (measured waste: the trailing no-op
+round cost 1,078 of 3,653 total tokens in attempt bot-auth-test and 1,921
+of 8,036 in loop-c1, per recorded usage on the records branch). After a
+successful write_file the file content is ELIDED from the in-memory
+history sent to later rounds (placeholder points at the transcript); the
+full content stays in the recorded transcript, and each elision is itself
+recorded. Review feedback is still passed VERBATIM; capture, budget
+accounting and fail-closed behavior are unchanged.
+
 Durability: every event is written locally (atomic) AND checkpointed
 (commit+push) to a dedicated operator records branch via a separate
 worktree (RECORDS_DIR, required at startup). Any persistence failure
@@ -127,7 +138,9 @@ SYSTEM = (f"You are the builder on repo Multiple-Human-Concept-Owner, branch {BR
           "git_commit, git_push. Be honest in commit messages: say you are Groq "
           "gpt-oss-120b committing via your own tool calls. The repo's local "
           "commit-msg hook REQUIRES your message to contain a line exactly like "
-          "'TURN: builder' - include it or the commit is rejected. Never include secrets.")
+          "'TURN: builder' - include it or the commit is rejected. Never include secrets. "
+          "The run ENDS automatically once git_push succeeds: no summary or follow-up "
+          "message is needed after it.")
 
 TOOLS = [
  {"type":"function","function":{"name":"write_file","description":"Write a markdown file under docs/.","parameters":{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"]}}},
@@ -244,6 +257,19 @@ def main():
             result = run_tool(name, args)
             record({"tool_call": name, "args": args, "result": result})
             messages.append({"role": "tool", "tool_call_id": c["id"], "content": json.dumps(result)})
+            if name == "write_file" and result.get("ok"):
+                # Elide the just-written content from the history sent to later
+                # rounds; the full bytes remain in the recorded transcript.
+                nbytes = result.get("bytes", 0)
+                c["function"]["arguments"] = json.dumps(
+                    {"path": args.get("path", ""),
+                     "content": f"[written to {args.get('path','')}: {nbytes} bytes; full content in the run transcript]"})
+                record({"history_elided": {"path": args.get("path", ""), "bytes": nbytes}})
+            if name == "git_push" and result.get("ok"):
+                record({"run_complete": {"reason": "git_push succeeded", "round": rnd + 1,
+                                         "api_calls": CALLS["n"]}})
+                print(f"round {rnd+1}: git_push succeeded; run complete ({CALLS['n']} API calls)")
+                return
     print(f"round cap {MAX_ROUNDS} reached; stopping")
 
 if __name__ == "__main__":

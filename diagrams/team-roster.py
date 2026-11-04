@@ -33,7 +33,7 @@ def avatar(login):
     im.putalpha(mask)
     return np.asarray(im)
 
-W, H = 1434, 1010
+W, H = 1434, 1330
 fig = plt.figure(figsize=(W/100, H/100), dpi=100)
 ax = fig.add_axes([0, 0, 1, 1]); ax.set_xlim(0, W); ax.set_ylim(H, 0); ax.axis("off")
 ax.add_patch(plt.Rectangle((0, 0), W, H, color="white"))
@@ -139,6 +139,28 @@ arrow((BLD[0], BLD[1]-24), (REV[0], BLD[1]-24), shrink=90)
 text(955, BLD[1]-62, "review requests (pinned commit)", 14.5, ARROW)
 arrow((REV[0], BLD[1]+24), (BLD[0], BLD[1]+24), shrink=90)
 text(955, BLD[1]+34, "review verdicts", 14.5, ARROW)
+
+# Standby band: provider routes QUALIFIED (key + free tool-calling probe, 2026-11-04)
+# but not yet assigned active work. Dashed connectors = standby, never an active seat.
+band = FancyBboxPatch((200, 955), 1034, 288, boxstyle="round,pad=6,rounding_size=14",
+                      fc="#fafafc", ec="#c9ccd4", lw=1.4, ls=(0, (5, 4)))
+ax.add_patch(band)
+text(717, 972, "Qualified backup routes - standby, not assigned active work", 16, INK, "bold")
+CER, RQY = (455, 1084, 48), (979, 1084, 48)
+node(*CER, icon="Ce")
+node(*RQY, icon="Rq")
+text(CER[0], CER[1]+CER[2]+12, "Cerebras (standby)", 16, INK, "bold")
+text(CER[0], CER[1]+CER[2]+40, "gpt-oss-120b", 13.5, GRAY, style="italic")
+text(CER[0], CER[1]+CER[2]+66, "free trial 5 RPM / 1M tokens-day", 12.5)
+text(CER[0], CER[1]+CER[2]+90, "tool calls verified 2026-11-04", 12.5)
+text(RQY[0], RQY[1]+RQY[2]+12, "Requesty (standby)", 16, INK, "bold")
+text(RQY[0], RQY[1]+RQY[2]+40, "router: free models, 200 requests-day", 13.5, GRAY, style="italic")
+text(RQY[0], RQY[1]+RQY[2]+66, "tool calls verified on google/gemma-4-31b-it", 12.5)
+text(RQY[0], RQY[1]+RQY[2]+90, "2026-11-04", 12.5)
+# one dashed standby link to the band: the Coordinator manages every delivery
+# seat, active or standby; standby routes activate only on the owner's go
+arrow((COR[0]+20, 905), (335, 958), rad=0.08, style=(0, (5, 4)), shrink=40)
+text(186, 916, "activates only on owner go", 13, ARROW, ha="left")
 
 # Footer: shared machine account is infrastructure, not a team member
 text(40, H-64, "@coolkowkank-bot is the shared machine account the Builder acts through:", 13, GRAY, ha="left")

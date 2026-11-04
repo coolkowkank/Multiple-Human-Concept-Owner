@@ -108,3 +108,94 @@ No sustained unattended run has happened; nothing here claims one.
   .team/ATTEMPTS.md.
 - Peer-reviewed: capture mechanics cleared in scoped static review;
   MAX_CALLS enforcement not independently reproduced by the reviewer.
+
+## Model-issued commits, identity and first-edit failure (4 Nov 2026, live/groq-dev-4)
+
+- First live model edit (e056ae9) replaced a 110-line findings doc with a
+  7-line summary: an over-deletion the review loop caught. The model then
+  restored the full doc and added only its entry (ac295a9), and the
+  reviewer supplied the final transport wording (applied in 015e551).
+  Lesson: first model output is not final output; immutable feedback plus
+  re-review is what made the fix verifiable.
+- Identity separation proven live (5ca0261): one model attempt issued
+  write_file, git_commit and git_push in three provider calls (this model
+  emitted exactly one tool call per response; not assumed universal).
+  Resulting commit: author "Groq (gpt-oss-120b model)" on the shared
+  bot's account-linked noreply, committer coolkowkank-bot, push
+  authenticated by the bot credential, remote head verified by the
+  operator. Public git shows author/committer/content; which credential
+  authenticated a push is operator-verified, not git-provable.
+- Failure mode kept visible: the same demo first ran with a 1-call
+  budget and stopped after write_file only (budget_stop recorded; no
+  commit, no push). A budget stop is not a completion. One other attempt
+  spent its third call on an HTTP 429 (free-plan rate limit) and stopped.
+- Capability is not authority: holding a provider or push token only
+  makes a run possible. Generic onboarding must derive the committer
+  identity from the verified token account (or explicit config) - the
+  executor hardcodes no identity and refuses otherwise - so another
+  user's token never silently attributes work to this project's bot.
+
+## Token efficiency, measured from records (4 Nov 2026)
+
+Recorded provider usage (usage fields in the per-event transcripts on
+live/groq-dev-3-records):
+
+- The executor used to request a trailing summary round after a
+  successful push. Measured waste: 1,078 of 3,653 total tokens (attempt
+  bot-auth-test) and 1,921 of 8,036 (attempt loop-c1) went to a final
+  no-tool-call summary response.
+- The prompt grows every round because the full history is resent; the
+  largest single growth step is the model's own write_file arguments
+  echoed back (loop-c1 round 3 prompt 1,629 tokens vs 1,021 the round
+  before, after a 576-completion-token file write).
+
+Changes (tests 9-11 in tests/test_self_commit_executor.py):
+
+- The run ends automatically on a successful git_push; the system prompt
+  tells the model no summary is needed after it.
+- After a successful write_file, the file content is elided from the
+  in-memory history sent to later rounds (a placeholder points at the
+  transcript; the full bytes stay in the recorded transcript and every
+  elision is itself recorded).
+
+Not changed: review feedback still reaches the model VERBATIM; budget
+accounting (every attempted request counts), fail-closed capture and
+provenance trailers are unchanged. Savings beyond the trailing-round
+figures above are estimates until a future run records new usage; none
+are claimed here.
+
+## Standby provider routes, qualified (4 Nov 2026)
+
+Probe-verified with the account's stored keys; free routes only; 4 provider
+requests total, each a single small tool-calling probe (a real capability
+check, since the executor route depends on tool calls):
+
+- Cerebras: key valid; models listed gpt-oss-120b and qwen-3.8-27b. Free
+  Trial tier limits (vendor docs, inference-docs.cerebras.ai/support/rate-limits):
+  5 requests/min, 30K uncached tokens/min, 1M tokens/day per model.
+  gpt-oss-120b returned a valid tool call (181 tokens total).
+- Requesty (router): key valid; 815 routed models listed, 13 of them
+  zero-price. Tool calls verified at cost 0 on google/gemma-4-31b-it
+  (125 tokens) and novita/ling-3.1-flash (299 tokens). Free tier per
+  requesty.ai/pricing: 200 requests/day on free models, no card. One
+  listed free model (nvidia/nemotron-3-super-120b-a12b) returned 404 at
+  completion time: a listing is not availability.
+
+Both routes are STANDBY only: qualified, not assigned active work. Using
+either as a Builder or reviewer route still needs the owner-scoped task,
+per-run budget and the same capture/budget guards as the Groq route.
+
+## Acceptance target (owner-stated 4 Nov 2026)
+
+The end goal: someone with their own AI clones this repo, runs it, and a
+team is set up in their target repository; they hand the Coordinator the
+concept in the agreed .md brief and leave; the Coordinator manages team
+dynamics and keeps working while the concept is unchanged, asking only
+when genuinely blocked or a concept-level decision is needed, inside
+agreed permissions and budgets, stopping when done.
+
+Status: NOT MET. The current hands-on runs (this repo's own development)
+required per-round steering and are not evidence of that autonomy. The
+fresh-clone, concept-to-result test - a new adopter's own AI running one
+full batch cycle with no Instinct-specific help - remains the open test
+("Next useful test" above). Nothing here claims it has passed.
