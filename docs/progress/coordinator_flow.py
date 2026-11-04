@@ -46,8 +46,8 @@ ax.text(1075,500,"Not accepted",ha="center",fontsize=10,fontweight="bold",color=
 ax.text(1075,517,"back to corrections",ha="center",fontsize=9,color=GRAY,va="top")
 arrow(910,532,650,560,"#b23b3b",rad=-0.25); 
 # example strip
-ax.text(40,596,"Live example (Research_lab): Eva review 1 (3ecde66) found one unverified claim and one missing caveat.\nSent back to the Researcher, who acknowledged and corrected. Eva recheck is pending.",fontsize=9.3,color=INK,va="top")
-ax.text(40,632,"Not yet closed: no corrected claim is accepted until Eva rechecks it.",fontsize=9.3,color=GRAY,va="top",fontstyle="italic")
+ax.text(40,596,"Live example (Research_lab): Eva review 1 found one unverified claim and one missing caveat. The Researcher and Nora corrected them.\nEva review 2 (3aff4c6) verified both. One extra claim stays 'author-reported, not verified'.",fontsize=9.3,color=INK,va="top")
+ax.text(40,632,"One review loop closed. This is not a standing pass or runtime automation, and it earns no milestone credit.",fontsize=9.3,color=GRAY,va="top",fontstyle="italic")
 # link
 arrow(250,322,200,418,GRAY,"--",0.0)
 ax.text(270,336,"a routine check can find a missed arrival",fontsize=8.6,color=GRAY,va="top")
