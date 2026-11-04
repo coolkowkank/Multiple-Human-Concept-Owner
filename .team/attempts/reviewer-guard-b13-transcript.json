@@ -115,7 +115,7 @@
                 "type": "function",
                 "function": {
                   "name": "edit_file",
-                  "arguments": "{\"new_string\":\"# placeholder\",\"old_string\":\"# placeholder\",\"path\":\"launcher/runtime.py\"}"
+                  "arguments": "{\"path\": \"launcher/runtime.py\", \"edit\": \"[1 anchored replacement applied to launcher/runtime.py; full payloads in the run transcript]\"}"
                 }
               }
             ]
@@ -157,6 +157,12 @@
       "path": "launcher/runtime.py",
       "replacements": 1,
       "bytes": 25625
+    }
+  },
+  {
+    "history_elided": {
+      "path": "launcher/runtime.py",
+      "tool": "edit_file"
     }
   }
 ]
