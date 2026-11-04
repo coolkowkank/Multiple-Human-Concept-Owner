@@ -44,10 +44,14 @@ gate queue. Stdlib-only Python 3.10+: nothing to install.
   webhook, an automation listener on another platform). No server of
   ours is exposed; delivery is best-effort and the bus stays the
   record. The URL is a secret and is never committed.
-- **Adapters**: how a seat's AI is called: `mock` (scripted, no keys),
+- **Adapters**: how a seat's response is produced: `mock` (scripted,
+  no keys), `queue` (a response reasoned OUTSIDE the process - a human
+  pasting into a chat session or an assistant-mediated agent - queued
+  via `launcher respond` and applied through the real seat path),
   `cli` (any installed agent CLI), `http` (OpenAI-compatible endpoint,
-  key from env), `interactive` (human-pasted session). This is where AI
-  from different platforms joins the same team.
+  key from env), `interactive` (roster marker for a human-pasted
+  session the supervisor does not manage). This is where AI from
+  different platforms joins the same team.
 
 ## Commands
 
@@ -76,13 +80,40 @@ python3 -m unittest discover -s tests     # mechanism test suite
 5. Answer gates as they open. `status` shows the one-line progress
    chain, so nobody needs to ping the team for updates.
 
+## Assistant-mediated and interactive seats
+
+A seat whose reasoning happens outside this process - a human pasting
+into a chat session on any platform, or another agent reasoning at
+turn time - joins through the `queue` adapter:
+
+```sh
+python3 -m launcher prompt NAME --repo PATH     # the exact prompt the
+                                                # seat's model would get
+# ... the operator reasons against that prompt, writes one JSON object ...
+python3 -m launcher respond NAME --repo PATH --file response.json
+python3 -m launcher seat NAME --repo PATH --once
+```
+
+`prompt` renders from live bus state only (brief, STATE, recent LOG) -
+the operator gets no side-channel context a live model would not have.
+`respond` validates and commits the response before the turn runs, so
+a lost push race cannot lose reasoned work. `seat --once` then takes
+the real path: lease, path checks, executed verify command, durable
+record. A seat keeps one stable session id per clone (`.git/`), so a
+returning operator session resumes and a second machine still stops.
+
+This route carries GENUINE reasoning when the operator genuinely
+reasons, but it is human/agent transport, not an autonomous model
+call: evidence must name the reasoner and say "assistant-mediated" or
+"interactive", never "live model".
+
 ## Real-model rehearsal routes
 
 Ordered by what needs no new spend:
 
-1. **Interactive seats**: existing chat sessions (any platform) join as
-   `interactive` seats; humans paste prompts and replies. Zero new
-   spend, uses sessions that already exist, at human relay speed.
+1. **Interactive / assistant-mediated seats** (above): existing chat
+   sessions or agents reason at turn time. Zero new spend, at relay
+   speed; transport is manual, reasoning is real if the operator's is.
 2. **Existing authenticated agent CLIs**: a `cli` adapter per seat using
    a CLI the owner already has signed in on their own machine, within
    its subscription and terms. No new keys; availability depends on the
@@ -90,12 +121,21 @@ Ordered by what needs no new spend:
 3. **Local models**: an `http` adapter pointed at a local
    OpenAI-compatible server (e.g. an owner-run one). No spend; quality
    depends on the local model.
-4. **Paid APIs**: an `http` adapter with a provider key. Requires owner
+4. **Free-tier model APIs** (verified against official docs 2026-11-04;
+   re-verify before relying on them): Groq (`http` adapter,
+   base `https://api.groq.com/openai/v1`, key env `GROQ_API_KEY` from
+   console.groq.com; free plan exists, e.g. openai/gpt-oss-20b listed
+   at 30 RPM / 1K RPD) and Gemini (`http` adapter, base
+   `https://generativelanguage.googleapis.com/v1beta/openai`, key env
+   `GEMINI_API_KEY` from Google AI Studio; free tier exists, per-model
+   limits, free-tier content may be used to improve Google's products).
+   Free tier still needs the owner's key and an explicit go decision.
+5. **Paid APIs**: an `http` adapter with a provider key. Requires owner
    approval of spend before any key is used.
 
-The demo and test suite use only `mock` adapters: they prove the
-mechanism, not model behavior. Any real-model claim will say which
-route and adapter produced it.
+The demo and test suite use only `mock` adapters and local fixtures:
+they prove the mechanism, not model behavior. Any real-model claim
+will say which route and adapter produced it.
 
 ## Known limits (honest)
 

@@ -100,6 +100,61 @@ def cmd_answer(args):
                  lambda: bus.answer_gate(args.gate_id, args.answer))
 
 
+def cmd_prompt(args):
+    """Print the exact (system, task) prompt a seat would receive this
+    turn, so an external operator (interactive paste session, or an
+    assistant-mediated agent) reasons against the real input."""
+    bus = Bus(args.repo, args.branch)
+    bus.pull()
+    state = bus.state()
+    seat = Seat(bus, args.name)
+    if state.get("turn") != args.name:
+        print(f"note: turn is {state.get('turn')!r}, not {args.name!r}; "
+              "rendering the prompt as if it were", file=sys.stderr)
+    system, task = seat.build_prompt(state)
+    print("=== SYSTEM ===")
+    print(system)
+    print("=== TASK ===")
+    print(task)
+
+
+def cmd_respond(args):
+    """Queue an externally-reasoned response for a `queue` seat, then
+    commit it (durable before the turn runs). The turn itself is taken
+    by `launcher seat NAME --once`, which applies the response through
+    the real seat path: lease, path checks, verify command, record."""
+    bus = Bus(args.repo, args.branch)
+    spec = bus.roster().get("seats", {}).get(args.name)
+    if not spec:
+        print(f"seat {args.name!r} not in roster", file=sys.stderr)
+        sys.exit(1)
+    adapter = spec.get("adapter", {})
+    if adapter.get("type") != "queue":
+        print(f"seat {args.name!r} adapter is {adapter.get('type')!r}, "
+              "not 'queue'; respond only feeds queue seats",
+              file=sys.stderr)
+        sys.exit(1)
+    path = adapter["path"]
+    if not os.path.isabs(path):
+        path = os.path.join(bus.repo, path)
+    try:
+        with open(args.file) as fh:
+            response = json.load(fh)
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"response file is not valid JSON: {exc}", file=sys.stderr)
+        sys.exit(1)
+    if not isinstance(response, dict):
+        print("response must be one JSON object", file=sys.stderr)
+        sys.exit(1)
+    os.makedirs(os.path.dirname(path) or bus.repo, exist_ok=True)
+    with open(path, "a") as fh:
+        fh.write(json.dumps(response) + "\n")
+    bus.commit_all(f"operator: response queued for {args.name}")
+    print(f"queued response for {args.name}; run "
+          f"`python3 -m launcher seat {args.name} --repo {bus.repo} "
+          f"--branch {bus.branch} --once` to take the turn")
+
+
 def _cmd_serve(args):
     import secrets
     from .relay import serve
@@ -186,6 +241,17 @@ def main(argv=None):
     p.add_argument("gate_id")
     p.add_argument("answer")
     p.set_defaults(fn=cmd_answer)
+
+    p = sub.add_parser("prompt", help="render the seat's exact prompt this turn")
+    base(p)
+    p.add_argument("name")
+    p.set_defaults(fn=cmd_prompt)
+
+    p = sub.add_parser("respond", help="queue an externally-reasoned response")
+    base(p)
+    p.add_argument("name")
+    p.add_argument("--file", required=True)
+    p.set_defaults(fn=cmd_respond)
 
     p = sub.add_parser("conform", help="check .team against the evidence interface")
     p.add_argument("--repo", default=".")

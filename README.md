@@ -88,7 +88,7 @@ Creates a fresh project repo, launches the full seat cycle (Coordinator drafts c
 ## Quick start: launch a real team
 
 1. `python3 -m launcher init --repo /path/to/project --branch team-work --default-roster`
-2. Fill `.team/brief.md` (or start from `templates/concept_to_coordinator.md`) and `.team/roster.json`: name each seat's adapter - `mock` for rehearsal, `cli` for an installed agent CLI, `http` for a model API, `interactive` for a session a human pastes prompts into.
+2. Fill `.team/brief.md` (or start from `templates/concept_to_coordinator.md`) and `.team/roster.json`: name each seat's adapter - `mock` for rehearsal, `queue` for responses reasoned outside the process (assistant-mediated or pasted), `cli` for an installed agent CLI, `http` for a model API, `interactive` as the unmanaged-session marker.
 3. `python3 -m launcher launch --repo /path/to/project` - the supervisor starts every automated seat, restarts crashes, escalates stalls, and prints human gates as they open.
 4. Watch progress with `python3 -m launcher status --repo /path/to/project`; answer gates with `python3 -m launcher answer <gate-id> "<decision>"`.
 

@@ -490,13 +490,15 @@ class MockQueueTests(unittest.TestCase):
 
 
 class AdapterConsumePlacementTests(unittest.TestCase):
-    def test_only_mock_has_consume(self):
-        from launcher.adapters import Adapter, CliAdapter, HttpAdapter, MockAdapter
+    def test_only_queue_backed_adapters_have_consume(self):
+        from launcher.adapters import (
+            Adapter, CliAdapter, HttpAdapter, MockAdapter, QueueAdapter)
         self.assertNotIn("consume", Adapter.__dict__)
         self.assertIsNone(getattr(CliAdapter(["true"]), "consume", None))
         self.assertIsNone(
             getattr(HttpAdapter("http://x", "m", "K"), "consume", None))
         self.assertTrue(hasattr(MockAdapter([]), "consume"))
+        self.assertTrue(hasattr(QueueAdapter("/tmp/x.jsonl"), "consume"))
 
 
 class InitGuardTests(unittest.TestCase):
@@ -643,3 +645,187 @@ class FalseGreenTests(unittest.TestCase):
             self.assertIn("all suites green", entry["body"])
         finally:
             shutil.rmtree(repo, ignore_errors=True)
+class QueueAdapterSeatPathTests(unittest.TestCase):
+    """The assistant-mediated / interactive route: responses reasoned
+    outside the process, applied through the real seat path."""
+
+    def _queue_repo(self):
+        seats = {
+            "builder": {"role": "builder", "allowed_paths": ["src/"],
+                        "adapter": {"type": "queue",
+                                    "path": ".team/queues/builder.jsonl"}},
+            "reviewer": {"role": "reviewer", "allowed_paths": ["review/"],
+                         "adapter": {"type": "mock", "script": []}},
+        }
+        repo, bus = make_repo(seats=seats)
+        self.addCleanup(shutil.rmtree, repo, True)
+        return repo, bus
+
+    def _set_turn(self, bus, name):
+        state = bus.state()
+        state["turn"] = name
+        state["status"] = "running"
+        bus.write_state(state)
+        bus.commit_all(f"operator: turn to {name}")
+
+    def test_queue_response_applied_through_real_seat_path(self):
+        repo, bus = self._queue_repo()
+        self._set_turn(bus, "builder")
+        from launcher.cli import main as cli_main
+        with open(os.path.join(repo, "resp.json"), "w") as fh:
+            json.dump({"summary": "built the thing",
+                       "writes": {"src/app.txt": "real content"},
+                       "verify_command": "test -f src/app.txt",
+                       "handoff": "reviewer",
+                       "status_line": "builder done"}, fh)
+        cli_main(["respond", "builder", "--repo", repo,
+                  "--branch", "team-work", "--file",
+                  os.path.join(repo, "resp.json")])
+        acted = Seat(bus, "builder").act_once()
+        self.assertTrue(acted)
+        state = bus.state()
+        self.assertEqual(state["turn"], "reviewer")
+        self.assertEqual(state["turn_seq"], 1)
+        with open(os.path.join(repo, "src/app.txt")) as fh:
+            self.assertEqual(fh.read(), "real content")
+        # queue consumed exactly once: a second seat process sees an
+        # empty queue and the turn has moved on
+        with open(os.path.join(repo, ".team/queues/builder.jsonl")) as fh:
+            self.assertEqual(fh.read().strip(), "")
+        log = bus.log(limit=1)[0]
+        self.assertIn("exit=0", log["body"])
+
+    def test_empty_queue_leaves_turn_for_operator(self):
+        repo, bus = self._queue_repo()
+        self._set_turn(bus, "builder")
+        seat = Seat(bus, "builder")
+        with self.assertRaises(SeatError):
+            seat.act_once()
+        self.assertEqual(bus.state()["turn"], "builder")
+
+    def test_respond_rejects_non_queue_seat(self):
+        repo, bus = make_repo(
+            seats={"builder": seat_spec([], ["src/"])})
+        self.addCleanup(shutil.rmtree, repo, True)
+        from launcher.cli import main as cli_main
+        with open(os.path.join(repo, "r.json"), "w") as fh:
+            fh.write("{}")
+        with self.assertRaises(SystemExit):
+            cli_main(["respond", "builder", "--repo", repo,
+                      "--branch", "team-work", "--file",
+                      os.path.join(repo, "r.json")])
+
+    def test_respond_rejects_invalid_json(self):
+        repo, bus = self._queue_repo()
+        from launcher.cli import main as cli_main
+        with open(os.path.join(repo, "bad.json"), "w") as fh:
+            fh.write("[1, 2]")
+        with self.assertRaises(SystemExit):
+            cli_main(["respond", "builder", "--repo", repo,
+                      "--branch", "team-work", "--file",
+                      os.path.join(repo, "bad.json")])
+
+    def test_prompt_command_matches_adapter_input(self):
+        scripts = [[{"summary": "x", "handoff": None,
+                     "status_line": "DONE all"}]]
+        repo, bus = make_repo(
+            seats={"builder": seat_spec(scripts[0], ["src/"])})
+        self.addCleanup(shutil.rmtree, repo, True)
+        state = bus.state()
+        state["turn"] = "builder"
+        state["status"] = "running"
+        bus.write_state(state)
+        seat = Seat(bus, "builder")
+        system, task = seat.build_prompt(state)
+        seat.act_once()
+        recorded = seat.adapter.calls[0]
+        self.assertEqual(recorded["system"], system)
+        self.assertEqual(recorded["prompt"], task)
+
+    def test_supervisor_does_not_start_queue_seats(self):
+        seats = {
+            "builder": seat_spec([], ["src/"]),
+            "humanseat": {"role": "reviewer", "allowed_paths": ["review/"],
+                          "adapter": {"type": "queue",
+                                      "path": ".team/queues/h.jsonl"}},
+        }
+        repo, bus = make_repo(seats=seats)
+        self.addCleanup(shutil.rmtree, repo, True)
+        sup = Supervisor(repo, "team-work")
+        self.assertEqual(set(sup.automated_seats()), {"builder"})
+
+
+class SeatSessionIdTests(unittest.TestCase):
+    def test_session_id_stable_per_clone_and_seat(self):
+        repo, bus = make_repo(seats={"builder": seat_spec([], ["src/"])})
+        self.addCleanup(shutil.rmtree, repo, True)
+        a = Seat(bus, "builder")
+        b = Seat(bus, "builder")
+        self.assertEqual(a.instance_id, b.instance_id)
+        self.assertTrue(os.path.exists(
+            os.path.join(repo, ".git", "team-seat-builder.instance")))
+
+    def test_queue_seat_can_act_in_two_turns_same_clone(self):
+        # The assistant-mediated operator flow: separate `seat --once`
+        # processes, same clone, same seat acting twice within lease TTL.
+        seats = {
+            "builder": {"role": "builder", "allowed_paths": ["src/"],
+                        "adapter": {"type": "queue",
+                                    "path": ".team/queues/builder.jsonl"}},
+            "reviewer": {"role": "reviewer", "allowed_paths": ["review/"],
+                         "adapter": {"type": "mock", "script": []}},
+        }
+        repo, bus = make_repo(seats=seats)
+        self.addCleanup(shutil.rmtree, repo, True)
+        q = os.path.join(repo, ".team/queues/builder.jsonl")
+        os.makedirs(os.path.dirname(q), exist_ok=True)
+
+        def turn_to(name):
+            state = bus.state()
+            state["turn"] = name
+            state["status"] = "running"
+            bus.write_state(state)
+            bus.commit_all(f"operator: turn to {name}")
+
+        turn_to("builder")
+        with open(q, "w") as fh:
+            fh.write(json.dumps({"summary": "one", "handoff": "reviewer",
+                                 "status_line": "s1"}) + "\n")
+        self.assertTrue(Seat(bus, "builder").act_once())
+        turn_to("builder")
+        with open(q, "w") as fh:
+            fh.write(json.dumps({"summary": "two", "handoff": None,
+                                 "status_line": "DONE"}) + "\n")
+        self.assertTrue(Seat(bus, "builder").act_once())
+        self.assertEqual(bus.state()["status"], "done")
+
+    def test_second_clone_gets_own_id_and_stops_on_fresh_lease(self):
+        # A copy of the clone is a different session: it must NOT inherit
+        # the per-clone id, and the fresh lease blocks it - the local
+        # proxy for "a second machine stops". Server-side enforcement
+        # remains a host feature, not claimed here.
+        import time
+        seats = {"builder": {"role": "builder", "allowed_paths": ["src/"],
+                             "adapter": {"type": "queue",
+                                         "path": ".team/queues/b.jsonl"}}}
+        repo, bus = make_repo(seats=seats)
+        self.addCleanup(shutil.rmtree, repo, True)
+        clone = repo + "-copy"
+        shutil.copytree(repo, clone)
+        self.addCleanup(shutil.rmtree, clone, True)
+        state = bus.state()
+        state["turn"] = "builder"
+        state["status"] = "running"
+        state["leases"]["builder"] = {"holder": Seat(bus, "builder").instance_id,
+                                      "claimed_at": time.time()}
+        bus.write_state(state)
+        seat2 = Seat(Bus(clone, "team-work"), "builder")
+        self.assertNotEqual(seat2.instance_id,
+                            state["leases"]["builder"]["holder"])
+        with self.assertRaises(SeatError):
+            seat2.claim_lease(state)
+        # after the lease TTL the same second session may take over
+        state["leases"]["builder"]["claimed_at"] = 0
+        seat2.claim_lease(state)
+        self.assertEqual(state["leases"]["builder"]["holder"],
+                         seat2.instance_id)

@@ -42,7 +42,30 @@ class Seat:
         self.relay = relay
         self.webhook = webhook
         self._relay_seq = 0
-        self.instance_id = instance_id or f"{name}-{uuid.uuid4().hex[:8]}"
+        self.instance_id = instance_id or self._session_id()
+        self._load_roster_entry(bus, name)
+
+    def _session_id(self):
+        """One stable session id per (clone, seat): persisted under
+        .git/ so repeated `seat --once` runs from this clone resume the
+        same session instead of tripping the single-session lease,
+        while a process on another machine still gets its own id and
+        stops. Falls back to a random id outside a git work tree."""
+        git_dir = os.path.join(self.bus.repo, ".git")
+        if not os.path.isdir(git_dir):
+            return f"{self.name}-{uuid.uuid4().hex[:8]}"
+        path = os.path.join(git_dir, f"team-seat-{self.name}.instance")
+        if os.path.exists(path):
+            with open(path) as fh:
+                saved = fh.read().strip()
+            if saved:
+                return saved
+        new_id = f"{self.name}-{uuid.uuid4().hex[:8]}"
+        with open(path, "w") as fh:
+            fh.write(new_id + "\n")
+        return new_id
+
+    def _load_roster_entry(self, bus, name):
         roster = bus.roster()
         if name not in roster.get("seats", {}):
             raise SeatError(f"seat {name!r} not in roster")
@@ -53,6 +76,10 @@ class Seat:
         sp = adapter_spec.get("script_path")
         if sp and not os.path.isabs(sp):
             adapter_spec["script_path"] = os.path.join(bus.repo, sp)
+        qp = adapter_spec.get("path")
+        if adapter_spec.get("type") == "queue" and qp \
+                and not os.path.isabs(qp):
+            adapter_spec["path"] = os.path.join(bus.repo, qp)
         self.adapter = build_adapter(adapter_spec)
 
     # -- lease: one active session per seat ----------------------------
@@ -83,9 +110,7 @@ class Seat:
             if state.get("turn") != self.name:
                 return False
             self.claim_lease(state)
-            brief = self._read(self.bus.repo, ".team/brief.md")
-            recent = self.bus.log(limit=20)
-            response = self._call_adapter(state, brief, recent)
+            response = self._call_adapter(state)
             self._apply(state, response)
             consume = getattr(self.adapter, "consume", None)
             if consume:
@@ -144,11 +169,21 @@ class Seat:
 
     # -- internals -------------------------------------------------------
 
-    def _call_adapter(self, state, brief, recent):
+    def build_prompt(self, state):
+        """The exact (system, task) prompt this seat's adapter would
+        receive for this state. Rendered by `launcher prompt` so an
+        interactive or assistant-mediated operator reasons against the
+        same input a live model would get - no side-channel context."""
+        brief = self._read(self.bus.repo, ".team/brief.md")
+        recent = self.bus.log(limit=20)
         system = prompts.system_prompt(self.role)
         task = prompts.task_prompt(
             self.name, self.role, brief, state, recent,
             batch=self.spec.get("batch"))
+        return system, task
+
+    def _call_adapter(self, state):
+        system, task = self.build_prompt(state)
         try:
             response = self.adapter.complete(system, task)
         except AdapterError as exc:

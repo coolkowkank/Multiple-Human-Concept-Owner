@@ -23,6 +23,33 @@ import subprocess
 import urllib.request
 
 
+def _read_queue(path):
+    if not os.path.exists(path):
+        return []
+    with open(path) as fh:
+        return [l for l in fh.read().splitlines() if l.strip()]
+
+
+def _peek_queue(path):
+    lines = _read_queue(path)
+    if not lines:
+        raise AdapterError(f"response queue empty at {path}")
+    return lines[0]
+
+
+def _consume_queue(path, peeked):
+    """Remove the peeked line after the turn was applied. Called by the
+    runtime inside the same transact mutation, so a reset after a lost
+    race also restores the queue. Raises if the file changed between
+    peek and consume (the record would be incoherent)."""
+    lines = _read_queue(path)
+    if not lines or lines[0] != peeked:
+        raise AdapterError(
+            f"response queue at {path} changed between peek and consume")
+    with open(path, "w") as fh:
+        fh.write("\n".join(lines[1:]) + ("\n" if len(lines) > 1 else ""))
+
+
 class AdapterError(Exception):
     pass
 
@@ -45,20 +72,11 @@ class MockAdapter(Adapter):
     successive prepared responses instead of restarting at script[0]."""
 
     def consume(self):
-        """Remove the peeked line after the turn was applied. Called by
-        the runtime inside the same transact mutation, so a reset after
-        a lost race also restores the queue. Raises if the file changed
-        between peek and consume (record would be incoherent)."""
+        """Remove the peeked line after the turn was applied; see
+        _consume_queue. A lost-race reset restores the queue file."""
         if not self.script_path or self._peeked is None:
             return
-        with open(self.script_path) as fh:
-            lines = [l for l in fh.read().splitlines() if l.strip()]
-        if not lines or lines[0] != self._peeked:
-            raise AdapterError(
-                f"mock script queue at {self.script_path} changed "
-                "between peek and consume")
-        with open(self.script_path, "w") as fh:
-            fh.write("\n".join(lines[1:]) + ("\n" if len(lines) > 1 else ""))
+        _consume_queue(self.script_path, self._peeked)
         self._peeked = None
 
 
@@ -71,19 +89,44 @@ class MockAdapter(Adapter):
     def complete(self, system, prompt):
         self.calls.append({"system": system, "prompt": prompt})
         if self.script_path:
-            with open(self.script_path) as fh:
-                lines = [l for l in fh.read().splitlines() if l.strip()]
-            if not lines:
-                raise AdapterError(
-                    f"mock script queue empty at {self.script_path}")
-            self._peeked = lines[0]
-            return json.loads(lines[0])
+            self._peeked = _peek_queue(self.script_path)
+            return json.loads(self._peeked)
         i = len(self.calls) - 1
         if callable(self.script):
             return self.script(system, prompt, i)
         if i >= len(self.script):
             raise AdapterError(f"mock script exhausted at call {i}")
         return self.script[i]
+
+
+class QueueAdapter(Adapter):
+    """A file-backed queue of responses reasoned OUTSIDE this process:
+    an interactive seat (a human pasting into a chat session on any
+    platform) or an assistant-mediated seat (another agent reads the
+    prompt, reasons, and queues its response). The transport is honest
+    glue: the harness owns the turn, lease, verify and record; the
+    reasoning happens wherever the operator ran it. It is not an
+    autonomous model call and evidence must not label it as one.
+
+    The queue file lives inside the bus (e.g. .team/queues/NAME.jsonl),
+    one JSON response object per line, consumed with the same
+    peek-then-consume-inside-transact semantics as the mock script
+    queue: a lost commit race restores the line, so a reasoned response
+    is never lost or applied twice."""
+
+    def __init__(self, path):
+        self.path = path
+        self._peeked = None
+
+    def complete(self, system, prompt):
+        self._peeked = _peek_queue(self.path)
+        return json.loads(self._peeked)
+
+    def consume(self):
+        if self._peeked is None:
+            return
+        _consume_queue(self.path, self._peeked)
+        self._peeked = None
 
 
 class CliAdapter(Adapter):
@@ -179,6 +222,8 @@ def build_adapter(spec):
                            script_path=spec.get("script_path"))
     if kind == "cli":
         return CliAdapter(spec["command"], timeout=spec.get("timeout", 1800))
+    if kind == "queue":
+        return QueueAdapter(spec["path"])
     if kind == "http":
         return HttpAdapter(
             spec["base_url"], spec["model"], spec["api_key_env"],

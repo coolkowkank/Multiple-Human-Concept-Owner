@@ -34,10 +34,16 @@ class Supervisor:
         self._stalled_seats = set()
         self._notified_gates = set()
 
+    # Seats whose responses are reasoned outside a managed process
+    # (interactive human paste, assistant-mediated queue) join the same
+    # bus but have no process for the supervisor to start or restart.
+    EXTERNAL_TYPES = {"interactive", "queue"}
+
     def automated_seats(self):
         roster = self.bus.roster().get("seats", {})
         return {name: spec for name, spec in roster.items()
-                if spec.get("adapter", {}).get("type") != "interactive"}
+                if spec.get("adapter", {}).get("type")
+                not in self.EXTERNAL_TYPES}
 
     def start_seat(self, name):
         import os

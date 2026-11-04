@@ -45,6 +45,19 @@ The cli and http adapters are exercised through the real seat path
 fixture command and a loopback fixture HTTP server, NOT live models.
 The relay remains loopback-only.
 
+The queue adapter (responses reasoned outside the process: interactive
+paste or assistant-mediated agents) plus the `prompt`/`respond`
+operator commands are exercised through the real seat path in the
+suite, including consume-once, empty-queue retry, stable per-clone
+session ids against the single-session lease, and supervisor
+exclusion. One local assistant-mediated cycle (4 turns, fizzbuzz
+batch) ran with every response reasoned at turn time and every verify
+command executed by the runtime, closing DONE with conformance PASS.
+That cycle used ONE reasoner for all seats and manual transport: it is
+evidence the harness applies genuinely-reasoned work, NOT of
+autonomous model judgment, heterogeneous platforms, or unattended
+operation.
+
 ## Two-operator rehearsal cycle (4 Nov 2026, branches rehearsal/i2i-1 and rehearsal/i2i-2)
 
 One bounded cycle, two real operators (two same-kind Instincts - NOT
