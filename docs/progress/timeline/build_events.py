@@ -40,11 +40,19 @@ trig("3ecde66","15:34","Eva review 1","14 claims checked: 12 supported, 1 partia
 trig("36499b5","15:35","Nora correction note","Response to Eva review 1, written by the Nora seat model. Clearly attributed.",lane=R)
 trig("61143ba","15:37","Researcher corrections","Unverified claim marked beside the claim, version caveat added beside the other.",lane=R)
 trig("3aff4c6","15:37","Eva review 2","Both corrections verified. One extra phrase stays author-reported, not verified. First loop closed: process evidence only, not a standing pass.",lane=R,extra=[dict(label="Review file",url=RV+"2026-11-04-eva-review-2.md")])
-for e in ev:
-    if e["id"] in old: e=old[e["id"]]
+TD="Team and docs"
+trig("811c6a9","15:57","Team registry, role blueprints and lifecycle published","Documents on team-launcher: Legacy Members registry, role blueprints, lifecycle rules. Maya and the Coordinator Assistant are vacant roles, not active. Documentation, not a milestone.",lane=TD)
+trig("f0cb55f","16:08","Coordinator blueprint and handover checklist","Reusable-methodology documentation. It lists what is not yet portable. Not proof of autonomous operation.",lane=TD)
+trig("83e33bc","16:15","Registry label correction","Removed an unsupported claim about how two accounts are operated. Both now read not project-configured.",lane=TD)
+trig("4d5453f","16:20","Registry: Builder assignment updated","Builder row now says the guard is unbuilt and held pending review of the tooling.",lane=TD)
+trig("35b0a3c","16:20","Guard batch closed: failed, guard unbuilt","6 of 8 reserved requests, 4 real sends, no commit or push, remote unchanged at 55e7c7e. A destructive placeholder edit was discarded, then an invalid edit request ended the run. No restart. Replaces the earlier running status of the guard attempt (15:53).")
+trig("09db68b","16:21","Fresh-operator dry-run documented","Offline commands only, no provider calls. Support-authored, not an independent takeover and not an autonomy pass.",lane=TD)
+OVERRIDE={"trg-91e928d":"Closed failed (batch closeout 16:20): no commit or push, remote unchanged, guard unbuilt. Earlier status 'running' is superseded."}
 ev=[old.get(e["id"],e) for e in ev]
 for k,v in old.items():
     if k not in {e["id"] for e in ev}: ev.append(v)
+for e in ev:
+    if e["id"] in OVERRIDE: e["status"]=OVERRIDE[e["id"]]
 ev.sort(key=lambda e:(e["day"],e["time"]))
 json.dump(dict(timezone="Europe/Helsinki",note="Recorded events use commit times. Planned items are not events. A check that finds no change leaves no record.",events=ev),open(out,"w"),indent=1)
 print(len(ev),"events")

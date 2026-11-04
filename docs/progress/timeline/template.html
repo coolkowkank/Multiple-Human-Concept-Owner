@@ -23,7 +23,7 @@ a{color:#1d5fb8}
 .lane{fill:#f6f6f4;stroke:var(--hair)}
 .marker{cursor:pointer;outline:none}.marker circle{stroke:#fff;stroke-width:1.5}
 .marker text{font-size:11px;font-weight:600;fill:#fff;pointer-events:none}
-.m-pub circle{fill:#5a6272}.m-bld circle{fill:#1d5fb8}.m-res circle{fill:#6a4fb3}
+.m-pub circle{fill:#5a6272}.m-bld circle{fill:#1d5fb8}.m-res circle{fill:#6a4fb3}.m-tmd circle{fill:#2f7d5b}
 .marker:focus-visible circle,.marker.sel circle{stroke:var(--ink);stroke-width:3}
 .detail p{margin:6px 0}.dtitle{font-weight:600;font-size:17px}
 .dn{display:inline-flex;width:24px;height:24px;border-radius:50%;background:var(--ink);color:var(--page);align-items:center;justify-content:center;font-size:12px;margin-right:6px}
@@ -58,10 +58,11 @@ const days=[...new Set(events.map(e=>e.day))].sort();
 const dayLabel=d=>new Date(d+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'});
 const LANES=[{key:'pub',label:'Chart publications',test:e=>e.kind==='publication'},
 {key:'bld',label:'Triggered: Builder and review',test:e=>e.kind==='trigger'&&e.lane==='Builder and review'},
-{key:'res',label:'Triggered: Research and Eva',test:e=>e.kind==='trigger'&&e.lane==='Research and Eva'}];
+{key:'res',label:'Triggered: Research and Eva',test:e=>e.kind==='trigger'&&e.lane==='Research and Eva'},
+{key:'tmd',label:'Triggered: Team and docs',test:e=>e.kind==='trigger'&&e.lane==='Team and docs'}];
 const ZOOMS=[{label:'Overview',ppm:5.5},{label:'Zoom 2x',ppm:14},{label:'Zoom 4x',ppm:28},{label:'Zoom 8x',ppm:56}];
 const R=11,ROW=28,LEFT=40,RPAD=220,NS='http://www.w3.org/2000/svg';
-const S={day:days[days.length-1],show:{pub:1,bld:1,res:1,plan:1},zoom:0,sel:null};
+const S={day:days[days.length-1],show:{pub:1,bld:1,res:1,tmd:1,plan:1},zoom:0,sel:null};
 const $=id=>document.getElementById(id);
 const el=(tag,attrs,txt)=>{const n=document.createElementNS(NS,tag);for(const k in attrs)n.setAttribute(k,attrs[k]);if(txt!=null)n.textContent=txt;return n};
 const h=(tag,cls,txt)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(txt!=null)n.textContent=txt;return n};
@@ -82,7 +83,7 @@ function render(scrollMode){
  const selected=numbered.find(e=>e.id===S.sel)||null;
  $('fact').textContent='Snapshot as of '+asOfTime+' EET, '+dayLabel(asOfDay);
  chips($('days'),days.map(d=>[d,dayLabel(d)]),k=>k===S.day,k=>{S.day=k;S.sel=null;render(1)},(()=>{const p=h('span','note','Earlier days are archived in the repository as one picture per day, see docs/progress/archive.');return p})());
- chips($('shows'),[['pub','Chart publications'],['bld','Builder and review'],['res','Research and Eva'],['plan','Planned']],k=>!!S.show[k],k=>{S.show[k]=S.show[k]?0:1;render()});
+ chips($('shows'),[['pub','Chart publications'],['bld','Builder and review'],['res','Research and Eva'],['tmd','Team and docs'],['plan','Planned']],k=>!!S.show[k],k=>{S.show[k]=S.show[k]?0:1;render()});
  chips($('zooms'),ZOOMS.map((z,i)=>[i,z.label]),k=>k===S.zoom,k=>{S.zoom=k;render(1)});
  $('dayh').textContent=dayLabel(S.day)+', time of day in EET';
  const lb=$('labels');lb.style.height=height+'px';lb.textContent='';
@@ -112,7 +113,7 @@ function render(scrollMode){
   const p3=h('p');const b=h('strong',null,'Status:');p3.appendChild(b);p3.appendChild(document.createTextNode(' '+selected.status));d.appendChild(p3);
   const p4=h('p','links');selected.evidence.forEach(ev=>{const a=h('a',null,ev.label);a.href=ev.url;p4.appendChild(a)});d.appendChild(p4)}
  else d.appendChild(h('p','note','Tap a numbered marker, or an item in the list below.'));
- const listed=numbered.filter(e=>e.kind==='publication'?S.show.pub:e.lane==='Builder and review'?S.show.bld:S.show.res);
+ const listed=numbered.filter(e=>e.kind==='publication'?S.show.pub:e.lane==='Builder and review'?S.show.bld:e.lane==='Team and docs'?S.show.tmd:S.show.res);
  $('listh').textContent='All events this day ('+listed.length+')';
  const ol=$('list');ol.textContent='';
  listed.forEach(e=>{const li=h('li');const b=h('button','item'+(e.id===S.sel?' sel':''));b.appendChild(h('span','t0',e.time));b.appendChild(h('span','n',String(e.n)));b.appendChild(h('span','t',e.title));

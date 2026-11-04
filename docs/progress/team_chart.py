@@ -43,7 +43,7 @@ def render(here, updated):
         tip = pts[-1]; px, py = -ty*6, tx*6
         ax.add_patch(Polygon([tip, (tip[0]-14*tx+px, tip[1]-14*ty+py), (tip[0]-14*tx-px, tip[1]-14*ty-py)], fc=ARROW, ec="none"))
         if label: text((a[0]+b[0])/2+lx, (a[1]+b[1])/2+ly, label, 10, "#8a8fa3")
-    text(W/2, 14, "Project Team", 22, INK, "bold")
+    text(W/2, 14, "Current Project Team", 22, INK, "bold")
     text(W/2, 46, "Latest update: " + updated, 12, GRAY)
     OWN=(590,135,46); COR=(590,335,46); RES=(190,565,40); EVA=(450,565,40); BLD=(700,565,40); REV=(990,565,46)
     node(OWN[0],OWN[1],OWN[2],"coolkowkank"); node(COR[0],COR[1],COR[2],"instinct-telkomsel")

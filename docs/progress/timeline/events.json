@@ -245,12 +245,13 @@
    ]
   },
   {
-   "id": "pub-a75ce06",
+   "id": "trg-a75ce06",
    "day": "2026-11-04",
    "time": "15:04",
-   "kind": "publication",
-   "title": "docs/progress: 15:05 update, review verdict returned (changes-required), WP7 criterion",
-   "status": "Published on main. Recorded commit time.",
+   "kind": "trigger",
+   "lane": "Builder and review",
+   "title": "Reviewer verdict: changes required",
+   "status": "Verdict recorded in this update commit. The verdict's own timestamp is not recorded, so this is the commit time.",
    "evidence": [
     {
      "label": "Commit a75ce06",
@@ -259,13 +260,12 @@
    ]
   },
   {
-   "id": "trg-a75ce06",
+   "id": "pub-a75ce06",
    "day": "2026-11-04",
    "time": "15:04",
-   "kind": "trigger",
-   "lane": "Builder and review",
-   "title": "Reviewer verdict: changes required",
-   "status": "Verdict recorded in this update commit. The verdict's own timestamp is not recorded, so this is the commit time.",
+   "kind": "publication",
+   "title": "docs/progress: 15:05 update, review verdict returned (changes-required), WP7 criterion",
+   "status": "Published on main. Recorded commit time.",
    "evidence": [
     {
      "label": "Commit a75ce06",
@@ -288,12 +288,13 @@
    ]
   },
   {
-   "id": "pub-fb34fc9",
+   "id": "trg-fb34fc9",
    "day": "2026-11-04",
    "time": "15:07",
-   "kind": "publication",
-   "title": "README progress: 15:06 update - WP7 credit reversed (changes-required is not a pass), review findings wording,",
-   "status": "Published on main. Recorded commit time.",
+   "kind": "trigger",
+   "lane": "Builder and review",
+   "title": "Coordinator reverses WP7 credit",
+   "status": "Changes-required is not a pass, so the credit was removed. The Verified criterion was not changed.",
    "evidence": [
     {
      "label": "Commit fb34fc9",
@@ -302,13 +303,12 @@
    ]
   },
   {
-   "id": "trg-fb34fc9",
+   "id": "pub-fb34fc9",
    "day": "2026-11-04",
    "time": "15:07",
-   "kind": "trigger",
-   "lane": "Builder and review",
-   "title": "Coordinator reverses WP7 credit",
-   "status": "Changes-required is not a pass, so the credit was removed. The Verified criterion was not changed.",
+   "kind": "publication",
+   "title": "README progress: 15:06 update - WP7 credit reversed (changes-required is not a pass), review findings wording,",
+   "status": "Published on main. Recorded commit time.",
    "evidence": [
     {
      "label": "Commit fb34fc9",
@@ -586,20 +586,6 @@
    ]
   },
   {
-   "id": "pub-b97dd2c",
-   "day": "2026-11-04",
-   "time": "15:38",
-   "kind": "publication",
-   "title": "Coordinator diagram: Eva review 2 closed the first loop; no credit change",
-   "status": "Published on main. Recorded commit time.",
-   "evidence": [
-    {
-     "label": "Commit b97dd2c",
-     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/b97dd2c"
-    }
-   ]
-  },
-  {
    "id": "trg-9f6c594",
    "day": "2026-11-04",
    "time": "15:38",
@@ -611,6 +597,20 @@
     {
      "label": "Commit 9f6c594",
      "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/9f6c594"
+    }
+   ]
+  },
+  {
+   "id": "pub-b97dd2c",
+   "day": "2026-11-04",
+   "time": "15:38",
+   "kind": "publication",
+   "title": "Coordinator diagram: Eva review 2 closed the first loop; no credit change",
+   "status": "Published on main. Recorded commit time.",
+   "evidence": [
+    {
+     "label": "Commit b97dd2c",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/b97dd2c"
     }
    ]
   },
@@ -664,14 +664,104 @@
    "kind": "trigger",
    "lane": "Builder and review",
    "title": "Reviewer-skip guard attempt starts",
-   "status": "Running at snapshot time. Not accepted. Needs tests and an independent review before any credit.",
+   "status": "Closed failed (batch closeout 16:20): no commit or push, remote unchanged, guard unbuilt. Earlier status 'running' is superseded.",
    "evidence": [
     {
      "label": "Commit 91e928d",
      "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/91e928d"
     }
    ]
+  },
+  {
+   "id": "trg-811c6a9",
+   "day": "2026-11-04",
+   "time": "15:57",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Team registry, role blueprints and lifecycle published",
+   "status": "Documents on team-launcher: Legacy Members registry, role blueprints, lifecycle rules. Maya and the Coordinator Assistant are vacant roles, not active. Documentation, not a milestone.",
+   "evidence": [
+    {
+     "label": "Commit 811c6a9",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/811c6a9"
+    }
+   ]
+  },
+  {
+   "id": "trg-f0cb55f",
+   "day": "2026-11-04",
+   "time": "16:08",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Coordinator blueprint and handover checklist",
+   "status": "Reusable-methodology documentation. It lists what is not yet portable. Not proof of autonomous operation.",
+   "evidence": [
+    {
+     "label": "Commit f0cb55f",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/f0cb55f"
+    }
+   ]
+  },
+  {
+   "id": "trg-83e33bc",
+   "day": "2026-11-04",
+   "time": "16:15",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Registry label correction",
+   "status": "Removed an unsupported claim about how two accounts are operated. Both now read not project-configured.",
+   "evidence": [
+    {
+     "label": "Commit 83e33bc",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/83e33bc"
+    }
+   ]
+  },
+  {
+   "id": "trg-4d5453f",
+   "day": "2026-11-04",
+   "time": "16:20",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Registry: Builder assignment updated",
+   "status": "Builder row now says the guard is unbuilt and held pending review of the tooling.",
+   "evidence": [
+    {
+     "label": "Commit 4d5453f",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/4d5453f"
+    }
+   ]
+  },
+  {
+   "id": "trg-35b0a3c",
+   "day": "2026-11-04",
+   "time": "16:20",
+   "kind": "trigger",
+   "lane": "Builder and review",
+   "title": "Guard batch closed: failed, guard unbuilt",
+   "status": "6 of 8 reserved requests, 4 real sends, no commit or push, remote unchanged at 55e7c7e. A destructive placeholder edit was discarded, then an invalid edit request ended the run. No restart. Replaces the earlier running status of the guard attempt (15:53).",
+   "evidence": [
+    {
+     "label": "Commit 35b0a3c",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/35b0a3c"
+    }
+   ]
+  },
+  {
+   "id": "trg-09db68b",
+   "day": "2026-11-04",
+   "time": "16:21",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Fresh-operator dry-run documented",
+   "status": "Offline commands only, no provider calls. Support-authored, not an independent takeover and not an autonomy pass.",
+   "evidence": [
+    {
+     "label": "Commit 09db68b",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/09db68b"
+    }
+   ]
   }
  ],
- "asOf": "2026-11-04T15:58"
+ "asOf": "2026-11-04T16:23"
 }
