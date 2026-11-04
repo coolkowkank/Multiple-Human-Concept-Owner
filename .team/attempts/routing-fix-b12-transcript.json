@@ -295,5 +295,12 @@
       },
       "service_tier": "on_demand"
     }
+  },
+  {
+    "no_tool_call": {
+      "round": 4,
+      "nudge": 1,
+      "content": ""
+    }
   }
 ]
