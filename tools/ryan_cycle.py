@@ -766,7 +766,8 @@ def redact(text, n=200, secret=None):
 
 # Structural only: no response-body text is ever persisted.
 DIAG_KEYS = ("stage", "class", "error_type", "status", "content_type",
-             "elapsed_s", "body_len", "body_kind")
+             "elapsed_s", "body_len", "body_kind", "finish_reason",
+             "reasoning_present")
 
 
 def body_kind(raw):
@@ -800,6 +801,24 @@ def clean_diag(d):
     return out
 
 
+def num_only(u, depth=0):
+    """Usage structure with numeric leaves only (token counts, cost);
+    no strings, so no reasoning or body text can be persisted."""
+    if not isinstance(u, dict) or depth > 3:
+        return None
+    out = {}
+    for k, v in u.items():
+        if isinstance(v, bool):
+            continue
+        if isinstance(v, (int, float)):
+            out[str(k)[:40]] = v
+        elif isinstance(v, dict):
+            sub = num_only(v, depth + 1)
+            if sub:
+                out[str(k)[:40]] = sub
+    return out
+
+
 def http_post_factory(env="REQUESTY_API_KEY"):
     def post(model, system, prompt, max_tokens):
         key = os.environ.get(env)
@@ -821,7 +840,11 @@ def http_post_factory(env="REQUESTY_API_KEY"):
                     "diag": clean_diag(d)}
         body = json.dumps({
             "model": model, "temperature": 0,
-            "max_completion_tokens": max_tokens,
+            # documented chat-completions fields (docs.requesty.ai):
+            # max_tokens (reasoning tokens count against it) and
+            # reasoning_effort "low"; never raised silently.
+            "max_tokens": max_tokens,
+            "reasoning_effort": "low",
             "messages": [{"role": "system", "content": system},
                          {"role": "user", "content": prompt}]}).encode()
         req = urllib.request.Request(
@@ -864,10 +887,27 @@ def http_post_factory(env="REQUESTY_API_KEY"):
         except ValueError as e:
             return unk("parse-json", "malformed", e, raw, ctype)
         try:
-            content = data["choices"][0]["message"]["content"] or ""
+            ch = data["choices"][0]
+            content = ch["message"]["content"]
         except (KeyError, IndexError, TypeError, AttributeError) as e:
             return unk("response-shape", "malformed", e, raw, ctype)
-        return {"kind": "ok", "usage": data.get("usage"), "content": content}
+        usage = data.get("usage") if isinstance(data, dict) else None
+        if not isinstance(content, str) or not content.strip():
+            # a 200 with no usable content is a response-shape failure,
+            # never a success; tokens may have been consumed (unknown).
+            r = unk("response-shape", "empty-content", None, raw, ctype)
+            fr = ch.get("finish_reason") if isinstance(ch, dict) else None
+            r["diag"]["finish_reason"] = redact(str(fr), 30) \
+                if fr is not None else None
+            r["diag"]["reasoning_present"] = int(bool(
+                isinstance(ch.get("message"), dict) and (
+                    ch["message"].get("reasoning_content")
+                    or ch["message"].get("reasoning"))))
+            r["usage"] = num_only(usage)
+            return r
+        fr = ch.get("finish_reason") if isinstance(ch, dict) else None
+        return {"kind": "ok", "usage": num_only(usage), "content": content,
+                "finish_reason": fr if isinstance(fr, str) else None}
     return post
 
 

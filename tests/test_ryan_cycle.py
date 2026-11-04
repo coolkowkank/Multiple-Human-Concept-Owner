@@ -573,6 +573,42 @@ class Diag(Base):
         def __exit__(self, *a):
             return False
 
+    def test_request_fields_and_empty_content(self):
+        import json as J
+        seen = {}
+
+        def uo(req, timeout=None):
+            seen["b"] = J.loads(req.data)
+            return self.Resp(J.dumps({"choices": [{
+                "message": {"content": "", "reasoning_content": "SECRETTHINK"},
+                "finish_reason": "length"}],
+                "usage": {"completion_tokens": 10, "note": "x",
+                          "completion_tokens_details": {
+                              "reasoning_tokens": 10}}}).encode())
+        out = self.call(uo)
+        b = seen["b"]
+        self.assertEqual(b["max_tokens"], 10)
+        self.assertEqual(b["reasoning_effort"], "low")
+        self.assertNotIn("max_completion_tokens", b)
+        self.assertEqual(out["kind"], "unknown")
+        self.assertEqual(out["diag"]["class"], "empty-content")
+        self.assertEqual(out["diag"]["finish_reason"], "length")
+        self.assertEqual(out["diag"]["reasoning_present"], 1)
+        self.assertEqual(out["usage"]["completion_tokens_details"],
+                         {"reasoning_tokens": 10})
+        self.assertNotIn("note", out["usage"])
+        self.assertNotIn("SECRETTHINK", J.dumps(out))
+
+    def test_ok_keeps_usage_and_finish_reason(self):
+        import json as J
+        out = self.call(lambda req, timeout=None: self.Resp(J.dumps({
+            "choices": [{"message": {"content": "hi"},
+                         "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 3, "cost": 0}}).encode()))
+        self.assertEqual((out["kind"], out["content"], out["finish_reason"],
+                          out["usage"]), ("ok", "hi", "stop",
+                                          {"prompt_tokens": 3, "cost": 0}))
+
     def test_classification_without_inferring_cause(self):
         import socket, urllib.error
         R = self.Resp
