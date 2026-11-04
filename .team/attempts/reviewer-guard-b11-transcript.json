@@ -175,5 +175,56 @@
       "x-ratelimit-reset-tokens": "9.405s"
     },
     "call": 3
+  },
+  {
+    "checkpoint_error": "Command '['git', '-C', '/tmp/records-wt', 'push', '--quiet', 'origin', 'HEAD']' returned non-zero exit status 1."
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-9270d7f6-1eae-4896-9c3a-11e271ad0692",
+      "object": "chat.completion",
+      "created": 1793797502,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "Let's open file.",
+            "tool_calls": [
+              {
+                "id": "fc_79324df6-82b4-4840-86db-e7c0a3915692",
+                "type": "function",
+                "function": {
+                  "name": "edit_file",
+                  "arguments": "{\"new_string\":\"# placeholder\",\"old_string\":\"# placeholder\",\"path\":\"launcher/runtime.py\"}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.170404326,
+        "prompt_tokens": 1196,
+        "prompt_time": 0.056684552,
+        "completion_tokens": 38,
+        "completion_time": 0.078167791,
+        "total_tokens": 1234,
+        "total_time": 0.134852343,
+        "completion_tokens_details": {
+          "reasoning_tokens": 25
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_4727af4560",
+      "x_groq": {
+        "id": "req_01m6kakdawexwb3q8hm2rg1trg",
+        "seed": 203688368
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
