@@ -32,11 +32,15 @@ changes and merges stay owner-only regardless of the chain.
 Dedicated Researcher + Verifier functions work for Ryan, separate from
 Nora/Eva prototype research: the Researcher gathers performance and
 workflow evidence; the Verifier independently checks claims before a
-proposal enters the chain. Staffing status 2026-11-04: research seeded
-by the coordinator's focused performance-analysis work; Verifier to be
-independently assigned once evidence is ready. No models assigned to
-either function yet - a name is recorded only after a verified-free
-qualification on the actual task.
+proposal enters the chain. Staffing status 2026-11-04: dedicated support is requested and its
+model assignments are unresolved. One loop is complete: the performance
+analysis was done by operator research, independently verified against
+the full sources by operator support (not a model seat), and checked once
+with a Groq gpt-oss-120b second-opinion sample (3076 tokens, cost 0 as
+provider-reported). That sample is a one-sample second opinion, not a
+qualification. No verifier is running now. Any model for either function
+needs a fresh verified-free qualification on the actual task and a new
+cap; none is open.
 - **Owns (scope):** docs/team/model-availability.md +
   docs/team/model-availability.json (the living availability record),
   tools/model_resources.py + tests/test_model_resources.py (the
