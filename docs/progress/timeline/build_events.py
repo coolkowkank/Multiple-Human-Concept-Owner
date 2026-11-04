@@ -52,12 +52,17 @@ trig("6a0f59a","16:37","Harness review status recorded","Project record of the v
 trig("2024e2d","16:39","F3 roster finding published","Supervisor reissue of the coordinator has no roster check, so a custom roster can stall. Finding only, not fixed. F1 and F2 are still undelivered.")
 trig("9115552","16:43","Researcher: stall-rule replay E4 v2","Offline replay. Timezone false-stalls confirmed; the two candidate rules are not told apart (N=1). Hypothesis level.",lane=R)
 trig("aacfe44","16:48","Durable ledger module and tests","Offline, not integrated into the executor. Not reviewed, no credit.",lane=TD)
-OVERRIDE={"trg-91e928d":"Closed failed (batch closeout 16:20): no commit or push, remote unchanged, guard unbuilt. Earlier status 'running' is superseded."}
+trig("1bf65d2","17:11","Coordinator Assistant status handoff contract","Documented contract for status drafts: small input, fixed output, coordinator-reviewed publication. Documentation, not a qualification.",lane=TD)
+trig("cd7f32c","17:14","Builder fix candidate: counter and escalation test","Model-drafted, operator-applied. F1, F2 and F4 fixes. Independent review followed.")
+trig("26ff4bc","17:19","Builder fix candidate: F3 roster guard","Escalates instead of reissuing to a missing coordinator seat. 167 offline tests reported. An independent review then accepted the fix (about 17:24). Offline project branch, not merged, no autonomy claim.")
+trig("8d97dd1","17:23","Team Resources (Ryan) and Assistant (Gemma) registered","Ryan: model route checks and replacement proposals, free resources only. Gemma: status drafts only, google/gemma-4-31b-it via Requesty, every draft reviewed, publication separate. No qualified backup route exists yet (gap).",lane=TD)
+trig("4a81cf9","17:25","Ryan route-check tooling committed","Offline tooling with 8 tests. Replacement selector exists, but backup coverage is a gap: all proposals return to the Coordinator. Not automatic failover.",lane=TD)
+OVERRIDE={"trg-2024e2d":"Finding published 16:39. Addressed by candidate 26ff4bc (17:19), which an independent review accepted. Earlier text superseded: the stall was an escalation gap, fixed offline.","trg-91e928d":"Closed failed (batch closeout 16:20): no commit or push, remote unchanged, guard unbuilt. Earlier status 'running' is superseded."}
 ev=[old.get(e["id"],e) for e in ev]
 for k,v in old.items():
     if k not in {e["id"] for e in ev}: ev.append(v)
 for e in ev:
     if e["id"] in OVERRIDE: e["status"]=OVERRIDE[e["id"]]
 ev.sort(key=lambda e:(e["day"],e["time"]))
-json.dump(dict(asOf="2026-11-04T16:50",timezone="Europe/Helsinki",note="Recorded events use commit times. Planned items are not events. A check that finds no change leaves no record.",events=ev),open(out,"w"),indent=1)
+json.dump(dict(asOf="2026-11-04T17:30",timezone="Europe/Helsinki",note="Recorded events use commit times. Planned items are not events. A check that finds no change leaves no record.",events=ev),open(out,"w"),indent=1)
 print(len(ev),"events")

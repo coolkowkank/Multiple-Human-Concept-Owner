@@ -8,7 +8,7 @@ from matplotlib.patches import Circle, FancyBboxPatch, Polygon
 INK = "#1a1a2e"; GRAY = "#5a6272"; ARROW = "#8a8fa3"; PURPLE = "#8b7ec8"
 
 def render(here, updated):
-    W, H = 1180, 955
+    W, H = 1180, 1170
     fig = plt.figure(figsize=(W/100, H/100), dpi=100)
     ax = fig.add_axes([0, 0, 1, 1]); ax.set_xlim(0, W); ax.set_ylim(H, 0); ax.axis("off")
     img = lambda n: mpimg.imread(os.path.join(here, "avatars", n + ".png"))
@@ -49,6 +49,8 @@ def render(here, updated):
     node(OWN[0],OWN[1],OWN[2],"coolkowkank"); node(COR[0],COR[1],COR[2],"instinct-telkomsel")
     node(BLD[0],BLD[1],BLD[2],"coolkowkank-bot"); node(REV[0],REV[1],REV[2],"instinct-christina")
     node(RES[0],RES[1],RES[2],"researcher-role"); node(EVA[0],EVA[1],EVA[2],icon="✓",bg="#2a9d8f")
+    RYN=(330,790,34); AST=(850,790,34)
+    node(RYN[0],RYN[1],RYN[2],icon="R",bg="#4a6fa5",fs=20); node(AST[0],AST[1],AST[2],icon="G",bg="#b0702a",fs=20)
     def labels(c, role, handle, l1, l2=None, l3=None):
         x, y, r = c; text(x, y+r+10, role, 14, INK, "bold"); text(x, y+r+32, handle, 11, GRAY, style="italic")
         for i, ln in enumerate([l1, l2, l3]):
@@ -61,6 +63,8 @@ def render(here, updated):
     labels(REV,"Bill - Independent reviewer","@instinct-christina","Reviews the Builder's pinned commits","Model: not project-configured")
     labels(EVA,"Eva - Evidence verifier","Uses @coolkowkank","shared research token",("Gemma 4 31B (free), trialed","Rq"),"runtime integration pending")
     labels(RES,"Nora - Researcher","Uses @coolkowkank","shared research token",("Nemotron-3 Ultra 550B (free)","Rq"),"synthesis; citations reviewed")
+    labels(RYN,"Ryan - Team Resources","active, coordination-run","Route checks + replacement proposals (free only)","Backup coverage: GAP, none qualified yet","Model: not project-configured")
+    labels(AST,"Gemma - Coordinator Assistant","active, status drafts only",("google/gemma-4-31b-it (free)","Rq"),"Coordinator reviews every draft","Publication stays coordination-run")
     # hierarchy: owner > coordinator > others (plain lines, no arrowheads)
     HL="#b4b8c6"
     ax.plot([OWN[0],COR[0]],[258,COR[1]-COR[2]-4],color=HL,lw=2,zorder=1)
@@ -68,6 +72,10 @@ def render(here, updated):
     ax.plot([COR[0],COR[0]],[COR[1]+COR[2]+60,busy],color=HL,lw=2,zorder=1)
     ax.plot([RES[0],REV[0]],[busy,busy],color=HL,lw=2,zorder=1)
     for c in (RES,EVA,BLD,REV): ax.plot([c[0],c[0]],[busy,c[1]-c[2]-4],color=HL,lw=2,zorder=1)
+    b2=712
+    ax.plot([COR[0],COR[0]],[busy,b2],color=HL,lw=2,zorder=1)
+    ax.plot([RYN[0],AST[0]],[b2,b2],color=HL,lw=2,zorder=1)
+    for c in (RYN,AST): ax.plot([c[0],c[0]],[b2,c[1]-c[2]-4],color=HL,lw=2,zorder=1)
     text(OWN[0]+14,262,"direction + gates",10,"#8a8fa3",ha="left")
     # workflow arrows (lateral, not hierarchy)
     arrow((RES[0]+50,RES[1]-12),(EVA[0]-46,EVA[1]-12),"sources + claims",0,-24)
@@ -77,13 +85,13 @@ def render(here, updated):
     ax.annotate("", xy=(0,0), xytext=(0,0))
     ax.annotate("", xy=(0,0), xytext=(0,0))
     # compact provider line (details live in docs)
-    y0=770
+    y0=985
     text(60,y0-8,"Provider pool:",12,INK,"bold",ha="left")
     badge(215,y0+2,"Gq",11); text(232,y0-6,"1) Groq: Builder",10,ha="left")
     badge(405,y0+2,"Ce",11); text(422,y0-6,"2) Cerebras: on hold",10,ha="left")
     badge(620,y0+2,"Rq",11); text(637,y0-6,"3) Requesty: free route, Nora and Eva trials",10,ha="left")
     text(60,y0+34,"On demand, not staffed: Architect, Independent QC, Records.  The Coordinator keeps responsibility for accepting reviewed work.",10,ha="left")
-    text(40,885,"Sources: docs/developers.md and the team roster chart on the team-launcher branch, plus the current Researcher assignment.",9,"#8a8fa3",ha="left")
-    text(40,903,"Lines show three levels: owner, Coordinator, others. Arrows show review loops: Alex and Bill on code, Nora and Eva on sources.",9,"#8a8fa3",ha="left")
-    text(40,921,"Builder commits go through @coolkowkank-bot. Researcher commits: role author, owner @coolkowkank as committer.",9,"#8a8fa3",ha="left")
+    text(40,1085,"Sources: docs/developers.md and the team roster chart on the team-launcher branch, plus the current Researcher assignment.",9,"#8a8fa3",ha="left")
+    text(40,1103,"Lines show three levels: owner, Coordinator, others. Arrows show review loops: Alex and Bill on code, Nora and Eva on sources.",9,"#8a8fa3",ha="left")
+    text(40,1121,"Builder commits go through @coolkowkank-bot. Researcher commits: role author, owner @coolkowkank as committer.",9,"#8a8fa3",ha="left")
     fig.savefig(os.path.join(here, "team.png")); plt.close(fig)

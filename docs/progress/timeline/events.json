@@ -1,5 +1,5 @@
 {
- "asOf": "2026-11-04T16:50",
+ "asOf": "2026-11-04T17:30",
  "timezone": "Europe/Helsinki",
  "note": "Recorded events use commit times. Planned items are not events. A check that finds no change leaves no record.",
  "events": [
@@ -814,7 +814,7 @@
    "kind": "trigger",
    "lane": "Builder and review",
    "title": "F3 roster finding published",
-   "status": "Supervisor reissue of the coordinator has no roster check, so a custom roster can stall. Finding only, not fixed. F1 and F2 are still undelivered.",
+   "status": "Finding published 16:39. Addressed by candidate 26ff4bc (17:19), which an independent review accepted. Earlier text superseded: the stall was an escalation gap, fixed offline.",
    "evidence": [
     {
      "label": "Commit 2024e2d",
@@ -849,6 +849,81 @@
     {
      "label": "Commit aacfe44",
      "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/aacfe44"
+    }
+   ]
+  },
+  {
+   "id": "trg-1bf65d2",
+   "day": "2026-11-04",
+   "time": "17:11",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Coordinator Assistant status handoff contract",
+   "status": "Documented contract for status drafts: small input, fixed output, coordinator-reviewed publication. Documentation, not a qualification.",
+   "evidence": [
+    {
+     "label": "Commit 1bf65d2",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/1bf65d2"
+    }
+   ]
+  },
+  {
+   "id": "trg-cd7f32c",
+   "day": "2026-11-04",
+   "time": "17:14",
+   "kind": "trigger",
+   "lane": "Builder and review",
+   "title": "Builder fix candidate: counter and escalation test",
+   "status": "Model-drafted, operator-applied. F1, F2 and F4 fixes. Independent review followed.",
+   "evidence": [
+    {
+     "label": "Commit cd7f32c",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/cd7f32c"
+    }
+   ]
+  },
+  {
+   "id": "trg-26ff4bc",
+   "day": "2026-11-04",
+   "time": "17:19",
+   "kind": "trigger",
+   "lane": "Builder and review",
+   "title": "Builder fix candidate: F3 roster guard",
+   "status": "Escalates instead of reissuing to a missing coordinator seat. 167 offline tests reported. An independent review then accepted the fix (about 17:24). Offline project branch, not merged, no autonomy claim.",
+   "evidence": [
+    {
+     "label": "Commit 26ff4bc",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/26ff4bc"
+    }
+   ]
+  },
+  {
+   "id": "trg-8d97dd1",
+   "day": "2026-11-04",
+   "time": "17:23",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Team Resources (Ryan) and Assistant (Gemma) registered",
+   "status": "Ryan: model route checks and replacement proposals, free resources only. Gemma: status drafts only, google/gemma-4-31b-it via Requesty, every draft reviewed, publication separate. No qualified backup route exists yet (gap).",
+   "evidence": [
+    {
+     "label": "Commit 8d97dd1",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/8d97dd1"
+    }
+   ]
+  },
+  {
+   "id": "trg-4a81cf9",
+   "day": "2026-11-04",
+   "time": "17:25",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Ryan route-check tooling committed",
+   "status": "Offline tooling with 8 tests. Replacement selector exists, but backup coverage is a gap: all proposals return to the Coordinator. Not automatic failover.",
+   "evidence": [
+    {
+     "label": "Commit 4a81cf9",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/4a81cf9"
     }
    ]
   }

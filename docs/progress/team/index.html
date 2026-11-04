@@ -17,7 +17,7 @@ main{max-width:1100px;margin:0 auto}h1{font-size:24px;margin:0 0 4px}h2{font-siz
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px 40px;width:100%;position:relative;padding-top:14px;border-top:2px solid var(--line);margin-top:0}
 .pair{display:grid;grid-template-columns:1fr 1fr;gap:10px;position:relative}
 .pair .loop{grid-column:1/-1;text-align:center;font-size:12px;color:#8a8fa3}
-.pairs{display:grid;grid-template-columns:1fr 1fr;gap:18px;width:100%;border-top:2px solid var(--line);padding-top:14px}
+.pairs>.pair:nth-child(3){grid-column:1/-1}.pairs{display:grid;grid-template-columns:1fr 1fr;gap:18px;width:100%;border-top:2px solid var(--line);padding-top:14px}
 .b{display:inline-block;min-width:22px;height:18px;line-height:18px;border-radius:9px;color:#fff;font-size:10px;font-weight:700;text-align:center;padding:0 5px;margin-right:4px;vertical-align:middle}
 .Gq{background:#e8553d}.Ce{background:#1d6fb8}.Rq{background:#8b7ec8}
 .vac{border-style:dashed;background:#faf9f6;text-align:left}
@@ -46,14 +46,16 @@ a{color:#1a5fb4}
    <div class="card"><img class="av" src="../avatars/instinct-christina.png" alt=""><div class="role">Bill - Independent reviewer <span class="tag act">active</span></div><div class="handle">@instinct-christina</div><div class="ln">Reviews the Builder's pinned commits</div><div class="ln">Model: not project-configured</div></div>
    <div class="loop">&#8644; review request / verdicts</div>
   </div>
+  <div class="pair">
+   <div class="card"><div class="av" style="background:#4a6fa5;color:#fff;font-size:30px;line-height:60px;font-weight:700;text-align:center" aria-hidden="true">R</div><div class="role">Ryan - Team Resources <span class="tag act">active</span></div><div class="handle">coordination-run</div><div class="ln">Checks model routes (working / capped) from evidence and proposes replacements from free resources only</div><div class="ln">Backup coverage: gap, none qualified yet</div><div class="ln">Model: not project-configured</div></div>
+   <div class="card"><div class="av" style="background:#b0702a;color:#fff;font-size:30px;line-height:60px;font-weight:700;text-align:center" aria-hidden="true">G</div><div class="role">Gemma - Coordinator Assistant <span class="tag act">active</span></div><div class="handle">status drafts only</div><div class="ln"><span class="b Rq">Rq</span>google/gemma-4-31b-it (free)</div><div class="ln">Coordinator reviews every draft</div><div class="ln">Publication stays coordination-run</div></div>
+   <div class="loop">support roles: route checks and status drafts, both reviewed by the Coordinator</div>
+  </div>
  </div>
 </div>
 
-<h2>Vacant roles (no active member)</h2>
-<div class="vacs">
- <div class="card vac"><b>Team Resources</b><span class="tag vc">vacant</span><div class="ln">Maya is defined for this role; none active until qualified.</div></div>
- <div class="card vac"><b>Coordinator Assistant</b><span class="tag vc">vacant</span><div class="ln">Unassigned; none active until assigned.</div></div>
-</div>
+<h2>Vacant roles</h2>
+<p class="ln">None right now. Known gap: no qualified backup model route exists yet for code, research or status work, so Ryan's replacement proposals go back to the Coordinator. This is not automatic failover.</p>
 
 <h2>Provider pool</h2>
 <p class="ln"><span class="b Gq">Gq</span>1) Groq: Builder &nbsp; <span class="b Ce">Ce</span>2) Cerebras: on hold &nbsp; <span class="b Rq">Rq</span>3) Requesty: free route, Nora and Eva trials. Badges are stylized letter marks.</p>
