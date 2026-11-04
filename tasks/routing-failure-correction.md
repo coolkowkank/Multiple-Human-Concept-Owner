@@ -1,3 +1,15 @@
+# Builder task: routing-failure handling correction - SUPERSEDED, DO NOT USE
+
+**SUPERSEDED 2026-11-04 15:05 EET, before any launch: the reviewer retracted
+the routing-semantics blocker. The coordinator-reissue pattern appears to
+come from the approved original proposal, not from model invention. This
+task v1 (63bc3c7) must not be worked. A reconciled task may follow after
+source semantics are settled. F1/F2/F4 test-quality findings remain valid
+and will be carried into any replacement task. Original v1 text preserved
+below unedited for the record.**
+
+---
+
 # Builder task: routing-failure handling correction (v1)
 
 Branch: live/builder-deadlock-fix (head 45cec13). You own:
