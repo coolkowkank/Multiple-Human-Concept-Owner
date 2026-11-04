@@ -2,3 +2,4 @@
 {"ts": "2026-11-04T11:12:55Z", "seat": "coordinator", "kind": "handoff", "body": "Assigning initial implementation of tinylib and tests to Builder", "turn_seq": 1}
 {"ts": "2026-11-04T11:12:59Z", "seat": "supervisor", "kind": "stall", "body": "turn stalled on builder; restarting seat"}
 {"ts": "2026-11-04T11:13:04Z", "seat": "supervisor", "kind": "restart", "body": "seat builder exited -15; restart 1"}
+{"ts": "2026-11-04T11:13:18Z", "seat": "builder", "kind": "handoff", "body": "Implement tinylib.add and corresponding test case | verify: `python3 -m unittest discover -s tests -v` exit=0 | tail:  / ---------------------------------------------------------------------- / Ran 1 test in 0.000s /  / OK", "turn_seq": 2}

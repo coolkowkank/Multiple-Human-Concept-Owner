@@ -1,13 +1,17 @@
 {
-  "turn": "builder",
-  "turn_seq": 1,
-  "turn_since": "2026-11-04T11:12:55Z",
+  "turn": null,
+  "turn_seq": 2,
+  "turn_since": "2026-11-04T11:13:18Z",
   "status": "running",
-  "status_line": "Building tinylib and tests",
+  "status_line": "Implementing library and tests",
   "leases": {
     "coordinator": {
       "holder": "coordinator-32a14394",
       "claimed_at": 1793790764.6772697
+    },
+    "builder": {
+      "holder": "builder-d21f29f3",
+      "claimed_at": 1793790784.7963538
     }
   }
 }
