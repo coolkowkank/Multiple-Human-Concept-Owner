@@ -21,7 +21,10 @@ def git(*args, cwd=None):
     subprocess.run(["git"] + list(args), cwd=cwd, check=True, capture_output=True)
 
 
-class ExecutorCase(unittest.TestCase):
+class ExecutorFixture(unittest.TestCase):
+    """Shared fixture/helpers only - no tests here, so subclass suites report
+    distinct method counts (independent review 2026-11-04: inheritance
+    re-runs are not independent coverage)."""
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tmp, True)
@@ -66,6 +69,34 @@ class ExecutorCase(unittest.TestCase):
                 "function": {"name": name, "arguments": args}}
 
 
+    @staticmethod
+    def _unknown_tool_payload(name="exec"):
+        err = {"message": f"Tool call validation failed: model attempted to call tool: "
+                          f"'{name}' which was not in request.tools",
+               "type": "invalid_request_error", "code": "tool_use_failed",
+               "failed_generation": json.dumps({"name": name, "arguments": {}})}
+        return json.dumps({"error": err}) + "\n400"
+
+    def _fake_curl(self, ns, responses):
+        class L(list):
+            pass
+        calls = L()
+        payloads = []
+        real_run = ns["subprocess"].run
+        queue = list(responses)
+        def run2(*a, **k):
+            if a and a[0] and "curl" in str(a[0][0]):
+                body = queue.pop(0)
+                calls.append(1)
+                payloads.append(json.loads(a[0][a[0].index("-d") + 1]))
+                return type("FP", (), {"returncode": 0, "stderr": "", "stdout": body})()
+            return real_run(*a, **k)
+        ns["subprocess"] = type("S", (), {"run": staticmethod(run2)})
+        calls.payloads = payloads
+        return calls
+
+
+class ExecutorCase(ExecutorFixture):
     # -- bounded small-edit interface (deadlock-fix batch, attempts b3/b5) --
 
     def test_edit_file_exact_single_replacement_byte_exact(self):
@@ -610,41 +641,12 @@ class ExecutorCase(unittest.TestCase):
         ns["main"]()
         self.assertFalse(any("run_complete" in e for e in ns["transcript"] if isinstance(e, dict)))
 
-if __name__ == "__main__":
-    unittest.main()
 
-
-
-class ExecutorHardeningCase(ExecutorCase):
+class ExecutorHardeningCase(ExecutorFixture):
     """Offline tests for the 2026-11-04 support hardening (batch
     reviewer-guard-b11/b11b failure modes): narrow unknown-tool provider
     rejection recovery and records-push landed-check/single retry."""
 
-    @staticmethod
-    def _unknown_tool_payload(name="exec"):
-        err = {"message": f"Tool call validation failed: model attempted to call tool: "
-                          f"'{name}' which was not in request.tools",
-               "type": "invalid_request_error", "code": "tool_use_failed",
-               "failed_generation": json.dumps({"name": name, "arguments": {}})}
-        return json.dumps({"error": err}) + "\n400"
-
-    def _fake_curl(self, ns, responses):
-        class L(list):
-            pass
-        calls = L()
-        payloads = []
-        real_run = ns["subprocess"].run
-        queue = list(responses)
-        def run2(*a, **k):
-            if a and a[0] and "curl" in str(a[0][0]):
-                body = queue.pop(0)
-                calls.append(1)
-                payloads.append(json.loads(a[0][a[0].index("-d") + 1]))
-                return type("FP", (), {"returncode": 0, "stderr": "", "stdout": body})()
-            return real_run(*a, **k)
-        ns["subprocess"] = type("S", (), {"run": staticmethod(run2)})
-        calls.payloads = payloads
-        return calls
 
     def test_unknown_tool_rejection_recovered_and_counted(self):
         # rejection -> recovery note -> model writes a file -> prose x2 -> nudge halt.
@@ -744,7 +746,7 @@ class ExecutorHardeningCase(ExecutorCase):
         self.assertEqual(len(pushes), 2)  # initial + single retry, then fail-closed
 
 
-class ExecutorHardeningV2Case(ExecutorHardeningCase):
+class ExecutorHardeningV2Case(ExecutorFixture):
     """Offline tests for hardening v2 (batch reviewer-guard-b13 failure modes):
     destructive placeholder edits refused client-side, and provider
     schema-validation rejections recovered within the same bounded cap."""
@@ -769,7 +771,7 @@ class ExecutorHardeningV2Case(ExecutorHardeningCase):
                                          "old_string": 'if response.get("status_line", "").startswith("DONE"):',
                                          "new_string": "# placeholder"})
         self.assertFalse(r["ok"])
-        self.assertIn("placeholder", r["error"])
+        self.assertIn("content-free", r["error"])
         self.assertEqual(open(target).read(), before)  # no corruption landed
 
     def test_noop_edit_refused(self):
@@ -783,11 +785,13 @@ class ExecutorHardeningV2Case(ExecutorHardeningCase):
         self.assertFalse(r["ok"])
         self.assertIn("no-op", r["error"])
 
-    def test_placeholder_write_refused(self):
+    def test_stub_write_new_file_allowed_no_false_positive(self):
+        # v3: the literal denylist is gone; a stub-looking NEW file is allowed
+        # (docs may legitimately contain such text). The destructive case is
+        # covered by the existing-file overwrite and edit guards.
         ns = self.load()
         r = ns["run_tool"]("write_file", {"path": "docs/x.md", "content": "..."})
-        self.assertFalse(r["ok"])
-        self.assertIn("placeholder", r["error"])
+        self.assertTrue(r["ok"])
 
     def test_schema_rejection_recovered_with_exact_feedback(self):
         ns = self.load(max_calls=10)
@@ -826,3 +830,181 @@ class ExecutorHardeningV2Case(ExecutorHardeningCase):
         ])
         ns["main"]()
         self.assertEqual(len(sends), 3)
+
+class ExecutorHardeningV3Case(ExecutorFixture):
+    """Offline coverage for the independent review (2026-11-04) findings:
+    bypass corpus, classifier counterexamples, feedback completeness,
+    ledger fail-closed, reservation vs confirmed-send accounting."""
+
+    def _target(self, body="def f():\n    return False\n"):
+        p = os.path.join(self.repo, "launcher", "runtime.py")
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        open(p, "w").write(body)
+        return p
+
+    # F1: bypass corpus from the review probes - all refused
+    def test_empty_replacement_of_code_refused(self):
+        ns = self.load()
+        self._target()
+        r = ns["run_tool"]("edit_file", {"path": "launcher/runtime.py",
+            "old_string": "def f():\n    return False", "new_string": ""})
+        self.assertFalse(r["ok"]); self.assertIn("content-free", r["error"])
+
+    def test_placeholder_suffix_variant_refused(self):
+        ns = self.load(); self._target()
+        r = ns["run_tool"]("edit_file", {"path": "launcher/runtime.py",
+            "old_string": "return False", "new_string": "# placeholder: implement later"})
+        self.assertFalse(r["ok"])
+
+    def test_multiline_placeholder_refused(self):
+        ns = self.load(); self._target()
+        r = ns["run_tool"]("edit_file", {"path": "launcher/runtime.py",
+            "old_string": "def f():\n    return False", "new_string": "# placeholder\n# TODO"})
+        self.assertFalse(r["ok"])
+
+    def test_pass_stub_refused(self):
+        ns = self.load(); self._target()
+        r = ns["run_tool"]("edit_file", {"path": "launcher/runtime.py",
+            "old_string": "def f():\n    return False", "new_string": "pass"})
+        self.assertFalse(r["ok"])
+
+    def test_semantic_change_allowed_operator_gate_owns_correctness(self):
+        # 'return False' -> 'return True' compiles and is NOT refused: the
+        # tool guard is not a semantic check; the suite + push gate own that.
+        ns = self.load(); p = self._target()
+        r = ns["run_tool"]("edit_file", {"path": "launcher/runtime.py",
+            "old_string": "return False", "new_string": "return True"})
+        self.assertTrue(r["ok"])
+        self.assertIn("return True", open(p).read())
+
+    def test_legitimate_deletion_requires_task_declaration(self):
+        # without declaration: refused; with 'deletions-allowed: true': allowed
+        ns = self.load(); p = self._target()
+        r = ns["run_tool"]("edit_file", {"path": "launcher/runtime.py",
+            "old_string": "def f():\n    return False", "new_string": ""})
+        self.assertFalse(r["ok"])
+        open(self.task, "w").write("task\n\ndeletions-allowed: true\n")
+        ns2 = self.load()
+        self._target()
+        r2 = ns2["run_tool"]("edit_file", {"path": "launcher/runtime.py",
+            "old_string": "def f():\n    return False", "new_string": ""})
+        self.assertTrue(r2["ok"], r2)
+
+    def test_docs_literal_ellipsis_edit_allowed(self):
+        ns = self.load()
+        p = os.path.join(self.repo, "docs", "notes.md")
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        open(p, "w").write("see figure\n")
+        r = ns["run_tool"]("edit_file", {"path": "docs/notes.md",
+            "old_string": "see figure", "new_string": "..."})
+        self.assertTrue(r["ok"])  # no code anchor -> guard not triggered
+
+    # F2: existing-file overwrite protection
+    def test_write_file_existing_large_file_refused(self):
+        ns = self.load()
+        p = self._target("x = 1\n" * 3000)  # ~18KB existing file
+        for payload in ["", "pass\n", "# TODO\n", "# placeholder\n# TODO\n"]:
+            r = ns["run_tool"]("write_file", {"path": "launcher/runtime.py", "content": payload})
+            self.assertFalse(r["ok"], payload)
+            self.assertIn("overwrite refused", r["error"])
+        self.assertEqual(open(p).read(), "x = 1\n" * 3000)
+
+    def test_write_file_created_this_run_may_be_rewritten(self):
+        ns = self.load()
+        r1 = ns["run_tool"]("write_file", {"path": "docs/a.md", "content": "one"})
+        self.assertTrue(r1["ok"])
+        r2 = ns["run_tool"]("write_file", {"path": "docs/a.md", "content": "two"})
+        self.assertTrue(r2["ok"])
+        r3 = ns["run_tool"]("write_file", {"path": "docs/a.md", "content": "two"})
+        self.assertFalse(r3["ok"])  # no-op write refused
+        self.assertIn("no-op", r3["error"])
+
+    # F3: classifier counterexamples stay fatal
+    def test_classifier_counterexamples_fatal(self):
+        ns = self.load()
+        cases = [
+            {"type": "invalid_request_error", "code": "authentication_error",
+             "message": "client config did not match schema"},
+            {"type": "invalid_request_error",
+             "message": "request configuration did not match schema"},
+            {"type": "invalid_request_error", "code": "tool_use_failed",
+             "message": "parameters for tool edit_file did not match schema"},  # no failed_generation
+        ]
+        for err in cases:
+            self._fake_curl(ns, [json.dumps({"error": err}) + "\n400"])
+            with self.assertRaises(RuntimeError):
+                ns["api"]([])
+        # non-400 status with the exact phrases: still fatal
+        err = {"type": "invalid_request_error", "code": "tool_use_failed",
+               "message": "attempted to call tool 'x' which was not in request.tools",
+               "failed_generation": "{}"}
+        self._fake_curl(ns, [json.dumps({"error": err}) + "\n500"])
+        with self.assertRaises(RuntimeError):
+            ns["api"]([])
+
+    # F4: feedback carries the COMPLETE provider message
+    def test_schema_feedback_carries_full_provider_message(self):
+        ns = self.load(max_calls=10)
+        tail = "missing properties: " + ", ".join(f"'p{i}'" for i in range(30))
+        err = {"message": "Tool call validation failed: parameters for tool "
+                          "edit_file did not match schema: errors: [" + tail + "]",
+               "type": "invalid_request_error", "code": "tool_use_failed",
+               "failed_generation": json.dumps({"name": "edit_file", "arguments": {}})}
+        sends = self._fake_curl(ns, [
+            json.dumps({"error": err}) + "\n400",
+            json.dumps(self.msg(content="a")) + "\n200",
+            json.dumps(self.msg(content="b")) + "\n200",
+            json.dumps(self.msg(content="c")) + "\n200",
+        ])
+        ns["main"]()
+        note = [m["content"] for m in sends.payloads[1]["messages"]
+                if m["role"] == "user" and "harness note" in m["content"]][0]
+        self.assertIn(tail, note)  # full diagnostic tail, not truncated at 150
+
+    def test_unknown_tool_feedback_names_tool_and_message(self):
+        ns = self.load(max_calls=10)
+        sends = self._fake_curl(ns, [
+            self._unknown_tool_payload("exec"),
+            json.dumps(self.msg(content="a")) + "\n200",
+            json.dumps(self.msg(content="b")) + "\n200",
+            json.dumps(self.msg(content="c")) + "\n200",
+        ])
+        ns["main"]()
+        note = [m["content"] for m in sends.payloads[1]["messages"]
+                if m["role"] == "user" and "harness note" in m["content"]][0]
+        self.assertIn("not in request.tools", note)  # full provider message included
+        self.assertIn("ONLY these tools exist", note)
+
+    # F6: ledger fail-closed + reservation vs confirmed sends
+    def test_malformed_ledger_halts_no_reset(self):
+        os.environ["BUDGET_LEDGER"] = os.path.join(self.tmp, "ledger.json")
+        self.addCleanup(lambda: os.environ.pop("BUDGET_LEDGER", None))
+        open(os.environ["BUDGET_LEDGER"], "w").write("{corrupt")
+        ns = self.load(max_calls=5)
+        with self.assertRaises(RuntimeError) as cm:
+            ns["_reserve_call"]()
+        self.assertIn("malformed", str(cm.exception))
+        self.assertEqual(open(os.environ["BUDGET_LEDGER"]).read(), "{corrupt")
+
+    def test_reservation_vs_confirmed_send_accounting(self):
+        ledger = os.path.join(self.tmp, "ledger.json")
+        os.environ["BUDGET_LEDGER"] = ledger
+        self.addCleanup(lambda: os.environ.pop("BUDGET_LEDGER", None))
+        ns = self.load(max_calls=5)
+        # transport failure: reserved but NOT confirmed
+        class FT:
+            returncode = 1
+            stderr = "conn refused"
+            stdout = ""
+        ns["subprocess"] = type("S", (), {"run": staticmethod(lambda *a, **k: FT())})
+        with self.assertRaises(RuntimeError):
+            ns["api"]([])
+        data = json.load(open(ledger))
+        self.assertEqual(data["used"], 1)
+        self.assertNotIn("sent_utc", data["history"][0])
+        self.assertEqual(ns["SENDS"]["n"], 0)
+
+
+
+if __name__ == "__main__":
+    unittest.main()

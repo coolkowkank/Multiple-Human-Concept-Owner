@@ -56,7 +56,11 @@ MODEL = os.environ.get("PROVIDER_MODEL", "openai/gpt-oss-120b")
 API_URL = os.environ.get("PROVIDER_API_URL", "https://api.groq.com/openai/v1/chat/completions")
 MAX_ROUNDS = int(os.environ.get("MAX_ROUNDS", "6"))
 MAX_NUDGES = int(os.environ.get("MAX_NUDGES", "2"))  # prose-only rounds tolerated before halt
-MAX_TOOL_RECOVERIES = int(os.environ.get("MAX_TOOL_RECOVERIES", "2"))  # provider unknown-tool rejections recovered before fail-closed abort; every recovery re-sends (reserved+counted)
+MAX_TOOL_RECOVERIES = int(os.environ.get("MAX_TOOL_RECOVERIES", "2"))  # provider tool-output rejections recovered before fail-closed abort; every recovery re-sends (reserved+counted)
+FEEDBACK_CAP = int(os.environ.get("FEEDBACK_CAP", "1000"))  # max provider-message chars fed back to the model; overflow is explicitly marked, never silently dropped
+
+def _bounded(s, cap):
+    return s if len(s) <= cap else s[:cap] + f"...[truncated; full {len(s)} chars preserved in the transcript]"
 MAX_CALLS = int(os.environ.get("MAX_CALLS", "6"))  # coordinator passes the loop's REMAINING global budget; every attempted provider request counts, including failed/error responses; the executor never retries
 CALLS = {"n": 0}
 # Zero-price routes only (owner rule for the Requesty gemma batch): when
@@ -201,8 +205,8 @@ SYSTEM = (f"You are the builder on repo Multiple-Human-Concept-Owner, branch {BR
           "edit_file takes exactly path, old_string, new_string - there are no "
           "line numbers. Never emit placeholder or stub text; every edit must "
           "be complete, compilable code. "
-          "Be honest in commit messages: say you are Groq "
-          "gpt-oss-120b committing via your own tool calls. The repo's local "
+          f"Be honest in commit messages: say you are {MODEL} "
+          "committing via your own tool calls. The repo's local "
           "commit-msg hook REQUIRES your message to contain a line exactly like "
           "'TURN: builder' - include it or the commit is rejected. Never include secrets. "
           "The run ENDS automatically once git_push succeeds: no summary or follow-up "
@@ -220,11 +224,30 @@ TOOLS = [
 # evidence on the NEXT real attempt - no inference probes). Nothing else
 # is captured; request-side auth material is outbound-only and never
 # recorded.
-# Destructive-placeholder guard (observed live 2026-11-04, batches
-# reviewer-guard-b11 and b13: the model replaced a real code line with the
-# literal text "# placeholder", then edited from its own stub). Refused
-# client-side before the worktree is corrupted - costs no provider call.
-PLACEHOLDER_RE = re.compile(r"^(#|//|--)?\s*placeholder\s*$|^\.\.\.$|^<placeholder>$", re.I)
+# Destructive content-free replacement guard (observed live 2026-11-04,
+# batches reviewer-guard-b11/b13; bypass corpus from the independent
+# review). Narrow by design: it refuses empty/stub/comment-only
+# replacements of CODE-bearing anchors. It is NOT a semantic-correctness
+# check - 'return False' -> 'return True' is a valid edit here; behavioral
+# correctness belongs to the operator test suite + push gate.
+CREATED_THIS_RUN = set()
+
+def _codeish(s):
+    return bool(re.search(r"\b(def|class|return|if|for|while|import)\b|=[^=]|\(|\{", s))
+
+_STUB_LINE = re.compile(r"^(#|//|--)?\s*(placeholder|todo|pass|\.\.\.|<placeholder>)\b", re.I)
+
+def _stub_only(s):
+    """True when the content carries no code: empty, or every line is a
+    stub/comment placeholder line."""
+    lines = [l for l in s.strip().splitlines() if l.strip()]
+    if not lines:
+        return True
+    return all(_STUB_LINE.match(l.strip()) for l in lines)
+
+# Grounded scope for legitimate deletions: the coordinator's task file
+# must declare them explicitly.
+DELETIONS_ALLOWED = bool(re.search(r"(?im)^deletions-allowed:\s*(true|yes)\s*$", TASK))
 
 RATE_HEADER_ALLOWLIST = {
     "x-ratelimit-limit-requests", "x-ratelimit-limit-tokens",
@@ -232,21 +255,25 @@ RATE_HEADER_ALLOWLIST = {
     "x-ratelimit-reset-requests", "x-ratelimit-reset-tokens",
     "retry-after"}
 
-def _classify_tool_rejection(err):
-    """'unknown_tool' | 'schema_violation' | None. Narrow: ONLY the provider's
-    rejections of the model's own malformed tool output, observed live
-    2026-11-04 - b11b: 'attempted to call tool ... not in request.tools';
-    b13: 'parameters for tool edit_file did not match schema' (invented
-    line_start/line_end). Auth faults, context errors, every other 400 stay
-    fatal."""
+def _classify_tool_rejection(err, status=""):
+    """'unknown_tool' | 'schema_violation' | None. Exact shape only, per the
+    two observed live rejections (2026-11-04 b11b/b13) and the independent
+    review's counterexamples: HTTP 400 AND code tool_use_failed AND type
+    invalid_request_error AND a failed_generation present AND the exact
+    message phrases. Auth errors, request-config schema errors, missing
+    failed_generation, non-400 statuses: all fatal."""
     if not isinstance(err, dict):
         return None
-    msg = err.get("message") or ""
-    if err.get("code") != "tool_use_failed" and err.get("type") != "invalid_request_error":
+    if str(status).strip() != "400":
         return None
-    if "not in request.tools" in msg:
+    if err.get("code") != "tool_use_failed" or err.get("type") != "invalid_request_error":
+        return None
+    if not err.get("failed_generation"):
+        return None
+    msg = err.get("message") or ""
+    if "attempted to call tool" in msg and "not in request.tools" in msg:
         return "unknown_tool"
-    if "did not match schema" in msg:
+    if "parameters for tool" in msg and "did not match schema" in msg:
         return "schema_violation"
     return None
 
@@ -274,10 +301,15 @@ MIN_CALL_INTERVAL_S = float(os.environ.get("MIN_CALL_INTERVAL_S", "0"))
 
 def _ledger_read(f):
     f.seek(0)
-    try:
-        return json.load(f)
-    except Exception:
+    raw = f.read()
+    if not raw.strip():
         return {"used": 0, "history": []}
+    try:
+        return json.loads(raw)
+    except Exception:
+        # Independent review 2026-11-04 (F6): a malformed existing ledger must
+        # HALT, never silently reset the budget to zero.
+        raise RuntimeError(f"malformed budget ledger {BUDGET_LEDGER}; failing closed (no budget reset)")
 
 def _pacing_wait_s(data, now, min_interval):
     """Seconds to wait before the next request: the configured floor AND
@@ -332,6 +364,28 @@ def _reserve_call():
         record({"pacing_wait": {"seconds": round(wait, 1), "min_interval": MIN_CALL_INTERVAL_S}})
         time.sleep(wait)
 
+SENDS = {"n": 0}  # transports that completed (any HTTP status); <= reservations
+
+def _confirm_send():
+    """Mark the newest unconfirmed reservation for this attempt as actually
+    sent. Reservations happen before transport (conservative accounting);
+    confirmed sends are the real-request count. Independent review F6:
+    report the two separately."""
+    SENDS["n"] += 1
+    if not BUDGET_LEDGER:
+        return
+    with open(BUDGET_LEDGER, "a+") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            data = _ledger_read(f)
+            for h in reversed(data.get("history", [])):
+                if h.get("attempt") == ATTEMPT and "sent_utc" not in h:
+                    h["sent_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                    break
+            f.seek(0); f.truncate(); json.dump(data, f); f.flush(); os.fsync(f.fileno())
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
+
 def _store_reset_hint(seconds):
     if not BUDGET_LEDGER or seconds is None:
         return
@@ -368,6 +422,7 @@ def api(messages):
     if p.returncode != 0:
         record({"api_error": {"kind": "transport", "detail": p.stderr[:300]}})
         raise RuntimeError(f"curl failed: {p.stderr[:300]}")
+    _confirm_send()  # transport completed; HTTP status handled below
     body, _, status = p.stdout.rpartition("\n")
     try:
         r = json.loads(body)
@@ -381,7 +436,7 @@ def api(messages):
             _store_reset_hint(_retry_hint_s(r["error"]))
         record({"api_error": {"kind": "api", "status": status.strip(), "detail": r["error"],
                               "rate_headers": rate_headers}})
-        kind = _classify_tool_rejection(r.get("error"))
+        kind = _classify_tool_rejection(r.get("error"), status)
         if kind:
             # Recoverable: the provider rejected the model's own malformed tool
             # output. The raw failure is recorded above; main() decides the
@@ -490,11 +545,20 @@ def run_tool(name, args):
             err = safe_path(path)
             if err: return {"ok": False, "error": err}
             if CRED.search(content): return {"ok": False, "error": "credential-pattern content refused"}
-            if PLACEHOLDER_RE.match(content.strip()): return {"ok": False, "error": "placeholder/stub content refused; write the complete file"}
             if len(content.encode()) > MAX_BYTES: return {"ok": False, "error": f"content exceeds {MAX_BYTES}-byte write cap; use edit_file anchored edits for existing files or split the work"}
             full = os.path.join(REPO, path)
+            if os.path.exists(full):
+                # Independent review 2026-11-04 (F2): the byte cap limited the
+                # INCOMING payload, so a large existing file could be truncated
+                # to empty/stub. Overwrites are limited to files this run
+                # created; everything else goes through anchored edit_file.
+                if path not in CREATED_THIS_RUN:
+                    return {"ok": False, "error": "file exists and was not created by this run; use edit_file anchored edits (existing-file overwrite refused)"}
+                if open(full, encoding="utf-8").read() == content:
+                    return {"ok": False, "error": "no-op write refused (content identical to existing file)"}
             os.makedirs(os.path.dirname(full), exist_ok=True)
             open(full, "w").write(content)
+            CREATED_THIS_RUN.add(path)
             return {"ok": True, "path": path, "bytes": len(content.encode())}
         if name == "edit_file":
             path = args.get("path", "")
@@ -503,7 +567,13 @@ def run_tool(name, args):
             if err: return {"ok": False, "error": err}
             if not old: return {"ok": False, "error": "old_string must be non-empty"}
             if old == new: return {"ok": False, "error": "no-op edit refused (old_string == new_string); nothing would change"}
-            if PLACEHOLDER_RE.match(new.strip()): return {"ok": False, "error": "placeholder/stub content refused; emit the complete replacement code, never a placeholder"}
+            if _codeish(old) and _stub_only(new) and not DELETIONS_ALLOWED:
+                # Destructive content-free replacement of code (observed live:
+                # b11/b13 '# placeholder'; review probes: empty string,
+                # '# placeholder: implement later', '# placeholder\n# TODO',
+                # 'pass'). Legitimate deletions require the task file to
+                # declare 'deletions-allowed: true' (grounded scope).
+                return {"ok": False, "error": "content-free replacement of code refused (empty/stub/comment-only); emit the complete replacement code, or have the task declare 'deletions-allowed: true' for a real deletion"}
             if CRED.search(new): return {"ok": False, "error": "credential-pattern content refused"}
             if len(old.encode()) > EDIT_MAX_BYTES or len(new.encode()) > EDIT_MAX_BYTES:
                 return {"ok": False, "error": f"edit strings exceed {EDIT_MAX_BYTES}-byte cap; split into smaller anchored edits"}
@@ -597,13 +667,16 @@ def main():
                 print(f"abort: provider rejected {tool_recoveries} generations for malformed tool calls; "
                       f"budget spent, failing closed")
                 return
+            full_msg = _bounded(str(err.get("message") or ""), FEEDBACK_CAP)
             if rej["kind"] == "unknown_tool":
                 why = ("it called a tool that does not exist. ONLY these tools exist: "
-                       "write_file, edit_file, git_commit, git_push.")
+                       "write_file, edit_file, git_commit, git_push. "
+                       "The provider's full error: " + full_msg)
             else:
-                why = ("its arguments failed schema validation (" +
-                       str(err.get("message"))[:150] + "). edit_file takes exactly "
-                       "path, old_string, new_string - there are no line numbers.")
+                why = ("its arguments failed schema validation. "
+                       "The provider's full error: " + full_msg +
+                       " edit_file takes exactly path, old_string, new_string - "
+                       "there are no line numbers.")
             messages.append({"role": "user", "content":
                 "[harness note - provider rejection, not model output] Your previous "
                 "generation was rejected because " + why + " Re-issue your intended "
@@ -659,7 +732,7 @@ def main():
                 record({"history_elided": {"path": args.get("path", ""), "bytes": nbytes}})
             if name == "git_push" and result.get("ok"):
                 record({"run_complete": {"reason": "git_push succeeded", "round": rnd + 1,
-                                         "api_calls": CALLS["n"]}})
+                                         "reserved": CALLS["n"], "confirmed_sends": SENDS["n"]}})
                 print(f"round {rnd+1}: git_push succeeded; run complete ({CALLS['n']} API calls)")
                 return
     print(f"round cap {MAX_ROUNDS} reached; stopping")
