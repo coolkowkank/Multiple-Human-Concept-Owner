@@ -96,5 +96,53 @@
       "x-ratelimit-reset-tokens": "36.952s"
     },
     "call": 4
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-a1ed11c0-6abb-45f4-af49-28e223f1bd9e",
+      "object": "chat.completion",
+      "created": 1793796549,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "Now commit and push.",
+            "tool_calls": [
+              {
+                "id": "fc_842f9a90-fc58-4df3-b525-52a3bfc5f3a3",
+                "type": "function",
+                "function": {
+                  "name": "git_commit",
+                  "arguments": "{\"message\":\"Fix test_no_stall_utc: use larger stall_timeout and ensure TZ is restored. Added complementary stall test. TURN: builder\"}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.175025766,
+        "prompt_tokens": 3804,
+        "prompt_time": 0.236723813,
+        "completion_tokens": 51,
+        "completion_time": 0.111274085,
+        "total_tokens": 3855,
+        "total_time": 0.347997898,
+        "completion_tokens_details": {
+          "reasoning_tokens": 6
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_f640395b96",
+      "x_groq": {
+        "id": "req_01m6k9pa26e6rvkca5v27g0tty",
+        "seed": 409686501
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
