@@ -52,8 +52,9 @@ def _now():
 
 class Seat:
     def __init__(self, bus: Bus, name, poll_interval=5, lease_ttl=900,
-                 instance_id=None, relay=None, webhook=None):
+                 instance_id=None, relay=None, webhook=None, completion_session=None):
         self.bus = bus
+        self.completion_session = completion_session
         self.name = name
         self.poll_interval = poll_interval
         self.lease_ttl = lease_ttl
@@ -130,7 +131,13 @@ class Seat:
         if state.get("turn") != self.name:
             return False
 
+        completion_snapshot = self.completion_session.snapshot() if self.completion_session else None
+
         def mutate():
+            if self.completion_session:
+                # Bus may replay the callback after a lost commit race. Evidence
+                # from the abandoned attempt is not a committed observation.
+                self.completion_session.restore(completion_snapshot)
             state = self.bus.state()
             if state.get("turn") != self.name:
                 return False
@@ -170,7 +177,30 @@ class Seat:
                 consume()
             return True
 
-        return self.bus.transact(f"TURN: {self.name} acting", mutate)
+        try:
+            result = self.bus.transact(f"TURN: {self.name} acting", mutate)
+        except Exception:
+            if self.completion_session:
+                self.completion_session.restore(completion_snapshot)
+            raise
+        if self.completion_session:
+            try:
+                self.completion_session.confirm_committed(self.bus.repo)
+            except Exception as exc:
+                # Fail closed in durable state too, not just the return value.
+                def invalidate():
+                    failed = self.bus.state()
+                    failed['status'] = 'blocked'
+                    failed['turn'] = None
+                    failed['status_line'] = 'Completion unconfirmed after commit'
+                    self.bus.write_state(failed)
+                try:
+                    self.bus.transact('operator: invalidate unconfirmed completion', invalidate)
+                except Exception:
+                    pass  # Surface the original check failure; never claim done.
+                self.completion_session.restore(completion_snapshot)
+                raise SeatError('completion unconfirmed after commit') from exc
+        return result
 
     def run(self, max_passes=None):
         passes = 0
@@ -499,6 +529,12 @@ class Seat:
                 self._write(self.bus.repo, path, content)
             tail = []
 
+        if self.completion_session:
+            try:
+                self.completion_session.observe(self, state, response)
+            except Exception as exc:
+                raise SeatError('completion evidence observation failed') from exc
+
         seq = state["turn_seq"] + 1
         handoff = response.get("handoff")
         seats = self.bus.roster().get("seats", {})
@@ -527,8 +563,21 @@ class Seat:
         if response.get("status_line"):
             state["status_line"] = response["status_line"]
         if response.get("status_line", "").startswith("DONE"):
-            state["status"] = "done"
-            state["turn"] = None
+            if self.completion_session:
+                try:
+                    eligible, reason = self.completion_session.decide(self)
+                except Exception as exc:
+                    raise SeatError('completion binding check failed') from exc
+                if not eligible:
+                    self.bus.open_gate(self.name, 'Completion refused: ' + reason)
+                    state['status'] = 'blocked'
+                    state['turn'] = None
+                else:
+                    state['status'] = 'done'
+                    state['turn'] = None
+            else:
+                state["status"] = "done"
+                state["turn"] = None
         elif state["status"] == "forming":
             state["status"] = "running"
         self.bus.write_state(state)
