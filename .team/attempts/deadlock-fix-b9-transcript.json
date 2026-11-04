@@ -144,5 +144,15 @@
       },
       "service_tier": "on_demand"
     }
+  },
+  {
+    "tool_call": "git_commit",
+    "args": {
+      "message": "Fix test_no_stall_utc: use larger stall_timeout and ensure TZ is restored. Added complementary stall test. TURN: builder"
+    },
+    "result": {
+      "ok": true,
+      "head": "45cec13eaf9dc0477f55b545042ffa453a00f20e"
+    }
   }
 ]
