@@ -324,5 +324,11 @@
       "ok": true,
       "head": "0fa083a0585f6d8bb4ee9f1e7c82fa8efe06a0e0"
     }
+  },
+  {
+    "pacing_wait": {
+      "seconds": 56.9,
+      "min_interval": 65.0
+    }
   }
 ]
