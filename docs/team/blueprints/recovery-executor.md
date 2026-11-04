@@ -4,6 +4,10 @@
   1793807666.323859 and 1793807753.116989: WP4 and WP9 transfer off
   the Coordinator, who executes zero WP jobs while any job is late).
 - **Instance:** recovery-1, alias unassigned.
+- **Reports to:** Coordinator Assistant assistant-2 (priorities, blockers;
+  role defined 2026-11-04, currently vacant, so escalations go to the
+  Coordinator until it is held). Technical acceptance stays with
+  independent review, not the assistant.
 - **Purpose:** finish the two late work packages the Coordinator was
   carrying, with measured evidence, not status prose.
 - **Current model / provider:** NONE. Operator execution only. No
