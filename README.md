@@ -11,7 +11,7 @@
 
 *Latest update: 2026-11-04 17:30 EET. [Static full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/team/) (GitHub Pages, selectable text, responsive cards; the picture below is the fallback). No role is currently vacant; Ryan has no qualified backup route yet, so replacement proposals go to the Coordinator; "not project-configured" means no documented model or provider.*
 
-![Current Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/973c36ff54f72cdfcdf19513bc7b50d748e999ec/docs/progress/team.png)
+![Current Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/aadf4a1a5301e2eac44637d1c0c78a064757acfa/docs/progress/team.png)
 
 ### Coordinator work timeline
 
