@@ -1,0 +1,41 @@
+{
+  "findings": [
+    {
+      "id": "C1",
+      "claim": "Swapping the model flips task outcomes more (22% at median) than swapping the harness (13%) or rerunning the same configuration (13%) on the hard45 subset.",
+      "sources": ["P3"],
+      "status": "SUPPORTED_BY_PACKET"
+    },
+    {
+      "id": "C2",
+      "claim": "Model rankings reverse across harnesses: Claude scores 36/63 vs GPT 31/63 in OpenHands, but PI records 19/63 for Claude and 38/63 for GPT.",
+      "sources": ["P1"],
+      "status": "SUPPORTED_BY_PACKET"
+    },
+    {
+      "id": "C3",
+      "claim": "Harness equivalence (CC vs mini-SWE within 5 percentage points) holds only for two Qwen models; OpenCode loses up to 9.2 percentage points relative to the other harnesses.",
+      "sources": ["P4"],
+      "status": "SUPPORTED_BY_PACKET"
+    },
+    {
+      "id": "C4",
+      "claim": "Model contrasts (Opus vs GPT) show wide confidence intervals (Opus -1.25 pp CI [-10,+7.5]; GPT +1.25 pp CI [-4.4,+6.9]) that do not establish equivalence or give a transportable probability of superiority.",
+      "sources": ["P5"],
+      "status": "SUPPORTED_BY_PACKET"
+    },
+    {
+      "id": "C5",
+      "claim": "OpenCode's harness advantage shrinks from about 6 to 2.67 percentage points as tool calls increase from 39.87 to 72.23.",
+      "sources": ["P7"],
+      "status": "SUPPORTED_BY_PACKET"
+    },
+    {
+      "id": "C6",
+      "claim": "Across 7 rerun pairs of 5 crossed models, model swaps flip 16% of task outcomes.",
+      "sources": ["P3"],
+      "status": "SUPPORTED_BY_PACKET"
+    }
+  ],
+  "summary": "Model selection has a larger effect on task performance than harness selection or rerun variance: model swaps flip 22% of tasks (median) versus 13% for harness swaps and 13% for reruns (P3). Model-harness interactions are substantial: rankings reverse between OpenHands and PI (P1), harness equivalence holds only for specific models (P4), and OpenCode's advantage varies with tool-call volume (P7). Model contrasts show wide CIs that do not establish equivalence (P5)."
+}

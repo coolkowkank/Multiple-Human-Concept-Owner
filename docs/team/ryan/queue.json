@@ -61,7 +61,7 @@
     {
       "id": "research-model-vs-harness",
       "kind": "research",
-      "status": "drafted",
+      "status": "superseded-by-packet-v2",
       "attempts": {
         "researcher": 1,
         "verifier": 1
@@ -141,7 +141,142 @@
           "passage": "F2PF 28% -> 49%, solves 43 -> 72, 169 tasks, 20,480 window"
         }
       ],
-      "note": "Researcher draft exists (1 request, ok, cost 0). UNVERIFIED model output. Next: verification review only on a new operator decision.",
+      "note": "Superseded by research-model-vs-harness-v2 (packet version 2, same draft). Kept unchanged otherwise for audit: v1 packet, attempts and run output.",
+      "findings": [
+        {
+          "id": "C1",
+          "claim": "Swapping the model flips task outcomes more (22% at median) than swapping the harness (13%) or rerunning the same configuration (13%) on the hard45 subset.",
+          "sources": [
+            "P3"
+          ],
+          "status": "SUPPORTED_BY_PACKET"
+        },
+        {
+          "id": "C2",
+          "claim": "Model rankings reverse across harnesses: Claude scores 36/63 vs GPT 31/63 in OpenHands, but PI records 19/63 for Claude and 38/63 for GPT.",
+          "sources": [
+            "P1"
+          ],
+          "status": "SUPPORTED_BY_PACKET"
+        },
+        {
+          "id": "C3",
+          "claim": "Harness equivalence (CC vs mini-SWE within 5 percentage points) holds only for two Qwen models; OpenCode loses up to 9.2 percentage points relative to the other harnesses.",
+          "sources": [
+            "P4"
+          ],
+          "status": "SUPPORTED_BY_PACKET"
+        },
+        {
+          "id": "C4",
+          "claim": "Model contrasts (Opus vs GPT) show wide confidence intervals (Opus -1.25 pp CI [-10,+7.5]; GPT +1.25 pp CI [-4.4,+6.9]) that do not establish equivalence or give a transportable probability of superiority.",
+          "sources": [
+            "P5"
+          ],
+          "status": "SUPPORTED_BY_PACKET"
+        },
+        {
+          "id": "C5",
+          "claim": "OpenCode's harness advantage shrinks from about 6 to 2.67 percentage points as tool calls increase from 39.87 to 72.23.",
+          "sources": [
+            "P7"
+          ],
+          "status": "SUPPORTED_BY_PACKET"
+        },
+        {
+          "id": "C6",
+          "claim": "Across 7 rerun pairs of 5 crossed models, model swaps flip 16% of task outcomes.",
+          "sources": [
+            "P3"
+          ],
+          "status": "SUPPORTED_BY_PACKET"
+        }
+      ]
+    },
+    {
+      "id": "research-model-vs-harness-v2",
+      "kind": "research",
+      "status": "drafted",
+      "attempts": {
+        "researcher": 1
+      },
+      "question": "How much does model selection change task performance when the harness (prompts, tools, scaffolding) is held fixed, and which model-harness interactions matter? Keep published findings separate from anything tested on this project.",
+      "packet": [
+        {
+          "id": "P1",
+          "title": "M1 rank reversal (as reported by an independent checker of the PDF)",
+          "locations": [
+            "https://arxiv.org/pdf/2610.00917 p4 Table 1; pp4-5 sec 4.1"
+          ],
+          "passage": "\"Claude records 36/63 in OpenHands and GPT records 31/63\"; PI \"records 19/63 and 38/63, respectively\""
+        },
+        {
+          "id": "P2",
+          "title": "M1 cost (as reported by an independent checker of the PDF)",
+          "locations": [
+            "https://arxiv.org/pdf/2610.00917 sec 4.3"
+          ],
+          "passage": "GPT PI $4.66/task at 60.32% vs DSH $19.94 at 52.38% (OpenRouter API prices incl. auxiliary calls; not billed savings)"
+        },
+        {
+          "id": "P3",
+          "title": "M3 discordance (as reported by an independent checker of the PDF)",
+          "locations": [
+            "https://arxiv.org/pdf/2610.04433 p6 sec 4.2 / Fig 2; p17 App F",
+            "https://arxiv.org/pdf/2610.04433 PDF p17 of 22, Appendix F (printed p25)"
+          ],
+          "passage": "\"Reruns on hard45 flip 13% of tasks at the median, and harness swaps flip the same 13%. Swapping the model flips more, 22% at the median\"; App F: 16% over 7 rerun pairs of the 5 crossed models; Appendix F \"Resolution of a paired comparison\": \"Across the ten rerun pairs on hard45 the median flip rate is 13%, and 16% over the 7 pairs on the five ladder models, since Claude Opus 5's three reruns are the quietest; across the 15 harness pairs it is 13%, and across the model pairs 22% at the median and up to 56%. On pool447 the one rerun pair flips 13% of tasks and the six harness pairs flip 9 to 16%.\""
+        },
+        {
+          "id": "P4",
+          "title": "M3 equivalence scope (as reported by an independent checker of the PDF)",
+          "locations": [
+            "https://arxiv.org/pdf/2610.04433 p5 Table 1; pp14-16"
+          ],
+          "passage": "CC vs mini-SWE within 5 pp on two Qwen models only; OpenCode loses up to 9.2 pp"
+        },
+        {
+          "id": "P5",
+          "title": "M5 contrasts (as reported by an independent checker of the PDF)",
+          "locations": [
+            "https://arxiv.org/pdf/2609.11987 pp7-9 Tables 3-5; p8"
+          ],
+          "passage": "Opus -1.25 pp CI [-10,+7.5]; GPT +1.25 pp CI [-4.4,+6.9]; \"They do not establish equivalence, and they do not give a transportable probability...\""
+        },
+        {
+          "id": "P6",
+          "title": "M5 selection (as reported by an independent checker of the PDF)",
+          "locations": [
+            "https://arxiv.org/pdf/2609.11987 pp4-5 sec 2.3"
+          ],
+          "passage": "80 of 256 tasks, outcome-informed screen; split post hoc (Table 5)"
+        },
+        {
+          "id": "P7",
+          "title": "M2 tool calls and OpenCode advantage (as reported by an independent checker of the PDF)",
+          "locations": [
+            "https://arxiv.org/pdf/2609.32459 pp6-7 sec 4.4/5.1.1, Fig 5/Table 4"
+          ],
+          "passage": "OpenCode advantage about 6 -> 2.67 pp; tool calls 39.87 -> 72.23"
+        },
+        {
+          "id": "P8",
+          "title": "M6 harness rankings (as reported by an independent checker of the PDF)",
+          "locations": [
+            "https://arxiv.org/pdf/2610.32483 p8 sec 5.3"
+          ],
+          "passage": "4x4 on four benchmarks, R=4, VCR defined as normal evaluable completion irrespective of correctness"
+        },
+        {
+          "id": "P9",
+          "title": "M7 harness treatment (as reported by an independent checker of the PDF)",
+          "locations": [
+            "https://arxiv.org/pdf/2608.26218 p9 Table 2, sec 4.1-4.2"
+          ],
+          "passage": "F2PF 28% -> 49%, solves 43 -> 72, 169 tasks, 20,480 window"
+        }
+      ],
+      "note": "Packet version 2 for the SAME unchanged Researcher draft (6 findings, copied verbatim from the v1 run). Only P3's passage is extended with the paper's own Appendix F text. v1 item, its packet and run output are kept for audit. Draft is UNVERIFIED model output; its wrong/unsupported claims are not corrected here. Not runnable beyond the one operator-authorised Verifier attempt.",
       "findings": [
         {
           "id": "C1",
