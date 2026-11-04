@@ -1,0 +1,27 @@
+{
+  "batch": 7,
+  "attempt": "reviewer-guard-b13",
+  "closed_utc": "2026-11-04T13:58:00Z",
+  "purpose": "reviewer-skip acceptance guard (task file 55e7c7e), first run on hardened executor 321257b",
+  "budget": {
+    "cap": 8,
+    "reserved": 6,
+    "real_sends": 4,
+    "reset": false,
+    "note": "6/8 reserved, 4 real provider responses (3 completed + 1 fatal error); 2 reservations frozen, never reused. One launch incident: sandbox killed the first process after 1 real send; same-batch process resumed on the same ledger, no budget reset."
+  },
+  "result": {
+    "built": false,
+    "pushed": null,
+    "remote": "live/reviewer-skip-guard unchanged at 55e7c7ef785fdb0eceb78208c0fb501ca3243e72",
+    "guard_status": "UNBUILT - reported as failed/unbuilt, not progress",
+    "failure_modes": [
+      "destructive placeholder: DONE-check line replaced with '# placeholder' (recurrence of b11 pattern)",
+      "wrong-schema tool call: edit_file invoked with invented line_start/line_end -> provider tool_use_failed 'did not match schema' -> fatal under v1 narrow classifier"
+    ],
+    "evidence": "diff sha256 690c54f32e2e6f8e5d8ef6930193417bd0d29b105de6f3862b58258ffcfeb9b5 (discarded after capture); transcript sha256 2bddc3ea07f5a644e1055095abe050f2f1ef9bd7bef73d8f370d59f6a9b291b6",
+    "followup": "hardening v2 proposal 77ed57a8cc679900472943d2d36b1693e0b4226e (placeholder guard + schema-rejection recovery) under independent review; NO rollout"
+  },
+  "api_calls_reserved": 6,
+  "api_calls_real": 4
+}
