@@ -11,7 +11,7 @@
 
 *Latest update: 2026-11-04 20:01 EET. [Static full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/team/) (selectable text, responsive cards; picture below is the fallback). Builder 2 carries the former Recovery Executor WP4/WP9 work, with no model configured. Bill accepts individually scoped read-only review requests and returns verdicts. No second Coordinator Assistant. Ryan's Researcher produces findings, his Verifier checks references, then Ryan reviews verified output. Researcher provisionally uses Nemotron-3 Ultra, Ryan and his Verifier provisionally use Ling 3.1 Flash in separate executions. All are UNQUALIFIED / PAUSED, not running. The Coordinator selects and assigns models; Ryan does not. Sam remains beside the Coordinator; Ryan is a side branch, not a serial manager.*
 
-![Current Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/26f7472bd0244862dbcd7274634625d45da5bafc/docs/progress/team.png)
+![Current Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/e037bf10f07f368efec6a1276791a60953675bd5/docs/progress/team.png)
 
 ### Coordinator work timeline
 
@@ -52,9 +52,9 @@
 **Individual jobs are in the same Gantt diagram**, after WP and RW rows. The chart includes latch revisions, independent reviews, performance analysis and Builder 2 work (formerly Recovery Executor). Markers show dated outputs or reviews only, not continuous runtime, idle time or extra milestone credit. Coordinator coordination is excluded.
 
 
-![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/26f7472bd0244862dbcd7274634625d45da5bafc/docs/progress/gantt.png)
+![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/e037bf10f07f368efec6a1276791a60953675bd5/docs/progress/gantt.png)
 
-![Progress S-curve](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/26f7472bd0244862dbcd7274634625d45da5bafc/docs/progress/s-curve.png)
+![Progress S-curve](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/e037bf10f07f368efec6a1276791a60953675bd5/docs/progress/s-curve.png)
 
 **[Open the Gantt chart and S-curve as a page](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/charts/)** (click a row for status and evidence). The page and these pictures change only when the project evidence changes; a check that finds nothing new leaves them as they are.
 
