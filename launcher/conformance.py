@@ -94,11 +94,15 @@ def check_repo(repo):
                 problems.append(
                     f"LOG.jsonl line {lineno}: {seat!r} is not a roster seat")
             seq = entry.get("turn_seq")
-            if seq is not None:
+            # Interface v0.1 section 2: turn_seq is optional per entry and
+            # retries may reuse a seq. Strictly-increasing is the
+            # exactly-once tripwire for TURN-ADVANCING entries (handoffs);
+            # other kinds are annotations and may reference any seq.
+            if kind == "handoff" and seq is not None:
                 if not isinstance(seq, int) or seq <= last_seq:
                     problems.append(
-                        f"LOG.jsonl line {lineno}: turn_seq {seq} not "
-                        f"strictly increasing after {last_seq}")
+                        f"LOG.jsonl line {lineno}: handoff turn_seq {seq} "
+                        f"not strictly increasing after {last_seq}")
                 else:
                     last_seq = seq
             if kind == "handoff":

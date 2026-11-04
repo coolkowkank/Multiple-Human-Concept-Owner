@@ -49,7 +49,11 @@ class Seat:
         self.spec = roster["seats"][name]
         self.role = self.spec.get("role", name)
         self.allowed_paths = self.spec.get("allowed_paths", [])
-        self.adapter = build_adapter(self.spec.get("adapter", {"type": "mock"}))
+        adapter_spec = dict(self.spec.get("adapter", {"type": "mock"}))
+        sp = adapter_spec.get("script_path")
+        if sp and not os.path.isabs(sp):
+            adapter_spec["script_path"] = os.path.join(bus.repo, sp)
+        self.adapter = build_adapter(adapter_spec)
 
     # -- lease: one active session per seat ----------------------------
 

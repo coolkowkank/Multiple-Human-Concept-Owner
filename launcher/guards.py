@@ -45,12 +45,12 @@ def check_commit(repo, message, staged_paths):
     # always come from the runtime, which stamps "TURN: <seat>", so a
     # seat cannot mint these prefixes itself.
     head = message.lstrip().split("\n", 1)[0].lower()
-    if head.startswith(("human:", "supervisor:")):
+    if head.startswith(("human:", "supervisor:", "operator:")):
         return []
     match = TURN_RE.search(message)
     if not match:
-        return ["commit message lacks a 'TURN: <seat>' line "
-                "(or an operational 'human:'/'supervisor:' prefix)"]
+        return ["commit message lacks a 'TURN: <seat>' line (or an "
+                "operational 'human:'/'supervisor:'/'operator:' prefix)"]
     seat = match.group(1)
     if seat == "setup":
         return problems

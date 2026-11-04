@@ -115,6 +115,8 @@ class GuardTests(unittest.TestCase):
                                       ["anything"]), [])
         self.assertEqual(check_commit(self.repo, "supervisor: restart",
                                       ["anything"]), [])
+        self.assertEqual(check_commit(self.repo, "operator: glue commit",
+                                      ["anything"]), [])
 
     def test_setup_turn_allowed(self):
         self.assertEqual(check_commit(self.repo, "TURN: setup", ["anything"]), [])
@@ -394,6 +396,7 @@ class ConformanceTests(unittest.TestCase):
             with open(os.path.join(repo, ".team", "LOG.jsonl"), "a") as fh:
                 fh.write('{"ts":"t","seat":"ghost","kind":"weird","body":"b","turn_seq":5}\n')
                 fh.write('{"ts":"t","seat":"builder","kind":"handoff","body":"did x | verify: `pytest`","turn_seq":3}\n')
+                fh.write('{"ts":"t","seat":"builder","kind":"handoff","body":"again | verify: `pytest` exit=0","turn_seq":2}\n')
                 fh.write('not json\n')
             problems, _ = check_repo(repo)
             text = "\n".join(problems)
@@ -414,6 +417,61 @@ class ConformanceTests(unittest.TestCase):
             self.assertTrue(any("unknown gate" in p for p in problems))
         finally:
             shutil.rmtree(repo, ignore_errors=True)
+
+
+class ConformanceSeqTests(unittest.TestCase):
+    def _repo_with_log(self, lines):
+        repo, bus = make_repo(seats={"builder": seat_spec([], ["src/"])})
+        with open(os.path.join(repo, ".team", "LOG.jsonl"), "a") as fh:
+            for l in lines:
+                fh.write(l + "\n")
+        self.addCleanup(shutil.rmtree, repo, True)
+        return repo
+
+    def test_status_annotations_may_reference_any_seq(self):
+        from launcher.conformance import check_repo
+        repo = self._repo_with_log([
+            '{"ts":"t","seat":"builder","kind":"handoff","body":"x","turn_seq":1}',
+            '{"ts":"t","seat":"builder","kind":"status","body":"note about turn 1","turn_seq":1}',
+            '{"ts":"t","seat":"builder","kind":"status","body":"late correction","turn_seq":0}',
+        ])
+        from launcher.conformance import check_repo
+        problems, _ = check_repo(repo)
+        self.assertEqual(problems, [], f"annotations flagged: {problems}")
+
+    def test_duplicate_or_decreasing_handoff_seq_flagged(self):
+        from launcher.conformance import check_repo
+        repo = self._repo_with_log([
+            '{"ts":"t","seat":"builder","kind":"handoff","body":"x","turn_seq":1}',
+            '{"ts":"t","seat":"builder","kind":"handoff","body":"retry","turn_seq":1}',
+        ])
+        problems, _ = check_repo(repo)
+        self.assertTrue(any("not strictly increasing" in p for p in problems))
+
+
+class MockQueueTests(unittest.TestCase):
+    def _queue(self, responses):
+        fd, path = tempfile.mkstemp(suffix=".jsonl")
+        with os.fdopen(fd, "w") as fh:
+            for r in responses:
+                fh.write(json.dumps(r) + "\n")
+        self.addCleanup(os.unlink, path)
+        return path
+
+    def test_pop_persists_across_processes(self):
+        from launcher.adapters import MockAdapter
+        path = self._queue([{"summary": "turn one"}, {"summary": "turn two"}])
+        # two separate adapter instances = two separate --once processes
+        r1 = MockAdapter([], script_path=path).complete("s", "p")
+        r2 = MockAdapter([], script_path=path).complete("s", "p")
+        self.assertEqual(r1["summary"], "turn one")
+        self.assertEqual(r2["summary"], "turn two")
+
+    def test_empty_queue_raises(self):
+        from launcher.adapters import MockAdapter, AdapterError
+        path = self._queue([])
+        with self.assertRaises(AdapterError):
+            MockAdapter([], script_path=path).complete("s", "p")
 
 
 class FalseGreenTests(unittest.TestCase):

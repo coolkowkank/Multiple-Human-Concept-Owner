@@ -34,14 +34,29 @@ class Adapter:
 
 class MockAdapter(Adapter):
     """Scripted adapter. `script` maps call index -> response dict,
-    or a callable(system, prompt, call_index) -> dict."""
+    or a callable(system, prompt, call_index) -> dict.
 
-    def __init__(self, script):
+    `script_path` (JSONL file) is the multi-process variant: each call
+    pops the first line and persists the remainder, so separate
+    `seat --once` processes consume successive prepared responses
+    instead of every process restarting at script[0]."""
+
+    def __init__(self, script, script_path=None):
         self.script = script
+        self.script_path = script_path
         self.calls = []
 
     def complete(self, system, prompt):
         self.calls.append({"system": system, "prompt": prompt})
+        if self.script_path:
+            with open(self.script_path) as fh:
+                lines = [l for l in fh.read().splitlines() if l.strip()]
+            if not lines:
+                raise AdapterError(
+                    f"mock script queue empty at {self.script_path}")
+            with open(self.script_path, "w") as fh:
+                fh.write("\n".join(lines[1:]) + ("\n" if len(lines) > 1 else ""))
+            return json.loads(lines[0])
         i = len(self.calls) - 1
         if callable(self.script):
             return self.script(system, prompt, i)
@@ -139,7 +154,8 @@ def build_adapter(spec):
     """Build an adapter from a roster spec dict."""
     kind = spec.get("type", "mock")
     if kind == "mock":
-        return MockAdapter(spec.get("script", []))
+        return MockAdapter(spec.get("script", []),
+                           script_path=spec.get("script_path"))
     if kind == "cli":
         return CliAdapter(spec["command"], timeout=spec.get("timeout", 1800))
     if kind == "http":
