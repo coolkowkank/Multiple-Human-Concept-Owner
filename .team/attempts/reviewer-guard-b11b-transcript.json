@@ -82,5 +82,25 @@
       "seconds": 60.7,
       "min_interval": 65.0
     }
+  },
+  {
+    "api_error": {
+      "kind": "api",
+      "status": "400",
+      "detail": {
+        "message": "Tool call validation failed: tool call validation failed: attempted to call tool 'exec' which was not in request.tools",
+        "type": "invalid_request_error",
+        "code": "tool_use_failed",
+        "failed_generation": "{\"name\": \"exec\", \"arguments\": {\"cmd\":[\"bash\",\"-lc\",\"ls -R\"]}}"
+      },
+      "rate_headers": {
+        "x-ratelimit-limit-requests": "1000",
+        "x-ratelimit-limit-tokens": "8000",
+        "x-ratelimit-remaining-requests": "999",
+        "x-ratelimit-remaining-tokens": "6549",
+        "x-ratelimit-reset-requests": "1m26.4s",
+        "x-ratelimit-reset-tokens": "10.882s"
+      }
+    }
   }
 ]
