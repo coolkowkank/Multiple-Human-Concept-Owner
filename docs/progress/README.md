@@ -10,6 +10,12 @@ Charts at the top of the main README come from `progress.json` and `render_progr
 - Credit is dated when the evidence was observed, so the curve does not claim earlier progress than the repo shows.
 - Weights are a judgment call by the maintainers of this chart. They are not effort estimates.
 
+## Research package criteria
+
+The Researcher role's deliverable is sourced literature insight, so WP8a does not require product adoption.
+- WP8a done: a published note whose citations resolve, whose key numbers match the sources, and which labels evidence class, limits and a proposed experiment. Partial while only some claims have been checked against sources.
+- WP8b done: a finding tested in an experiment on this prototype with results recorded. Adopting it is a separate decision.
+
 ## What the forecast is
 
 No plan or schedule existed before 2026-11-04 14:40 EET, so there is no planned-versus-actual history and none is invented here. The dashed forecast is a baseline set on that date. Later updates keep it visible so slips show up honestly. It is a guess, not a commitment.

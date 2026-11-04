@@ -21,7 +21,7 @@ plt.rcParams["svg.fonttype"] = "none"; plt.rcParams["font.family"] = "DejaVu San
 x0, x1 = D(2026,11,3,12), D(2026,11,5,15)
 
 # Gantt
-fig, ax = plt.subplots(figsize=(11, 5.6))
+fig, ax = plt.subplots(figsize=(11, 6.1))
 for i, p in enumerate(P):
     y = len(P) - 1 - i; s = t(p["start"])
     if p["status"] in ("verified", "partial"):

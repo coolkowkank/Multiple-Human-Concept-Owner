@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04T14:45:00+02:00",
+ "as_of": "2026-11-04T14:44:00+02:00",
  "timezone": "EET (UTC+2), same as commit timestamps",
  "rules": "Weighted milestone progress, not independently verified completion. Milestone done = 100% of weight (tests pass or an independent review passed). Partial = 50%. In progress / not started = 0%. Weights are judgment calls. Commits alone never count.",
  "packages": [
@@ -74,13 +74,24 @@
    "evidence": "Waits for green tests on WP5"
   },
   {
-   "id": "WP8",
-   "name": "Research_lab: literature insights",
-   "weight": 5,
-   "status": "in_progress",
+   "id": "WP8a",
+   "name": "Researcher: sourced literature findings",
+   "weight": 3,
+   "status": "partial",
    "start": "2026-11-04T14:35",
+   "end": "2026-11-04T14:44",
+   "credit_at": "2026-11-04T14:44",
    "forecast_end": "2026-11-04T20:00",
-   "evidence": "Research_lab: first literature note published (b42f670, 3 findings). Findings are untested and unreviewed, adoption not proven, so 0% until a finding is tested"
+   "evidence": "Note b42f670 published with citations, evidence classes, limits and proposed experiments. Independent spot check at 14:44: 3 of 3 arXiv links resolve with matching titles; F1 numbers match the paper abstract. F2 and F3 numbers not yet checked, so partial"
+  },
+  {
+   "id": "WP8b",
+   "name": "Researcher: a finding tested on this prototype",
+   "weight": 2,
+   "status": "not_started",
+   "start": "2026-11-04T20:00",
+   "forecast_end": "2026-11-05T06:00",
+   "evidence": "No experiment run yet. Adoption is a separate decision and is not required for WP8a"
   },
   {
    "id": "WP9",
