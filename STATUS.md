@@ -1,76 +1,75 @@
 # Project status: team launcher
 
-Current working branch: `team-launcher` (head `9407acc` plus the
-cross-clone proof commit on top - see git log). Frozen evidence
-branches: `rehearsal/i2i-1`, `rehearsal/i2i-2`, `rehearsal/live-1`,
-`evidence/groq-1`. None of the frozen branches are modified by ongoing
-work.
+Living tracker for findings and ongoing work. Finding IDs are stable
+across updates. States: `open` / `fixed-unverified` (fix + regression
+test landed, independent review pending) / `verified` (independently
+reproduced). Frozen evidence branches never change: `rehearsal/i2i-1`,
+`rehearsal/i2i-2`, `rehearsal/live-1`, `evidence/groq-1`.
 
-## What the launcher does
+New to the repo? Read `HANDOFF.md` first, then only what your task
+needs.
 
-Runs a small team of seats (coordinator, builder, reviewer, QC) that
-hand off work through a git-based bus. A seat's response can come from
-a mock, a queued human/agent-reasoned response (`launcher respond`),
-a local CLI, or an OpenAI-compatible HTTP endpoint, so models from
-different providers can join the same team through one mechanism.
+## Findings
 
-## Findings (live-1 review cycle, branch `rehearsal/live-1`)
+### Cycle live-1 (evidence frozen on branch `rehearsal/live-1`)
 
-A bounded live review cycle ran with genuinely reasoned turns:
-coordinator assignment, an independent peer review, an independent QC
-verdict, and a coordinator close. QC verdict: **PASS on the bounded
-review batch, NOT readiness for parallel or unattended operation.**
-The cycle found real defects:
-
-| # | Severity | Finding | Status |
-| --- | --- | --- | --- |
-| 1 | major | Queued responses had no binding to the bus state they were reasoned against; a stale response could be applied silently after the bus moved | Fixed (`9407acc`): `respond` stamps turn/turn_seq/head; the runtime refuses stale applies and preserves the queue |
-| 2 | minor | `launcher respond` staged with `git add -A`, sweeping unrelated dirty files into queue commits | Fixed (`9407acc`): only the queue file is staged |
-| 3 | minor | Rendering a prompt wrote a session-id file as a side effect | Fixed (`9407acc`): session ids are lazy, minted on first seat action |
-| 4 | minor | `respond` printed a seat command hinting a fixed branch, not the actual checkout | Fixed (`9407acc`): hint uses the real checkout branch and flags mismatches |
-
-Each fix has a regression test. Suite: 60 tests green, including a
-cross-clone integration test that reproduces the stale-response
-scenario through real processes and proves the refusal.
-
-Artifacts:
+Independent QC verdict: **PASS on the bounded review batch only - NOT
+readiness for parallel or unattended operation.**
 [review findings](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/rehearsal/live-1/review/live-1-findings.md)
 ·
-[independent QC verdict](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/rehearsal/live-1/review/live-1-qc.md)
+[QC verdict](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/rehearsal/live-1/review/live-1-qc.md)
 
-## Provider routes (access validation status)
+| ID | Sev | Finding | State |
+| --- | --- | --- | --- |
+| F1 | major | Queued responses unbound to bus state; stale apply possible | verified, fixed `9407acc` + cross-clone proof `a80255f` |
+| F2 | minor | `respond` swept untracked dirt via `git add -A` | verified, fixed `9407acc` |
+| F3 | minor | Prompt render wrote session-id file as side effect | verified, fixed `9407acc` |
+| F4 | minor | `respond` hinted fixed branch, not actual checkout | verified, fixed `9407acc` |
 
-Validation so far is credential-level only (non-inference calls);
-no provider is "working" for the team until a bounded live test passes.
+### Patch review of `9407acc` (independent, read-only)
 
-| Provider | Status |
+| ID | Finding | State |
+| --- | --- | --- |
+| P1 | Recovery blocker: stale first queue line kept; re-`respond` appended behind it; seat refuses same stale line forever | fixed-unverified |
+| P2 | Head binding incomplete: `_queue.head` stored but only turn/seq compared; head-only operator commit still applied | fixed-unverified |
+| P3 | `commit_paths` committed the whole pre-staged index, not just its paths | fixed-unverified |
+| P4 | `init` and gate-answer routes still used `git add -A`; audit wording corrected | fixed-unverified |
+
+P1-P4 fixes: P1 `respond` refuses to queue behind stale lines;
+`--discard-stale` is the verified recovery. P2 full head check
+(ancestor + queue-files-only diff). P3 pre-staged index is refused,
+never swept. P4 `init` and gate answers stage exactly their files.
+Regression tests pin each. Independent re-review pending; states move
+to `verified` only after it.
+
+## Provider routes (credential-level validation only)
+
+No provider is team-ready until a bounded live test passes. Keys live
+in the owner's vault, never in the repo.
+
+| Provider | State |
 | --- | --- |
-| Groq | Free plan confirmed by the account owner. Key validated via `/models`. Bounded live test passed (2 turns, fail then self-repair; termination gap recorded honestly): [evidence/groq-1](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/tree/evidence/groq-1/evidence/groq-1). Observed limits for `openai/gpt-oss-20b`: 8000 TPM / 1000 RPD |
-| Requesty | Key validated via the gateway's `/models` (808 models visible, free-tier models present). Per docs, free tier is 200 requests/day and 20/minute per organization, shared across all free models; no card required, no trial expiry. No inference run yet |
-| Cerebras | Key validated via `/models` (`qwen-3.8-27b`, `gpt-oss-120b`). Account plan and credit state are not yet established; no inference run |
-| Gemini | Free tier exists per vendor docs (AI Studio key; free-tier content may be used to improve products). No key collected yet |
+| Groq | Free plan owner-confirmed; `/models` OK; bounded 2-turn live test passed with honest termination gap ([evidence/groq-1](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/tree/evidence/groq-1/evidence/groq-1)); `openai/gpt-oss-20b` observed 8000 TPM / 1000 RPD |
+| Requesty | `/models` OK (808 models, free tier present); free tier 200 req/day + 20/min per org, shared pool, no card, no expiry (vendor docs); no inference yet |
+| Cerebras | `/models` OK (`qwen-3.8-27b`, `gpt-oss-120b`); plan/credits not established; no inference |
+| Gemini | Free tier exists per vendor docs (AI Studio; free content may train products); no key collected |
 
-## What is proven vs not
+## Proven vs not
 
-Proven: the queue/transport mechanism (handoffs across clones, lease
-behavior, stale-response refusal, conformance checks) under its test
-suite; one bounded Groq live exchange with honest termination limits.
+Proven: queue mechanism - cross-clone handoffs, leases, stale
+refusal + recovery, conformance checks (66 tests). One bounded Groq
+live exchange.
 
-Not proven: unattended or parallel operation, reliable cycle closing
-by live models (a live model did not emit the DONE status line on its
-own), multi-day runs, heterogeneous-platform autonomy. These remain
-claims to test, not features.
+Not proven: unattended/parallel operation, live models closing cycles
+(no DONE status line observed), multi-day runs, heterogeneous
+autonomy.
 
-## Ongoing work
+## Next actions
 
-- Independent read-only review of the fix batch by the peer reviewer
-  (accepted, results pending).
-- Remaining technical gaps before any unattended/parallel claim:
-  leases are cooperative and locally enforced; the relay is
-  best-effort; supervisor restart semantics are untested; live models
-  may not close cycles; rate-limit/backoff handling in the HTTP
-  adapter is minimal; `verify_command` runs via shell and is not
-  sandboxed; prompt-size budgeting against provider limits is manual.
-- Next bounded meaningful proof: a fresh live cycle against the fixed
-  head (`9407acc` or later), under a new explicit go-ahead, reusing
-  the live-1 protocol with the fixed queue binding.
+1. Independent read-only re-review of the P1-P4 fixes (this head).
+2. Then, under a fresh explicit go-ahead: bounded live cycle on the
+   fixed head, live-1 protocol, hard stop.
+3. Open gaps before any unattended claim: cooperative local leases;
+   best-effort relay; supervisor restart untested; models may not
+   close cycles; minimal 429 backoff; unsandboxed `verify_command`
+   shell; manual prompt-size budgeting.

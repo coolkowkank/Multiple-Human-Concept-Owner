@@ -16,7 +16,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from launcher.bus import Bus, STATE, LOG  # noqa: E402
+from launcher.bus import Bus, BusError, STATE, LOG  # noqa: E402
 from launcher.guards import check_commit  # noqa: E402
 from launcher.runtime import Seat, SeatError  # noqa: E402
 from launcher.adapters import AdapterError, parse_response  # noqa: E402
@@ -932,3 +932,129 @@ class QueueBindingRegressionTests(unittest.TestCase):
         with open(marker) as fh:
             first = fh.read().strip()
         self.assertEqual(seat.instance_id, first)
+
+
+class PatchReviewRegressionTests(unittest.TestCase):
+    """Independent patch-review findings on the live-1 fix batch
+    (A: recovery blocker, B: incomplete head binding, C: staged-index
+    sweep, D: remaining add -A operator routes). Each pins a fix."""
+
+    def _queue_repo(self):
+        seats = {
+            "builder": {"role": "builder", "allowed_paths": ["src/"],
+                        "adapter": {"type": "queue",
+                                    "path": ".team/queues/builder.jsonl"}},
+            "reviewer": {"role": "reviewer", "allowed_paths": ["review/"],
+                         "adapter": {"type": "mock", "script": []}},
+        }
+        repo, bus = make_repo(seats=seats)
+        self.addCleanup(shutil.rmtree, repo, True)
+        return repo, bus
+
+    def _turn_to_builder(self, bus):
+        state = bus.state()
+        state["turn"] = "builder"
+        state["status"] = "running"
+        bus.write_state(state)
+        bus.commit_all("operator: turn to builder")
+
+    def _respond_args(self, repo, extra=None, summary="work"):
+        from launcher.cli import main as cli_main
+        with open(os.path.join(repo, "resp.json"), "w") as fh:
+            json.dump({"summary": summary, "writes": {}, "handoff":
+                       "reviewer", "status_line": "s"}, fh)
+        args = ["respond", "builder", "--repo", repo, "--branch",
+                "team-work", "--file", os.path.join(repo, "resp.json")]
+        cli_main(args + (extra or []))
+
+    def _make_stale(self, repo, bus):
+        self._turn_to_builder(bus)
+        self._respond_args(repo)
+        state = bus.state()
+        state["turn_seq"] += 2
+        bus.write_state(state)
+        bus.commit_all("operator: two turns passed elsewhere")
+
+    def test_a_respond_refuses_to_append_behind_stale_line(self):
+        repo, bus = self._queue_repo()
+        self._make_stale(repo, bus)
+        from launcher.cli import main as cli_main
+        with open(os.path.join(repo, "resp.json"), "w") as fh:
+            json.dump({"summary": "fresh", "writes": {}, "handoff":
+                       "reviewer", "status_line": "s"}, fh)
+        with self.assertRaises(SystemExit):
+            cli_main(["respond", "builder", "--repo", repo, "--branch",
+                      "team-work", "--file",
+                      os.path.join(repo, "resp.json")])
+        with open(os.path.join(repo, ".team/queues/builder.jsonl")) as fh:
+            self.assertEqual(len(fh.read().strip().splitlines()), 1)
+
+    def test_a_discard_stale_recovers_and_fresh_response_applies(self):
+        repo, bus = self._queue_repo()
+        self._make_stale(repo, bus)
+        self._respond_args(repo, ["--discard-stale"], summary="fresh")
+        with open(os.path.join(repo, ".team/queues/builder.jsonl")) as fh:
+            lines = fh.read().strip().splitlines()
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(json.loads(lines[0])["summary"], "fresh")
+        # the fresh line is bound to the CURRENT bus state, so the
+        # seat applies it directly - recovery proven end to end
+        self.assertTrue(Seat(bus, "builder").act_once())
+        self.assertEqual(bus.state()["turn"], "reviewer")
+
+    def test_b_head_only_operator_commit_is_staleness(self):
+        repo, bus = self._queue_repo()
+        self._turn_to_builder(bus)
+        self._respond_args(repo)
+        # operator commit touching a non-queue file, turn/seq unchanged
+        with open(os.path.join(repo, "notes.txt"), "w") as fh:
+            fh.write("operator note")
+        bus.commit_all("operator: unrelated note")
+        with self.assertRaises(SeatError) as ctx:
+            Seat(bus, "builder").act_once()
+        self.assertIn("head moved", str(ctx.exception))
+        with open(os.path.join(repo, ".team/queues/builder.jsonl")) as fh:
+            self.assertNotEqual(fh.read().strip(), "")
+
+    def test_c_prestaged_index_refused_not_swept(self):
+        repo, bus = self._queue_repo()
+        self._turn_to_builder(bus)
+        with open(os.path.join(repo, "staged.txt"), "w") as fh:
+            fh.write("pre-staged")
+        git(repo, "add", "staged.txt")
+        from launcher.cli import main as cli_main
+        with open(os.path.join(repo, "resp.json"), "w") as fh:
+            json.dump({"summary": "work", "writes": {}, "handoff":
+                       "reviewer", "status_line": "s"}, fh)
+        with self.assertRaises(BusError) as ctx:
+            cli_main(["respond", "builder", "--repo", repo, "--branch",
+                      "team-work", "--file",
+                      os.path.join(repo, "resp.json")])
+        self.assertIn("staged changes", str(ctx.exception))
+        # nothing committed: staged file still staged, queue not written
+        self.assertIn("A  staged.txt", git(repo, "status",
+                                           "--porcelain").stdout)
+
+    def test_d_gate_answer_commit_contains_only_answers_file(self):
+        repo, bus = self._queue_repo()
+        with open(os.path.join(repo, "dirt.txt"), "w") as fh:
+            fh.write("untracked")
+        from launcher.cli import main as cli_main
+        cli_main(["answer", "g1", "yes", "--repo", repo,
+                  "--branch", "team-work"])
+        show = git(repo, "show", "--name-only", "--format=", "HEAD").stdout
+        self.assertEqual(show.strip(), ".team/gates/ANSWERS.jsonl")
+        self.assertIn("?? dirt.txt", git(repo, "status",
+                                         "--porcelain").stdout)
+
+    def test_d_init_commit_contains_exactly_layout_files(self):
+        seats = {"builder": seat_spec([], ["src/"])}
+        repo, bus = make_repo(seats=seats)
+        self.addCleanup(shutil.rmtree, repo, True)
+        root = git(repo, "rev-list", "--max-parents=0", "HEAD").stdout.strip()
+        show = git(repo, "show", "--name-only", "--format=", root).stdout
+        committed = set(show.split())
+        self.assertEqual(committed, {
+            ".team/STATE.json", ".team/LOG.jsonl", ".team/roster.json",
+            ".team/brief.md", ".team/gates/PENDING.jsonl",
+            ".team/gates/ANSWERS.jsonl"})

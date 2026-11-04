@@ -76,7 +76,9 @@ class Bus:
             if not os.path.exists(full):
                 with open(full, "w") as fh:
                     fh.write(content)
-        self.commit_all("operator: init coordination layout")
+        self.commit_paths("operator: init coordination layout",
+                          [STATE, LOG, ROSTER, BRIEF,
+                           GATES_PENDING, GATES_ANSWERS])
 
     # -- git transport ---------------------------------------------------
 
@@ -107,13 +109,41 @@ class Bus:
     def commit_paths(self, message, paths):
         """Commit ONLY the named paths. Unlike commit_all (git add -A),
         an unrelated dirty file elsewhere in the worktree is never
-        swept into the commit (live-1 review finding)."""
+        swept into the commit (live-1 review finding). Pre-STAGED
+        changes are refused rather than swept (live-1 patch review):
+        the commit would otherwise include the whole existing index."""
+        pre_staged = _git(
+            self.repo, "diff", "--cached", "--name-only").stdout.split()
+        if pre_staged:
+            raise BusError(
+                "refusing to commit only "
+                f"{paths}: the index already has staged changes "
+                f"({', '.join(pre_staged)}) - unstage or commit them "
+                "first so this commit contains exactly its own paths")
         _git(self.repo, "add", "--", *paths)
         if _git(self.repo, "diff", "--cached", "--quiet",
                 check=False).returncode == 0:
             return False
         _git(self.repo, "commit", "-m", message)
         return True
+
+    def transact_paths(self, message, paths, mutate):
+        """transact() with explicit staging: commit exactly `paths`."""
+        for attempt in range(self.retries):
+            self.pull()
+            result = mutate()
+            if not self.commit_paths(message, paths):
+                return result
+            try:
+                self.push()
+                return result
+            except BusError:
+                if self._confirm_landed():
+                    return result
+                _git(self.repo, "reset", "--hard", "HEAD~1", check=False)
+                if attempt == self.retries - 1:
+                    raise BusError(f"lost {self.retries} commit races on {self.branch}")
+        return result
 
     def transact(self, message, mutate):
         """Pull, mutate working tree, commit, push; retry on races.

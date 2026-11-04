@@ -119,20 +119,31 @@ class Seat:
             response = self._call_adapter(state)
             binding = response.pop("_queue", None)
             if binding is not None:
-                # `launcher respond` stamps the turn/turn_seq the response
-                # was reasoned against. Applying it after the bus moved
-                # would replay a stale batch (live-1 major finding), so
-                # refuse and leave the queue for the operator instead.
+                # `launcher respond` stamps the turn/turn_seq/head the
+                # response was reasoned against. Applying it after the
+                # bus moved would replay a stale batch (live-1 major
+                # finding), so refuse and leave the queue for the
+                # operator instead. The head check is real: the stamped
+                # head must still be an ancestor and only queue files
+                # may have changed since (live-1 patch review - an
+                # operator commit touching anything else is staleness,
+                # even when turn/seq happen to be unchanged).
+                stale = None
                 if (binding.get("turn") != state.get("turn")
                         or binding.get("turn_seq") != state.get("turn_seq")):
+                    stale = "turn/turn_seq moved"
+                elif not self._head_binding_clean(binding.get("head")):
+                    stale = "head moved by non-queue commits"
+                if stale:
                     raise SeatError(
-                        "queued response is stale: bound to "
+                        f"queued response is stale ({stale}): bound to "
                         f"turn={binding.get('turn')!r} "
-                        f"seq={binding.get('turn_seq')} but the bus is at "
-                        f"turn={state.get('turn')!r} "
+                        f"seq={binding.get('turn_seq')} "
+                        f"head={str(binding.get('head'))[:12]} but the "
+                        f"bus is at turn={state.get('turn')!r} "
                         f"seq={state.get('turn_seq')} - re-render with "
                         "`launcher prompt` and re-queue with "
-                        "`launcher respond`")
+                        "`launcher respond` (it can --discard-stale)")
             self._apply(state, response)
             consume = getattr(self.adapter, "consume", None)
             if consume:
@@ -213,6 +224,23 @@ class Seat:
         if not isinstance(response, dict):
             raise SeatError(f"{self.name} returned a non-object response")
         return response
+
+    def _head_binding_clean(self, stamped):
+        """True when the stamped head is an ancestor of HEAD and every
+        change since touches only queue files. A missing/unknown head
+        or any non-queue change is staleness."""
+        if not stamped:
+            return False
+        ancestor = subprocess.run(
+            ["git", "-C", self.bus.repo, "merge-base", "--is-ancestor",
+             stamped, "HEAD"], capture_output=True)
+        if ancestor.returncode != 0:
+            return False
+        changed = subprocess.run(
+            ["git", "-C", self.bus.repo, "diff", "--name-only",
+             stamped, "HEAD"], capture_output=True, text=True
+        ).stdout.split()
+        return all(p.startswith(".team/queues/") for p in changed)
 
     def _apply(self, state, response):
         writes = response.get("writes") or {}

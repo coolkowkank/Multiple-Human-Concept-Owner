@@ -96,8 +96,9 @@ def cmd_status(args):
 
 def cmd_answer(args):
     bus = Bus(args.repo, args.branch)
-    bus.transact(f"gate {args.gate_id} answered",
-                 lambda: bus.answer_gate(args.gate_id, args.answer))
+    bus.transact_paths(f"gate {args.gate_id} answered",
+                       [".team/gates/ANSWERS.jsonl"],
+                       lambda: bus.answer_gate(args.gate_id, args.answer))
 
 
 def cmd_prompt(args):
@@ -149,10 +150,39 @@ def cmd_respond(args):
     # Bind the response to the bus state it was reasoned against
     # (live-1 major finding: an unbound queued response could be
     # applied silently after the bus moved). The runtime refuses the
-    # apply when turn/turn_seq have moved on.
+    # apply when turn/turn_seq/head have moved on.
     state = bus.state()
     head = subprocess.run(["git", "-C", bus.repo, "rev-parse", "HEAD"],
                           capture_output=True, text=True).stdout.strip()
+    # Stale lines already in the queue would be refused by the runtime
+    # forever (the seat always reads the first line), so appending
+    # behind one strands the fresh response. Refuse unless the operator
+    # explicitly discards the stale lines (live-1 patch review).
+    stale = []
+    if os.path.exists(path):
+        with open(path) as fh:
+            existing = [json.loads(line) for line in fh if line.strip()]
+        for line in existing:
+            bound = line.get("_queue")
+            if (bound is None
+                    or bound.get("turn") != state.get("turn")
+                    or bound.get("turn_seq") != state.get("turn_seq")):
+                stale.append(line)
+    if stale:
+        if not args.discard_stale:
+            print(f"queue for {args.name} holds {len(stale)} stale "
+                  "line(s) the runtime would refuse; re-queue with "
+                  "--discard-stale to drop them, or clear the queue "
+                  "file yourself", file=sys.stderr)
+            sys.exit(1)
+        with open(path) as fh:
+            kept = [json.loads(line) for line in fh if line.strip()]
+        kept = [line for line in kept if line not in stale]
+        with open(path, "w") as fh:
+            for line in kept:
+                fh.write(json.dumps(line) + "\n")
+        print(f"discarded {len(stale)} stale queued line(s) for "
+              f"{args.name}")
     response["_queue"] = {"turn": state.get("turn"),
                           "turn_seq": state.get("turn_seq"),
                           "head": head}
@@ -272,6 +302,10 @@ def main(argv=None):
     base(p)
     p.add_argument("name")
     p.add_argument("--file", required=True)
+    p.add_argument("--discard-stale", action="store_true",
+                   help="drop stale queued lines (bound to an old "
+                        "turn/seq) before appending; without it a "
+                        "stale queue is an error, not a silent append")
     p.set_defaults(fn=cmd_respond)
 
     p = sub.add_parser("conform", help="check .team against the evidence interface")
