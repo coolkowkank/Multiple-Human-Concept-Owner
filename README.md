@@ -10,7 +10,7 @@
 
 *The Coordinator does routine checks on a 30-minute schedule while work is active, and handles arrivals (drafts, reviews, test results, failures, blockers) as they come. Trigger handling is Coordinator judgment; there is no automatic gate in the repo.*
 
-![Coordinator work](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/ede85ab36f997451c1f70ca608f9ec2ec57ae8bb/docs/progress/coordinator-work.png)
+![Coordinator work](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/b97dd2ca3691323137f935275ec690da9bca9235/docs/progress/coordinator-work.png)
 
 ### Project progress
 
