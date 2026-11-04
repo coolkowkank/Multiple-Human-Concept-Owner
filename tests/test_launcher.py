@@ -766,6 +766,61 @@ class ParseTests(unittest.TestCase):
         with self.assertRaises(AdapterError):
             parse_response('```json\n{bad}\n```')
 
+    # Adversarial cases proposed by Groq gpt-oss-120b (controlled
+    # one-shot call, 2026-11-04) and REVIEWED against actual parser
+    # behavior: 3 of its 15 expectations were wrong and are corrected
+    # here (fence-in-string, duplicate keys, semantic cancel key).
+    def test_groq_escaped_quotes_bare_object_accepted(self):
+        self.assertEqual(
+            parse_response('{ "key": "value with \\"escaped quotes\\"" }'),
+            {"key": 'value with "escaped quotes"'})
+
+    def test_groq_unicode_escape_accepted(self):
+        self.assertEqual(parse_response('   {"u":"\\u2603"}\n'),
+                         {"u": "\u2603"})
+
+    def test_groq_fence_marker_inside_string_rejected(self):
+        # CORRECTED expectation (Groq said ACCEPT): the parser splits
+        # on every triple backtick, so a ``` inside a JSON string
+        # breaks the single-fence shape - conservative REJECT, healed
+        # by the correction round. Documented limitation, fail-closed.
+        payload = ('```json\n{ "s": "this is a ``` not a fence" }\n```')
+        with self.assertRaises(AdapterError):
+            parse_response(payload)
+
+    def test_groq_non_json_fence_tag_rejected(self):
+        with self.assertRaises(AdapterError):
+            parse_response('```javascript\n{ "key": "value" }\n```')
+
+    def test_groq_duplicate_keys_accepted_last_wins(self):
+        # CORRECTED expectation (Groq said REJECT): json.loads accepts
+        # duplicate keys, last value wins - documented laxness, not a
+        # parser-contract violation.
+        self.assertEqual(
+            parse_response('```json\n{ "dup": 1, "dup": 2 }\n```'),
+            {"dup": 2})
+
+    def test_groq_deep_nesting_accepted(self):
+        payload = ('```json\n{ "a": { "b": { "c": { "d": { "e": '
+                   '"end" } } } } }\n```')
+        self.assertEqual(parse_response(payload)["a"]["b"]["c"]["d"],
+                         {"e": "end"})
+
+    def test_groq_single_backtick_inside_string_accepted(self):
+        payload = '```json\n{ "key": "a backtick ` inside" }\n```'
+        self.assertEqual(parse_response(payload),
+                         {"key": "a backtick ` inside"})
+
+    def test_groq_cancel_key_inside_object_accepted(self):
+        # CORRECTED expectation (Groq said REJECT): the parser is
+        # SYNTACTIC - a "cancel" KEY inside valid JSON is data, not an
+        # outside-prose instruction. Semantic screening is not the
+        # parser's job; outside prose is what N2 rejects.
+        payload = ('```json\n{ "cancel": "replace", "payload": '
+                   '{ "data": 123 } }\n```')
+        self.assertEqual(parse_response(payload)["cancel"], "replace")
+
+
 
 class SupervisorTests(unittest.TestCase):
     def test_done_cycle_and_stop(self):
