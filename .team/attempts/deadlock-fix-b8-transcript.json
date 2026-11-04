@@ -146,5 +146,19 @@
       },
       "service_tier": "on_demand"
     }
+  },
+  {
+    "tool_call": "edit_file",
+    "args": {
+      "new_string": "    def _check_stall(self, state):\n        # Handle routing failures before stall detection\n        turn = state.get(\"turn\")\n        status = state.get(\"status\")\n        if status == \"running\" and not turn:\n            # routing failure detected\n            count = getattr(self, \"_routing_failure_count\", 0) + 1\n            self._routing_failure_count = count\n            self.bus.append_log(\"supervisor\", \"routing-failure\",\n                                f\"routing failure detected; state: {state}\")\n            if count >= 2:\n                self._escalate(\"consecutive routing failures\")\n                return\n            # re-issue turn to coordinator\n            state[\"turn\"] = \"coordinator\"\n            state[\"turn_since\"] = time.strftime(\"%Y-%m-%dT%H:%M:%SZ\", time.gmtime())\n            self.bus.write_state(state)\n            self.bus.commit_all(\"supervisor: reissued turn to coordinator after routing failure\")\n            return\n        if not turn or status != \"running\":\n            return\n        since = state.get(\"turn_since\")\n        if not since:\n            return\n        try:\n            # parse as UTC using calendar.timegm\n            ts = calendar.timegm(time.strptime(since, \"%Y-%m-%dT%H:%M:%SZ\"))\n        except ValueError:\n            return\n        if time.time() - ts < self.stall_timeout:\n            return\n        if turn in self._stalled_seats:\n            return\n        self._stalled_seats.add(turn)\n        if turn in self.procs:\n            self.bus.append_log(\"supervisor\", \"stall\",\n                                f\"turn stalled on {turn}; restarting seat\")\n            self.bus.commit_all(f\"supervisor: stall on {turn}\")\n            self.procs[turn].terminate()\n        else:\n            self._escalate(\n                f\"turn stalled on interactive seat {turn}; \"\n                \"a human must nudge or re-open that session\")\n",
+      "old_string": "    def _check_stall(self, state):\n        turn = state.get(\"turn\")\n        if not turn or state.get(\"status\") != \"running\":\n            return\n        since = state.get(\"turn_since\")\n        if not since:\n            return\n        try:\n            ts = time.mktime(time.strptime(since, \"%Y-%m-%dT%H:%M:%SZ\"))\n        except ValueError:\n            return\n        if time.time() - ts < self.stall_timeout:\n            return\n        if turn in self._stalled_seats:\n            return\n        self._stalled_seats.add(turn)\n        if turn in self.procs:\n            self.bus.append_log(\"supervisor\", \"stall\",\n                                f\"turn stalled on {turn}; restarting seat\")\n            self.bus.commit_all(f\"supervisor: stall on {turn}\")\n            self.procs[turn].terminate()\n        else:\n            self._escalate(\n                f\"turn stalled on interactive seat {turn}; \"\n                \"a human must nudge or re-open that session\")\n",
+      "path": "launcher/supervisor.py"
+    },
+    "result": {
+      "ok": true,
+      "path": "launcher/supervisor.py",
+      "replacements": 1,
+      "bytes": 7580
+    }
   }
 ]
