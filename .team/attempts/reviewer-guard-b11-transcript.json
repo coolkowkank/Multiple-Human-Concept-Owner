@@ -32,7 +32,7 @@
                 "type": "function",
                 "function": {
                   "name": "edit_file",
-                  "arguments": "{\"new_string\":\"# TODO: placeholder\",\"old_string\":\"if response.get(\\\"status_line\\\", \\\"\\\").startswith(\\\"DONE\\\"):\",\"path\":\"launcher/runtime.py\"}"
+                  "arguments": "{\"path\": \"launcher/runtime.py\", \"edit\": \"[1 anchored replacement applied to launcher/runtime.py; full payloads in the run transcript]\"}"
                 }
               }
             ]
@@ -74,6 +74,12 @@
       "path": "launcher/runtime.py",
       "replacements": 1,
       "bytes": 25631
+    }
+  },
+  {
+    "history_elided": {
+      "path": "launcher/runtime.py",
+      "tool": "edit_file"
     }
   }
 ]
