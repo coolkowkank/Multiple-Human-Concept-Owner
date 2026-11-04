@@ -1,8 +1,8 @@
 {
-  "turn": null,
+  "turn": "builder",
   "turn_seq": 0,
   "turn_since": null,
-  "status": "forming",
-  "status_line": "team forming",
+  "status": "running",
+  "status_line": "live/groq-dev-1: bounded Groq builder turn, one batch",
   "leases": {}
 }
