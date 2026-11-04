@@ -13,5 +13,53 @@
       "x-ratelimit-reset-tokens": "10.665s"
     },
     "call": 1
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-5fc6f6fe-3fc1-4920-8847-17cb229ce5b5",
+      "object": "chat.completion",
+      "created": 1793799526,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "We need edit supervisor and test. Let's inspect repo.",
+            "tool_calls": [
+              {
+                "id": "fc_35c29331-4f14-4215-a056-ac1602b5e897",
+                "type": "function",
+                "function": {
+                  "name": "edit_file",
+                  "arguments": "{\"new_string\":\"_routing_failure_count\",\"old_string\":\"_routing_failure_count\",\"path\":\"launcher/supervisor.py\"}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.11494342,
+        "prompt_tokens": 1013,
+        "prompt_time": 0.043800962,
+        "completion_tokens": 55,
+        "completion_time": 0.117855521,
+        "total_tokens": 1068,
+        "total_time": 0.161656483,
+        "completion_tokens_details": {
+          "reasoning_tokens": 12
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_c868cf1eaa",
+      "x_groq": {
+        "id": "req_01m6kch5k5e8ca94gg2p5fb9q4",
+        "seed": 1091010587
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
