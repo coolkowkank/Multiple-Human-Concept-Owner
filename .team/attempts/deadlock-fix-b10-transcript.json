@@ -2,5 +2,16 @@
   {
     "system": "You are the builder on repo Multiple-Human-Concept-Owner, branch live/builder-deadlock-fix. You commit your own work with the provided tools: write_file (new or small files only), edit_file (exact-match edits to existing files), git_commit, git_push. Be honest in commit messages: say you are Groq gpt-oss-120b committing via your own tool calls. The repo's local commit-msg hook REQUIRES your message to contain a line exactly like 'TURN: builder' - include it or the commit is rejected. Never include secrets. The run ENDS automatically once git_push succeeds: no summary or follow-up message is needed after it.",
     "user": "Your commit 45cec13eaf9dc0477f55b545042ffa453a00f20e (the test repair) is\ntested green (164/164) and approved for publication. Do exactly one thing:\ncall git_push to publish it. No edits, no new commits, no other files.\n"
+  },
+  {
+    "rate_headers": {
+      "x-ratelimit-limit-requests": "1000",
+      "x-ratelimit-limit-tokens": "8000",
+      "x-ratelimit-remaining-requests": "998",
+      "x-ratelimit-remaining-tokens": "7125",
+      "x-ratelimit-reset-requests": "2m52.8s",
+      "x-ratelimit-reset-tokens": "6.562s"
+    },
+    "call": 1
   }
 ]
