@@ -1,5 +1,8 @@
 # WP8a: F2 and F3 full-text source check (Researcher agent, 2026-11-04 17:5x EET)
 Status: independently VERIFIED 2026-11-04 - an independent verifier (not the Eva seat model) read both full PDFs (R2 sec 3.16/4.2; R3 Table 6 raw rows) and confirmed every proposed correction, with two small refinements (56% is over all 54 cycles, not the mirage rate; 37.5% body vs 38% abstract for rejected improvements). Corrections applied to 2026-11-04-initial-literature-scan.md in the same commit. Original note below, author text unchanged. Fetched with the coordinator web fetch tool; no model calls.
+## CURRENT STATUS (added 2026-11-04 18:2x EET; supersedes the checklist at the bottom)
+RESOLVED. An independent verifier read both full PDFs; the missing reads named below (R2 sec 3.16 body, R3 Table 6 raw rows) are done and every correction was confirmed. The corrected scan is the current source: research/findings/2026-11-04-initial-literature-scan.md. The F2 wording fix and the X1 removal are applied there, and the R3 matched-token limit is in REFERENCES.md. Verification was by an independent verifier, not the Eva seat model. No experiment data is needed (WP8b is separate and unchanged). The note body and the "What remains" list below are kept as dated history and are NOT current.
+
 Frozen criterion (progress README line 20): citations resolve, key numbers match sources, class/limits/proposed experiment labelled. F1 was already checked (Eva review 1). This note covers F2 and F3.
 
 ## F2 = R2, arXiv 2607.25152 (PDF https://arxiv.org/pdf/2607.25152, fetched OK, ~50 KB text)
@@ -24,7 +27,7 @@ New limits to add: (1) state and recent-transcript contexts are matched at the s
 ## Coverage of Eva audit
 Eva reviews 1 and 2 covered 14 claims (12 supported, 1 partial, C5 resolved after PDF). Those verdicts rest on coordinator-fetched passages. They do not cover the details above (38% rejection, X1 absence, matched-token limit). The loop is closed for that publication round but is not a standing pass. Eva should review this note.
 
-## What remains for WP8a (who)
+## What remained for WP8a (HISTORICAL as of the original 17:5x note; all items below are resolved, see CURRENT STATUS above)
 1. Eva: audit this note's F2/F3 rows against coordinator-fetched passages (R2 sec 3.16 body and R3 sec 5.2 Table 6 are the missing reads).
 2. Coordinator/executor: apply the F2 wording fix and drop X1 in the published scan; publish this note.
 3. Researcher: add the R3 matched-token limit to REFERENCES once reviewed.
