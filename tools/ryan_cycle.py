@@ -41,23 +41,21 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import model_resources as mr
 
 BASE_URL = "https://router.requesty.ai/v1"
-# CANDIDATES only (Ryan chooses the role models).
-# Nothing here is an assignment. BOOTSTRAP_RYAN is the one default: the
-# route Ryan uses to make the allocation decision itself, because Ryan
-# cannot choose his own model before he has one. It is gated like any
-# other call (fresh price-0 listing, ledger caps).
+# CANDIDATES only, NOT assignments. Model choice and assignment belong to
+# the project operator (main), never to Ryan: assign_manual() is the only
+# way assignments.json is written, and step() refuses any file that does
+# not carry decided_by == OPERATOR.
+OPERATOR = "main"
 CANDIDATES = {
     "researcher": "nvidia/nemotron-3-ultra-550b-a55b",
     "verifier": "google/gemma-4-31b-it",
     "ryan": "nvidia/nemotron-3-ultra-550b-a55b",
 }
-BOOTSTRAP_RYAN = CANDIDATES["ryan"]
 BLOCKED_STATUS = ("not-qualified", "uncallable", "capped", "cooldown")
 ROLES = ("researcher", "verifier", "ryan")
-CEILINGS = {"researcher": 2048, "verifier": 1536, "ryan": 2048,
-            "allocation": 1024}
+CEILINGS = {"researcher": 2048, "verifier": 1536, "ryan": 2048}
 ROLE_CAP = {"researcher": 2, "verifier": 2, "ryan": 2}  # per question
-QUESTION_BUDGET = 5  # + 1 allocation = 6 requests per cycle; clean = 3
+QUESTION_BUDGET = 5  # <= 5 requests per question; clean path = 3
 DAILY_CAP = 24      # 4 cycles x 6 requests, all three roles combined
 CYCLES_PER_DAY = 4
 SPACING_S = 10
@@ -300,69 +298,36 @@ def load_assignments(root):
         return json.load(f)
 
 
-def allocate(root, post, list_models, record, now):
-    """Ryan's model-backed allocation decision: ONE request, counted in
-    the daily cap like any other. The choice is saved ONLY if it passes
-    validate_assignments; otherwise it is NOT saved (the verbatim reply stays under
-    runs/alloc/) and a human decides. Ryan's choice is a decision, not proof the routes work:
-    cycle 1 tests them. The allocation request counts as 1 of the 24
-    daily requests AND takes 1 of the 4 daily question/cycle slots
-    (qid "alloc"), so it leaves 3 research questions that day."""
-    store = Store(root)
-    with store.lock():
-        state, why = ledger_gate(store, now, "alloc")
-    if state == "wait":
-        return {"action": "wait", "reason": why, "calls": 0}
-    bad = route_gate(record, BOOTSTRAP_RYAN)
-    if bad:
-        return {"action": "needs-human", "reason": "bootstrap route: " +
-                bad, "calls": 0}
-    listing = list_models()
-    free_gate(listing, BOOTSTRAP_RYAN, now)
-    pool = sorted("%s (lab: %s)" % (m["id"], m.get("model_lab"))
-                  for m in listing.get("data", [])
-                  if mr.price_zero(listing, m["id"]))
-    prompt = ("Choose one model per role (researcher, verifier, ryan) "
-              "from this price-0 list ONLY. Verifier must be a different "
-              "model lab than the researcher (labs shown). Candidates already "
-              "tried: %s. Route record: %s\nPrice-0 ids: %s\nReply "
-              'with ONE JSON object: {"models":{"researcher":"id",'
-              '"verifier":"id","ryan":"id"},"why":{"researcher":"...",'
-              '"verifier":"...","ryan":"..."}}') % (
-                  json.dumps(CANDIDATES),
-                  json.dumps((record or {}).get("routes", [])), pool)
-    system = "You are Ryan, Team Resources."
-    if len((system + prompt).encode()) > MAX_INPUT_BYTES:
-        return {"action": "needs-human", "reason": "allocation input too "
-                "large", "calls": 0}
-    entry = {"phase": "reserved", "rid": None, "ts": iso(now),
-             "qid": "alloc", "role": "allocation", "model": BOOTSTRAP_RYAN}
-    state, why = store.reserve(now, entry, "alloc")
-    if state == "wait":
-        return {"action": "wait", "reason": why, "calls": 0}
-    rid = entry["rid"]
-    res = post(BOOTSTRAP_RYAN, system, prompt, CEILINGS["allocation"])
-    out = settle(store, rid, "alloc", "allocation", BOOTSTRAP_RYAN, res, now)
-    if out:
-        return out
-    store.write_run("alloc", "allocation-%d.txt" % len(store.ledger()),
-                    res["content"])
-    try:
-        obj = strict_json(res["content"])
-    except ValueError as e:
-        return {"action": "rejected", "reason": "format: %s" % e,
-                "calls": 1}
+def allocate(*args, **kwargs):
+    """DISABLED. Ryan no longer chooses or assigns models (owner steering
+    2026-11-04 19:44 EET). Kept as a refusing stub so no caller can make
+    a model request to pick models. Use assign_manual()."""
+    return {"action": "disabled", "calls": 0,
+            "reason": "Ryan does not assign models; use assign_manual"}
+
+
+def assign_manual(root, models, why, listing, record, now, source_ref):
+    """Operator-made assignment, validated by the SAME gates as before
+    (exact price-0 in a fresh listing, recorded non-blocked route, lab
+    independence, justification per role). Makes NO model request, writes
+    no ledger line, and does not clear a pause. Returns {'action':
+    'assigned'|'rejected', ...}. SOURCE_REF names the operator decision."""
+    if not isinstance(source_ref, str) or len(source_ref.strip()) < 10:
+        return {"action": "rejected", "reason": "source_ref required"}
+    obj = {"models": models, "why": why}
     bad = validate_assignments(obj, record, listing, now)
     if bad:
-        return {"action": "rejected", "reason": bad, "calls": 1}
-    obj["decided_by"] = "ryan"
+        return {"action": "rejected", "reason": bad, "calls": 0}
+    obj["decided_by"] = OPERATOR
+    obj["source_ref"] = source_ref.strip()
     obj["decided_at"] = iso(now)
+    store = Store(root)
     with store.lock():
         ap = os.path.join(root, "assignments.json")
         with open(ap + ".tmp", "w") as f:
             json.dump(obj, f, indent=2)
         os.replace(ap + ".tmp", ap)
-    return {"action": "assigned", "calls": 1, "models": obj["models"]}
+    return {"action": "assigned", "calls": 0, "models": models}
 
 
 def settle(store, rid, qid, role, model, res, now):
@@ -552,6 +517,9 @@ def step(root, post, list_models, now, record):
         assign = load_assignments(root)
         if assign is None:
             return {"action": "needs-allocation", "calls": 0}
+        if assign.get("decided_by") != OPERATOR:
+            return {"action": "needs-allocation", "calls": 0,
+                    "reason": "assignments.json not made by the operator"}
         model = assign["models"][role]
         if sum(q["attempts"].values()) >= QUESTION_BUDGET:
             q["status"] = "needs-human"
@@ -796,8 +764,26 @@ def redact(text, n=200, secret=None):
     return t[:n]
 
 
+# Structural only: no response-body text is ever persisted.
 DIAG_KEYS = ("stage", "class", "error_type", "status", "content_type",
-             "elapsed_s", "excerpt")
+             "elapsed_s", "body_len", "body_kind")
+
+
+def body_kind(raw):
+    b = (raw or b"").lstrip()[:1]
+    if not raw:
+        return "empty"
+    if b == b"<":
+        return "html-or-xml"
+    if b == b"{":
+        return "json-object-like"
+    if b == b"[":
+        return "json-array-like"
+    try:
+        raw[:200].decode("utf-8")
+        return "text"
+    except UnicodeDecodeError:
+        return "binary"
 
 
 def clean_diag(d):
@@ -810,7 +796,7 @@ def clean_diag(d):
         if isinstance(v, (int, float)) and not isinstance(v, bool):
             out[k] = round(v, 2) if isinstance(v, float) else v
         elif isinstance(v, str):
-            out[k] = redact(v, 200 if k == "excerpt" else 60)
+            out[k] = redact(v, 60)
     return out
 
 
@@ -829,8 +815,8 @@ def http_post_factory(env="REQUESTY_API_KEY"):
             if ctype:
                 d["content_type"] = ctype
             if raw is not None:
-                d["excerpt"] = redact(raw[:400].decode("utf-8", "replace"),
-                                      200, key)
+                d["body_len"] = len(raw)
+                d["body_kind"] = body_kind(raw)
             return {"kind": "unknown", "usage": None, "content": "",
                     "diag": clean_diag(d)}
         body = json.dumps({
@@ -847,12 +833,13 @@ def http_post_factory(env="REQUESTY_API_KEY"):
             resp = urllib.request.urlopen(req, timeout=120)
         except urllib.error.HTTPError as e:
             ct = e.headers.get("content-type", "") if e.headers else ""
+            eb = e.read()[:2000]
             return {"kind": "http", "code": e.code, "usage": None,
-                    "content": redact(e.read()[:300].decode(
-                        "utf-8", "replace"), 300, key),
+                    "content": "",
                     "diag": clean_diag({
                         "stage": "http-status", "class": "http",
                         "status": e.code, "content_type": ct.split(";")[0],
+                        "body_len": len(eb), "body_kind": body_kind(eb),
                         "elapsed_s": time.monotonic() - t0})}
         except urllib.error.URLError as e:
             r = e.reason

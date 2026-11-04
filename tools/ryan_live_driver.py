@@ -15,8 +15,11 @@ now = time.time()
 def listing():
     req = urllib.request.Request(rc.BASE_URL + "/models", headers={
         "authorization": "Bearer " + KEY, "user-agent": "team-launcher-ryan-cycle/0.1"})
-    with urllib.request.urlopen(req, timeout=40) as r:
-        d = json.loads(r.read())
+    try:
+        with urllib.request.urlopen(req, timeout=40) as r:
+            d = json.loads(r.read())
+    except Exception as e:  # class only: messages can echo request details
+        raise rc.Halt("listing GET failed: " + type(e).__name__)
     env = {"fetched_at": rc.iso(now), "source": "requesty /v1/models GET",
            "data": d["data"]}
     return env

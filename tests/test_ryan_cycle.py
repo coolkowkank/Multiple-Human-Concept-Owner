@@ -27,7 +27,8 @@ RECORD = {"provider_blocks": {}, "routes": [
 ASSIGN = {"models": {"researcher": "nvidia/nemotron-3-ultra-550b-a55b",
                      "verifier": "google/gemma-4-31b-it",
                      "ryan": "nvidia/nemotron-3-ultra-550b-a55b"},
-          "why": {r: "route already recorded working" for r in rc.ROLES}}
+          "why": {r: "route already recorded working" for r in rc.ROLES},
+          "decided_by": "main"}
 
 
 def ok(obj, usage=None):
@@ -271,39 +272,65 @@ class Safety(Base):
         self.assertEqual(self.calls, [])
 
 
-class Allocation(Base):
-    ALLOC = ASSIGN
+class ManualAssign(Base):
+    SRC = "operator decision 2026-11-04 test"
 
-    def test_valid_choice_saved_and_counts_in_cap(self):
-        rec = RECORD
-        out = rc.allocate(self.d, lambda *a: ok(self.ALLOC), FRESH, rec,
-                          T0 + 20)
-        self.assertEqual(out["action"], "assigned")
+    def go(self, models, why=None, record=RECORD, listing=FRESH, src=None):
+        return rc.assign_manual(
+            self.d, models, why or ASSIGN["why"], listing(), record,
+            T0 + 20, self.SRC if src is None else src)
+
+    def test_valid_manual_assignment_saved_with_no_call_no_ledger(self):
+        out = self.go(ASSIGN["models"])
+        self.assertEqual((out["action"], out["calls"]), ("assigned", 0))
         with open(os.path.join(self.d, "assignments.json")) as f:
-            self.assertEqual(json.load(f)["decided_by"], "ryan")
-        self.assertEqual(len([e for e in self.store.ledger()
-                              if e["phase"] == "reserved"]), 1)
+            a = json.load(f)
+        self.assertEqual(a["decided_by"], "main")
+        self.assertEqual(a["source_ref"], self.SRC)
+        self.assertEqual(self.store.ledger(), [])
 
-    def test_invalid_choices_rejected_not_saved(self):
-        rec = {"routes": [RECORD["routes"][0], {
-            "id": "google/gemma-4-31b-it", "provider": "requesty",
-            "status": "cooldown"}], "provider_blocks": {}}
-        cases = []
-        same = json.loads(json.dumps(ASSIGN))
-        same["models"]["verifier"] = "nvidia/nemotron-3-ultra-550b-a55b"
-        cases.append((same, RECORD))
-        cases.append((ASSIGN, rec))                     # verifier cooldown
-        paid = json.loads(json.dumps(ASSIGN))
-        paid["models"]["ryan"] = "paid/model"
-        cases.append((paid, RECORD))
-        nojust = json.loads(json.dumps(ASSIGN)); nojust["why"]["ryan"] = ""
-        cases.append((nojust, RECORD))
-        for i, (a, r) in enumerate(cases):
-            out = rc.allocate(self.d, lambda *x, a=a: ok(a), FRESH, r,
-                              T0 + 20 + 30 * i)
-            self.assertEqual(out["action"], "rejected", i)
+    def test_same_gates_reject_bad_manual_choices(self):
+        m = ASSIGN["models"]
+        rec_cool = {"routes": [RECORD["routes"][0], dict(
+            RECORD["routes"][1], status="cooldown")], "provider_blocks": {}}
+        cases = [
+            (dict(m, verifier=m["researcher"]), RECORD),          # same id
+            (dict(m, verifier="nvidia/other"), RECORD),           # same lab
+            (m, rec_cool),                                        # cooldown
+            (dict(m, ryan="paid/model"), RECORD),                 # paid
+            (dict(m, verifier="nolab/model"), RECORD),            # no lab
+        ]
+        for i, (mm, rec) in enumerate(cases):
+            self.assertEqual(self.go(mm, record=rec)["action"], "rejected", i)
+        stale = lambda: dict(FRESH(), fetched_at=rc.iso(T0 - 7200))
+        self.assertEqual(self.go(m, listing=stale)["action"], "rejected")
+        self.assertEqual(self.go(m, src="x")["action"], "rejected")
         self.assertFalse(os.path.exists(os.path.join(
             self.d, "assignments.json")))
+
+    def test_allocate_is_disabled_and_makes_no_request(self):
+        out = rc.allocate(self.d, lambda *a: 1 / 0, FRESH, RECORD, T0)
+        self.assertEqual((out["action"], out["calls"]), ("disabled", 0))
+        self.assertEqual(self.store.ledger(), [])
+
+    def test_step_refuses_assignment_not_made_by_operator(self):
+        bad = dict(ASSIGN, decided_by="ryan")
+        self.seed(assign=bad)
+        out = self.run_step([])
+        self.assertEqual((out["action"], out["calls"]), ("needs-allocation", 0))
+        nob = {k: v for k, v in ASSIGN.items() if k != "decided_by"}
+        self.seed(assign=nob)
+        self.assertEqual(self.run_step([])["calls"], 0)
+        self.assertEqual(self.calls, [])
+
+    def test_manual_assignment_does_not_clear_a_pause(self):
+        self.seed(assign=None)
+        self.store.append({"phase": "halt", "ts": rc.iso(T0),
+                           "reason": "unknown transport outcome x"})
+        self.go(ASSIGN["models"])
+        with self.assertRaises(rc.Halt):
+            self.run_step([ok(R_OK)])
+        self.assertEqual(self.calls, [])
 
 
 class Review2(Base):
@@ -324,17 +351,6 @@ class Review2(Base):
              "status": "working"}] + RECORD["routes"][1:]}
         bad = rc.validate_assignments(ASSIGN, rec, FRESH(), T0)
         self.assertIn("no route record", bad)
-
-    def test_bootstrap_uses_same_availability_gate(self):
-        for rec in ({"routes": [], "provider_blocks": {}},
-                    {"routes": [dict(RECORD["routes"][0], status="capped")],
-                     "provider_blocks": {}},
-                    {"routes": RECORD["routes"],
-                     "provider_blocks": {"requesty": {}}}):
-            out = rc.allocate(self.d, lambda *a: 1 / 0, FRESH, rec, T0 + 20)
-            self.assertEqual((out["action"], out["calls"]),
-                             ("needs-human", 0))
-        self.assertEqual(self.store.ledger(), [])
 
     def test_step_refuses_blocked_route_record(self):
         self.seed()
@@ -583,15 +599,17 @@ class Diag(Base):
                              (stage, cls))
             self.assertNotIn("error_text", out["diag"])
 
-    def test_excerpt_is_redacted_and_bounded_and_no_key_anywhere(self):
+    def test_no_body_text_persisted_only_structure(self):
         body = (b"oops " + self.KEY.encode() + b" Bearer abc.def.ghi "
-                + b"A" * 300)
+                + b"shortsecret12 " + b"A" * 300)
         out = self.call(lambda *a, **k: self.Resp(body, "text/plain"))
         blob = json.dumps(out)
-        self.assertNotIn(self.KEY, blob)
-        self.assertNotIn("abc.def.ghi", blob)
-        self.assertLessEqual(len(out["diag"]["excerpt"]), 200)
-        self.assertEqual(out["diag"]["content_type"], "text/plain")
+        for bad in (self.KEY, "abc.def.ghi", "shortsecret12", "oops"):
+            self.assertNotIn(bad, blob)
+        self.assertNotIn("excerpt", out["diag"])
+        self.assertEqual((out["diag"]["body_kind"], out["diag"]["body_len"],
+                          out["diag"]["content_type"]),
+                         ("text", len(body), "text/plain"))
 
     def test_http_error_diag_has_status_no_headers(self):
         import urllib.error, io
@@ -602,13 +620,14 @@ class Diag(Base):
         out = self.call(uo)
         self.assertEqual(out["diag"]["status"], 500)
         self.assertNotIn(self.KEY, json.dumps(out))
+        self.assertEqual(out["content"], "")
 
     def test_settle_persists_only_clean_diag_in_ledger(self):
         self.seed()
         post = lambda *a: {"kind": "unknown", "usage": None, "content": "",
                            "diag": {"stage": "read-body", "class": "timeout",
                                     "authorization": "Bearer SECRET",
-                                    "excerpt": "x" * 900,
+                                    "excerpt": "shortsecret12" * 70,
                                     "error_type": "TimeoutError"}}
         with self.assertRaises(rc.Halt):
             self.run_step([post()])
@@ -616,8 +635,9 @@ class Diag(Base):
         self.assertEqual(res["outcome"], "unknown")
         self.assertEqual(res["diag"]["stage"], "read-body")
         self.assertNotIn("authorization", res["diag"])
-        self.assertLessEqual(len(res["diag"]["excerpt"]), 200)
+        self.assertNotIn("excerpt", res["diag"])
         self.assertNotIn("SECRET", json.dumps(self.store.ledger()))
+        self.assertNotIn("shortsecret12", json.dumps(self.store.ledger()))
 
 
 if __name__ == "__main__":

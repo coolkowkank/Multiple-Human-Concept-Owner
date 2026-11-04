@@ -20,6 +20,6 @@ Facts (observed by the operator driver; ledger.jsonl has the lines):
   external clearance and an explicit go; a price-0 listing does not clear it.
 
 Follow-up (offline): the transport now classifies timeout, network, HTTP,
-malformed (stage, error class, status, content type, redacted bounded
-excerpt) and writes only allowlisted fields to the ledger. See
+malformed (stage, error class, status, content type, body length and a coarse
+body kind; no response text) and writes only allowlisted fields to the ledger. See
 tests/test_ryan_cycle.py class Diag.

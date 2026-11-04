@@ -123,7 +123,10 @@ AI models (authority sits with the project owner's own channel, not this
 file).
 Status: runner `tools/ryan_cycle.py` is built and mock-tested only; no
 model is assigned or running. Details and caps: `docs/team/ryan/README.md`.
-Ryan allocates models for the other roles inside the validation gates; paid
-use and access changes stay owner-held. Ryan may draft project policy
-(roles, model allocation, token budgets, handoff standards) and keep job
+Correction 2026-11-04 19:44 EET: Ryan does NOT choose, assign or change
+models for any role. The project operator (main) chooses and assigns them
+through `assign_manual()`, validated by the same free-price, route, lab
+independence and justification gates. Paid use and access changes stay
+owner-held. Ryan may draft project policy (roles, token budgets, handoff
+standards; no model assignment or change, even by policy) and keep job
 descriptions token-lean; adoption follows the existing approval chain.
