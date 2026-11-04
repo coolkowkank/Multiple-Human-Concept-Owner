@@ -181,5 +181,53 @@
       "x-ratelimit-reset-tokens": "9.81s"
     },
     "call": 5
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-266957e7-008e-472a-b941-298582ad1d23",
+      "object": "chat.completion",
+      "created": 1793800668,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "We need actual content to modify. Let's open snippet.",
+            "tool_calls": [
+              {
+                "id": "fc_5d7c19ea-8944-4d0c-b837-9f57488d2d81",
+                "type": "function",
+                "function": {
+                  "name": "edit_file",
+                  "arguments": "{\"new_string\":\"if response.get(\\\"status_line\\\", \\\"\\\").startswith(\\\"DONE\\\"):\\n            # Verify QC verdict before marking done\\n            if self._qc_verdict_valid():\\n                state[\\\"status\\\"] = \\\"done\\\"\\n                state[\\\"turn\\\"] = None\\n            else:\\n                # Route to QC seat and log review-required\\n                qc_seat = self.roster.get_seat_by_role(\\\"qc\\\")\\n                if qc_seat:\\n                    state[\\\"turn\\\"] = qc_seat.name\\n                    self.bus.append_log(self.name, \\\"review-required\\\", f\\\"DONE claim by {self.name} requires QC review for head {self.repo.head_sha()}\\\")\\n                else:\\n                    self.bus.open_human_gate(f\\\"no QC seat to review DONE claim by {self.name}\\\")\\n\",\"old_string\":\"if response.get(\\\"status_line\\\", \\\"\\\").startswith(\\\"DONE\\\"):\\n            state[\\\"status\\\"] = \\\"done\\\"\\n            state[\\\"turn\\\"] = None\",\"path\":\"launcher/runtime.py\"}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.467057444,
+        "prompt_tokens": 1238,
+        "prompt_time": 0.092198403,
+        "completion_tokens": 254,
+        "completion_time": 0.541869472,
+        "total_tokens": 1492,
+        "total_time": 0.634067875,
+        "completion_tokens_details": {
+          "reasoning_tokens": 13
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_02b0d31eca",
+      "x_groq": {
+        "id": "req_01m6kdm0kmed9s821a15q1ttyn",
+        "seed": 1788784857
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
