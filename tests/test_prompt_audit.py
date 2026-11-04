@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from launcher import prompts
-from launcher.prompt_audit import audit_parts, render_audited_prompt, PromptAuditAdapter
+from launcher.prompt_audit import audit_parts, render_audited_prompt, PromptAuditAdapter, AuditRecordAfterSuccess
 
 
 class PromptAuditTests(unittest.TestCase):
@@ -50,6 +50,11 @@ class PromptAuditTests(unittest.TestCase):
 
     def test_renderer_drift_refused(self):
         with patch.object(prompts, 'task_prompt', return_value='changed'):
+            with self.assertRaises(ValueError):
+                self.render()
+
+    def test_system_renderer_drift_refused(self):
+        with patch.object(prompts, 'system_prompt', return_value='changed'):
             with self.assertRaises(ValueError):
                 self.render()
 
@@ -130,8 +135,22 @@ class WrapperTests(unittest.TestCase):
 
     def test_post_call_log_failure_is_not_retried(self):
         with patch.object(self.wrapper, '_record', side_effect=[None, OSError('disk')]):
-            with self.assertRaises(OSError):
+            with self.assertRaises(AuditRecordAfterSuccess) as caught:
                 self.wrapper.complete(self.system, self.task)
+        self.assertEqual(self.inner.complete.call_count, 1)
+        self.assertFalse(caught.exception.retry_safe)
+        self.assertTrue(caught.exception.adapter_returned)
+        self.assertTrue(caught.exception.call_id)
+        self.assertIsInstance(caught.exception.__cause__, OSError)
+
+    def test_error_log_failure_preserves_original_adapter_exception(self):
+        original = RuntimeError('original adapter error')
+        self.inner.complete.side_effect = original
+        with patch.object(self.wrapper, '_record', side_effect=[None, OSError('disk')]):
+            with self.assertRaises(RuntimeError) as caught:
+                self.wrapper.complete(self.system, self.task)
+        self.assertIs(caught.exception, original)
+        self.assertIsInstance(caught.exception.__cause__, OSError)
         self.assertEqual(self.inner.complete.call_count, 1)
 
 

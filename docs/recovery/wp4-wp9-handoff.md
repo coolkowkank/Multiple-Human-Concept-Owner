@@ -41,7 +41,11 @@ sequence proximity alone is not a reliable join.
 
 Single writer only. Not a transport/budget/authorization ledger. Recording
 failure before the call prevents it; recording failure after the call may mean
-transport completed and MUST NOT cause an automatic replay. Crash after a start
+the adapter returned and MUST NOT cause an automatic replay.
+`AuditRecordAfterSuccess` is a distinct exception with `retry_safe=False`,
+`adapter_returned=True` and the local call ID. It is not transport/billing proof.
+If error-record writing fails, the original adapter exception remains the raised
+exception and the audit-write failure is chained as its cause. Crash after a start
 record leaves outcome unknown. The wrapper delegates queue consume. Hash-only
 logging is not permission to audit private material; scope stays public project.
 
@@ -111,3 +115,58 @@ Observed public source locations (branch names, not invented deep links):
   `docs/progress/README.md`), Research_lab (`research/findings/2026-11-04-rw1-handoff-validator-spec.md`,
   `research/findings/2026-11-04-rw3-token-baseline-requesty-run.md`),
   live/requesty-tinylib-experiment (`.team/LOG.jsonl`, roster, brief, usage logs).
+
+
+## Independent-review follow-up (2026-11-04)
+
+The original 3cb4fcc was accepted for narrow offline opt-in/unwired use only,
+with independently reproduced 16 focused and 212 full-suite passes. This
+forward follow-up addresses the two error-signalling findings and adds system
+renderer-drift coverage. Live wiring remains a separate reviewed step.
+
+Before any matched live comparison, freeze an approved task list and sample
+size, not a stopping rule based on favorable results. Use an initial bounded
+pilot solely to estimate paired variance and failure rates; report it as a
+pilot, not a powered savings claim. A later confirmatory sample size must be
+chosen from pilot variance, a predeclared minimum useful difference and desired
+confidence/power, subject to a separately approved call budget. If that budget
+cannot support the sample, report imprecision rather than widen the budget.
+No numeric sample size or live run is authorized here.
+
+Assign neutral output IDs and have independent correctness judges blind to
+variant/order and token usage, using one frozen rubric. Keep the mapping for
+reconciliation after verdicts; document any unavoidable unblinding. Retain all
+predeclared pairs. If only one variant errors, show that pair in the primary
+attempted-pair results as a discordant failure, not a paired successful saving.
+Report acceptance/error counts for all attempted tasks; successful-completion
+paired token differences are a separate conditional analysis with the exact
+eligible-pair denominator. Do not impute missing error tokens as zero. Report
+observed usage and unknown usage separately; no unconditional savings or
+non-inferiority claim can follow from incomplete usage/correctness evidence.
+
+## WP4 source reconciliation and offline acceptance matrix
+
+Read public refs at 18:15 EET: reviewer-skip branch
+`55e7c7ef785fdb0eceb78208c0fb501ca3243e72` contains only a task, not guard
+implementation; accepted latch v5 candidate
+`561f2e5cc4eb84b4cdcbacd81394a882495b8704` still has unconditional DONE in
+runtime.py. The older task is QC-only and does not prove Reviewer participation.
+No provider authority question is ready until this gap and composition are
+resolved. This is prerequisite preparation, not a guard implementation.
+
+Minimum offline matrix for the eventual composed candidate:
+- DONE without Reviewer evidence: refuse completion, even with QC PASS.
+- DONE without QC PASS: refuse completion, even with Reviewer evidence.
+- Reviewer and QC evidence for different application states: refuse.
+- Both pass at the same frozen application pin: eligible, subject to all other
+  acceptance criteria and independent reproduction. A seat name or prose claim
+  is not authenticated execution evidence by itself.
+- Application files change after verdicts: invalidate both verdicts.
+- Evidence/log-only commits: must not accidentally invalidate unchanged
+  application evidence. Freeze the application-path/tree binding definition
+  and record both commit provenance and application digest. No naive equality
+  with the latest moving repository HEAD.
+- Missing Reviewer/QC seat, stale evidence or ambiguous application binding:
+  fail closed and expose the missing prerequisite; never silently skip a seat.
+- Actual run report must distinguish unattended runtime recovery from operator
+  repair. Offline matrix success alone is not an autonomous WP4 result.

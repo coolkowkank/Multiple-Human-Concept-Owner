@@ -66,6 +66,21 @@ def render_audited_prompt(seat, role, brief, state, recent_log, batch=None):
 
 
 
+class AuditRecordAfterSuccess(RuntimeError):
+    """Adapter returned, but its audit completion record failed. DO NOT RETRY.
+
+    This says nothing about provider transport/billing: the wrapped adapter may
+    be a queue or mock. A caller must reconcile its own evidence before acting.
+    """
+    retry_safe = False
+    adapter_returned = True
+
+    def __init__(self, call_id):
+        self.call_id = call_id
+        super().__init__('adapter returned but audit write failed; do not retry '
+                         f'automatically; reconcile call_id={call_id}')
+
+
 class PromptAuditAdapter:
     """Opt-in, single-writer adapter wrapper. Never enabled by this module.
 
@@ -101,11 +116,19 @@ class PromptAuditAdapter:
         try:
             result = self.inner.complete(system, prompt)
         except Exception as exc:
-            self._record(dict(event='adapter_call_error', call_id=call_id,
-                              error_type=type(exc).__name__))
+            try:
+                self._record(dict(event='adapter_call_error', call_id=call_id,
+                                  error_type=type(exc).__name__))
+            except Exception as audit_exc:
+                # Preserve the adapter exception as the raised failure. The
+                # failed audit write is its cause, never a replacement verdict.
+                raise exc from audit_exc
             raise
-        self._record(dict(event='adapter_call_returned', call_id=call_id,
-                          provider_tokens=None))
+        try:
+            self._record(dict(event='adapter_call_returned', call_id=call_id,
+                              provider_tokens=None))
+        except Exception as audit_exc:
+            raise AuditRecordAfterSuccess(call_id) from audit_exc
         return result
 
     def consume(self):
