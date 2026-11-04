@@ -365,5 +365,11 @@
       "nudge": 2,
       "content": "I cannot proceed because I do not have access to the repository contents to make the required edits."
     }
+  },
+  {
+    "pacing_wait": {
+      "seconds": 59.1,
+      "min_interval": 65.0
+    }
   }
 ]
