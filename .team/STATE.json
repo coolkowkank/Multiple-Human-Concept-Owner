@@ -1,9 +1,9 @@
 {
-  "turn": "qc",
-  "turn_seq": 3,
-  "turn_since": "2026-11-04T00:21:44Z",
+  "turn": null,
+  "turn_seq": 4,
+  "turn_since": "2026-11-04T00:24:03Z",
   "status": "active",
-  "status_line": "i2i-2: batch 1 review PASS, qc turn next",
+  "status_line": "i2i-2: qc verdict FAIL (review artifact structural nonconformance); single agreed cycle complete, handoff null",
   "leases": {
     "coordinator": {
       "holder": "coordinator-973cb2de",
@@ -16,6 +16,10 @@
     "reviewer": {
       "holder": "reviewer-67847ca5",
       "claimed_at": 1793751704.825814
+    },
+    "qc": {
+      "holder": "qc-b2a6977c",
+      "claimed_at": 1793751843.5416908
     }
   }
 }
