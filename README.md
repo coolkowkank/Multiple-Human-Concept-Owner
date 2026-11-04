@@ -36,7 +36,19 @@
 
 ### Project progress
 
-*As of 2026-11-04 17:50 EET. Weighted milestone progress is **61.0%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
+*As of 2026-11-04 18:02 EET. Weighted milestone progress is **61.0%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
+
+**Continuous / out-of-WP work** (as of 2026-11-04 18:02 EET). Work outside the milestones, with no credit and no effect on the score. Excludes the Coordinator's own coordination. A commit shows an output, not how long anyone worked. No live run telemetry exists, so a state comes from the latest evidence and says unknown when there is none. Idle is not assumed. [Pages view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/charts/)
+
+| Member | Assignment | State | Latest evidenced output | Age |
+|---|---|---|---|---|
+| Nora - Researcher | Research notes outside the work packages (E4 replay, RW3, RW1); WP8a source checks are in the Gantt above | **Working** | 328cec7: RW3 token baseline and RW1 handoff validator spec, offline, no model instance | 17:34 (28 min) |
+| Eva - Evidence verifier | Review of the E4 replay and the RW3/RW1 notes | **Waiting** | 3aff4c6: Review 2 of the first audit loop | 15:37 (2.4 h) |
+| Alex - Builder | Escalation-latch follow-up to the accepted WP5 fix (operator-authored, no model draft) | **Working** | 4459866: Third latch revision. Earlier two got changes-required; the third also has open findings | 17:50 (12 min) |
+| Bill - Independent reviewer | Independent review of Builder commits | **Unknown** | No Bill-authored review recorded in the repo after review 1 on 45cec13. The latch reviews came from another independent reviewer | no evidence |
+| Ryan - Team Resources | Model-route checks; team performance analysis (assigned 17:48) | **Working** | 0584bbe: Role contract: performance job, proposal review chain, support functions | 17:54 (8 min) |
+| Sam - Coordinator Assistant | Status drafts, each reviewed | **Unassigned** | No Sam draft has been requested or produced yet. The 17:50 update was prepared by the maintainer | no evidence |
+| Ryan's Verifier | Check claims before Ryan sends proposals | **Unassigned** | Role defined, no one assigned, no model assigned | no evidence |
 
 ![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/81cb157f2d709231c47b08c2ca2700d914c3bfd6/docs/progress/gantt.png)
 

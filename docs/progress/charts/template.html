@@ -15,6 +15,7 @@ svg{display:block;max-width:100%}.row{cursor:pointer}.row:focus{outline:none}.ro
 .detail p{margin:4px 0}.t{font-weight:600}
 .people{display:grid;gap:6px;margin-top:10px;font-size:14px}.people div{display:flex;align-items:center;gap:8px}.people img{width:26px;height:26px;border-radius:50%}
 table{border-collapse:collapse;font-size:14px;width:100%}td,th{padding:6px 8px;border-bottom:1px solid #eee;text-align:left;vertical-align:top}
+@media(max-width:700px){#ctbl,#ctbl tbody,#ctbl tr,#ctbl td{display:block;width:100%}#ctbl tr:first-child{display:none}#ctbl tr{border:1px solid #e2dfd8;border-radius:10px;margin:0 0 8px;padding:6px 10px;background:#fff}#ctbl td{border:0;padding:2px 0}#ctbl td:first-child{font-weight:700}#ctbl td[data-l]:not(:first-child)::before{content:attr(data-l)": ";color:#5a6272;font-size:12px}}
 </style><link rel="stylesheet" href="../nav.css"><script src="../nav.js"></script></head><body><main>
 <h1>Project progress</h1>
 <p class="mut" id="asof"></p>
@@ -25,6 +26,9 @@ table{border-collapse:collapse;font-size:14px;width:100%}td,th{padding:6px 8px;b
 <div class="scroll"><svg id="gantt" role="img" aria-label="Gantt chart"></svg></div>
 <div class="detail" id="detail" aria-live="polite"><p class="mut">Tap a row to see its status, weight and evidence.</p></div>
 <div class="people" id="people"></div>
+<h2 id="ctitle"></h2>
+<p class="mut" id="cnote"></p>
+<div class="scroll"><table id="ctbl"></table></div>
 <h2>S-curve</h2>
 <p class="mut" id="sinfo"></p>
 <div class="legend" id="slegend"></div>
@@ -91,4 +95,11 @@ $('sinfo').textContent='No plan existed before '+D.as_of.slice(0,10)+', so there
 // table
 const tb=$('tbl');tb.innerHTML='<tr><th>ID</th><th>Package</th><th>Weight</th><th>Status</th><th>Credit</th></tr>';
 P.forEach(p=>{const r=tb.insertRow();[p.id,p.name,p.weight+'%',LAB[p.status],(p.weight*(CRED[p.status]||0)).toFixed(1)+'%'].forEach(v=>{r.insertCell().textContent=v})});
+
+// continuous work
+(function(){const C=D.continuous;if(!C)return;$('ctitle').textContent=C.title;$('cnote').textContent=C.note;const t=$('ctbl');t.innerHTML='<tr><th>Member</th><th>Assignment</th><th>State</th><th>Latest evidenced output</th><th>Age at '+hhmm(D.as_of)+'</th></tr>';
+ const col={Working:'#e3f1e6',Waiting:'#fff3d6',Blocked:'#fbe3e3',Unassigned:'#ececec',Unknown:'#e8eaf6'};
+ C.rows.forEach(r=>{const tr=t.insertRow();tr.insertCell().textContent=r.member;(function(c){c.textContent=r.assignment;c.dataset.l='Assignment'})(tr.insertCell());const s=tr.insertCell();s.dataset.l='State';const b=document.createElement('b');b.textContent=r.state;b.style.cssText='background:'+(col[r.state]||'#eee')+';padding:1px 8px;border-radius:6px;font-size:12px';s.appendChild(b);
+  const o=tr.insertCell();o.dataset.l='Latest output';o.textContent=(r.ref?r.ref+': ':'')+r.what+'. Source: '+r.source+'.';
+  const a=tr.insertCell();a.dataset.l='Age';if(r.last){const m=Math.round((new Date(D.as_of.slice(0,16))-new Date(r.last))/60000);a.textContent=(r.last.slice(11,16))+' ('+(m<60?m+' min':(m/60).toFixed(1)+' h')+')'}else a.textContent='no evidence'})})();
 </script></body></html>
