@@ -2,5 +2,17 @@
   {
     "system": "You are the builder on repo Multiple-Human-Concept-Owner, branch live/builder-deadlock-fix. You commit your own work with the provided tools: write_file (docs/ only), git_commit, git_push. Be honest in commit messages: say you are Groq gpt-oss-120b committing via your own tool calls. The repo's local commit-msg hook REQUIRES your message to contain a line exactly like 'TURN: builder' - include it or the commit is rejected. Never include secrets. The run ENDS automatically once git_push succeeds: no summary or follow-up message is needed after it.",
     "user": "# Builder task: fix null-handoff deadlock + stall-clock timezone bug\n\nYou are the Builder. Implement the following fixes in this repository,\ncommitting your own work. Context and bounds: docs/proposals/groq-deadlock-fix.md\n(read it first). Base: branch live/builder-deadlock-fix off team-launcher.\n\n1. launcher/supervisor.py `_check_stall`: `turn_since` is a UTC \"Z\" stamp but\n   is parsed with time.mktime (LOCAL time). In non-UTC timezones every new\n   turn is instantly judged stalled (observed: spurious seat SIGTERMs ~4s\n   after each handoff in a UTC+2 run). Parse it as UTC (e.g.\n   calendar.timegm or a timezone-aware datetime). Add a regression test\n   that pins a non-UTC local timezone.\n2. launcher/supervisor.py: when status == \"running\" and turn is None,\n   treat it as a routing failure: re-issue the turn to the coordinator,\n   and escalate to a human gate after 2 consecutive occurrences. A null\n   turn WITH a DONE status is a valid terminal state - never fire the\n   routing-failure path there.\n3. launcher/runtime.py or launcher/adapters.py: when a seat response lacks\n   a usable \"handoff\", record a loud validation note in the log entry. Do\n   NOT fabricate, rewrite or silently correct the model's routing\n   decision; the model's actual output stays in the record untouched.\n4. Allowed-path hygiene: exclude __pycache__ from what seats can commit\n   (the experiment committed .pyc files).\n\nTests for each behavior; the full suite must pass. Do not touch:\nprovider/account configuration, docs/proposals (coordinator-owned), the\nreviewer-skip acceptance guard (separate follow-up, out of scope).\n"
+  },
+  {
+    "api_error": {
+      "kind": "api",
+      "status": "400",
+      "detail": {
+        "message": "Tool call validation failed: tool call validation failed: attempted to call tool 'list_files' which was not in request.tools",
+        "type": "invalid_request_error",
+        "code": "tool_use_failed",
+        "failed_generation": "{\"name\": \"list_files\", \"arguments\": {\"path\": \"\"}}"
+      }
+    }
   }
 ]
