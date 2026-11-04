@@ -13,7 +13,7 @@ Coordinator checks only the finished result or an escalation.
   VERIFIED result or ESCALATE to the owner channel. Never edits feedback.
 
 ## Transport (public files, .team/review/ on live/groq-dev-3)
-- LOOP.json: {"state": ..., "cycle": 1-3, "pinned_sha": ..., "notes": ...}
+- LOOP.json: {"state": ..., "cycle": N, "pinned_sha": ..., "api_used": N, "notes": ...}
 - FEEDBACK.md: reviewer-written findings for the model (input to next fix).
 - States: REVIEW_REQUESTED -> FEEDBACK_READY -> FIX_COMMITTED -> VERIFIED
   Any state -> ESCALATE (with reason) at any time.
@@ -26,7 +26,16 @@ Coordinator checks only the finished result or an escalation.
 4. Reviewer re-reviews: VERIFIED (loop ends) or new FEEDBACK (cycle+1).
 
 ## Bounds
-- Max 3 cycles, then ESCALATE. Each attempt: <=6 API rounds, free plan only.
-- No main merge, no access changes, no paid routes, no history rewrite.
+- GLOBAL BUDGET: 6 provider/API rounds TOTAL across the ENTIRE loop (all
+  cycles, all attempts) - peer-agreed bound. NOT per attempt.
+- Every attempted provider request counts, including failed/error/blocked
+  calls and any probe. The executor never retries automatically.
+- Enforcement: harness refuses any request beyond the remaining budget
+  (budget_stop recorded, fail-closed); the coordinator passes only the
+  remaining budget into each attempt. Global counter: LOOP.json "api_used",
+  reconciled against per-event transcripts on the records branch.
+- Cycles continue until VERIFIED, budget exhaustion, or ESCALATE.
+- Free plan only. No main merge, no access changes, no paid routes, no
+  history rewrite.
 - Per-event transcripts: live/groq-dev-3-records (operator record-keeping).
 - Fail-closed: any capture failure halts the run before the next API call.

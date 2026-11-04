@@ -30,6 +30,8 @@ KEY = open(os.environ["GROQ_KEY_FILE"]).read().strip()
 TASK = open(TASK_FILE).read()
 MODEL = "openai/gpt-oss-120b"
 MAX_ROUNDS = 6
+MAX_CALLS = int(os.environ.get("MAX_CALLS", "6"))  # coordinator passes the loop's REMAINING global budget; every attempted provider request counts, including failed/error responses; the executor never retries
+CALLS = {"n": 0}
 MAX_BYTES = 20000
 # Fixed HARNESS-controlled author identity for every model-issued commit: visible
 # model credit without inventing a GitHub account. RFC 2606 reserves .invalid as
@@ -101,6 +103,10 @@ TOOLS = [
 ]
 
 def api(messages):
+    if CALLS["n"] >= MAX_CALLS:
+        record({"budget_stop": {"used": CALLS["n"], "budget": MAX_CALLS}})
+        raise RuntimeError(f"API call budget exhausted ({CALLS['n']}/{MAX_CALLS}); refusing further provider requests")
+    CALLS["n"] += 1  # counted BEFORE the request: failed/transport-blocked attempts consume budget too
     payload = {"model": MODEL, "messages": messages, "tools": TOOLS,
                "reasoning_effort": "low", "max_completion_tokens": 4096}
     p = subprocess.run(["curl", "-sS", "--max-time", "120", "-w", "\n%{http_code}",
