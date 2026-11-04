@@ -4,21 +4,21 @@
 
 *Latest update: 2026-11-04 15:41 EET.*
 
-![Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/021b98b47074ea494b1aca1165292ee55f8f5516/docs/progress/team.png)
+![Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/32fe4807e9285f92c7b8ca164bdb51ca5aa5248d/docs/progress/team.png)
 
 ### Coordinator work timeline
 
 *As of 2026-11-04 15:41 EET. Time runs left to right. Solid markers are recorded events taken from commit times on `main` and `Research_lab`. The hatched box is planned, not yet happened. A routine check that finds no change is not recorded in the repo, so it is not drawn. Trigger work has no schedule and handling it is Coordinator judgment, not an automatic gate. See [how the two kinds of work run](docs/progress/coordinator-work.png).*
 
-![Coordinator work timeline](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/main/docs/progress/coordinator-timeline.png)
+![Coordinator work timeline](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/32fe4807e9285f92c7b8ca164bdb51ca5aa5248d/docs/progress/coordinator-timeline.png)
 
 ### Project progress
 
 *As of 2026-11-04 15:41 EET. Weighted milestone progress is **47.5%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
 
-![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/021b98b47074ea494b1aca1165292ee55f8f5516/docs/progress/gantt.png)
+![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/32fe4807e9285f92c7b8ca164bdb51ca5aa5248d/docs/progress/gantt.png)
 
-![Progress S-curve](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/021b98b47074ea494b1aca1165292ee55f8f5516/docs/progress/s-curve.png)
+![Progress S-curve](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/32fe4807e9285f92c7b8ca164bdb51ca5aa5248d/docs/progress/s-curve.png)
 
 The large icon on each Gantt row is the accountable current owner (a role assignment, not authorship). Small icons are contributors. A legend under the chart gives names and roles. Telkomsel, Alex, Nora and Bill are project aliases for the four roles, not separate GitHub accounts. Nora (Researcher) uses the owner's @coolkowkank account through a shared research token that Eva (Evidence verifier) may also use, by the owner's grant, with the role as commit author, so each has a role icon instead of an avatar.
 
