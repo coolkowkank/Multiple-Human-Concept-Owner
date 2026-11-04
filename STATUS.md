@@ -77,7 +77,8 @@ autonomy.
 3. Then, under a fresh explicit go-ahead: bounded live cycle on the
    fixed head, live-1 protocol, hard stop.
 3. Open gaps before any unattended claim: cooperative local leases;
-   best-effort relay; supervisor restart untested; models may not
-   close cycles; unsandboxed `verify_command` shell; manual
-   prompt-size budgeting. (429 backoff with Retry-After landed in
-   `HttpAdapter`, regression-tested against a stub server.)
+   best-effort relay; models may not close cycles; unsandboxed
+   `verify_command` shell; manual prompt-size budgeting. Closed from
+   this list: 429 backoff with Retry-After; supervisor-restart
+   semantics (orphaned lease blocks a new supervisor's seat, no
+   duplicate turn - regression test).

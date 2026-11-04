@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -1280,3 +1281,40 @@ class SecondRoundRegressionTests(unittest.TestCase):
         with open(os.path.join(repo, "src", "wip.txt"), "w") as fh:
             fh.write("in-domain scratch")
         self.assertTrue(Seat(bus, "builder").act_once())
+
+
+class SupervisorRestartSemanticsTests(unittest.TestCase):
+    """A restarted supervisor spawns fresh seat processes while the
+    previous supervisor's seats may still be alive (orphans). The seat
+    lease is the safety net: the newcomer must stop instead of acting,
+    so a supervisor restart cannot duplicate a turn."""
+
+    def test_orphaned_lease_blocks_new_supervisors_seat(self):
+        script = [{"summary": "should never run", "writes": {},
+                   "verify_command": None, "handoff": None,
+                   "status_line": "DONE"}]
+        seats = {"worker": {"role": "builder", "allowed_paths": ["src/"],
+                            "adapter": {"type": "mock", "script": script}}}
+        repo, bus = make_repo(seats=seats)
+        self.addCleanup(shutil.rmtree, repo, True)
+        state = bus.state()
+        state["turn"] = "worker"
+        state["status"] = "running"
+        # the orphan: a seat process from the dead supervisor holds the
+        # lease with a fresh timestamp and a different session id
+        state["leases"]["worker"] = {"holder": "worker-orphaned00",
+                                     "claimed_at": time.time()}
+        bus.write_state(state)
+        bus.commit_all("operator: orphaned seat holds the lease")
+        seq_before = bus.state()["turn_seq"]
+        sup = Supervisor(repo, "team-work", poll=0.1, restart_limit=0)
+        self.assertEqual(sup.run(max_seconds=3), "timeout")
+        # the newcomer stopped on the lease: no turn taken, nothing
+        # applied, and with restart_limit=0 no restart was attempted
+        self.assertEqual(bus.state()["turn_seq"], seq_before)
+        self.assertNotIn("worker", sup.procs)
+        self.assertNotIn("worker", sup.restarts)
+        # the crash was escalated through a gate, not silently dropped
+        gates = [g for g in bus.pending_gates()
+                 if "worker" in g.get("question", "")]
+        self.assertTrue(gates)

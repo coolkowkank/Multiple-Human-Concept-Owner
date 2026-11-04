@@ -57,11 +57,12 @@ gate queue. Stdlib-only Python 3.10+: nothing to install.
 
 - Operator routes stage exactly their own files: `launcher respond`
   and gate answers commit only their queue/gate file, and `init`
-  commits exactly the layout files. A dirty worktree is never swept
-  in; a pre-staged index is refused rather than included. Seat turns
-  (`launcher seat`) still commit the whole mutation set by design -
-  the bus refuses to pull into a dirty tree, so unrelated work must
-  not live in a seat's clone anyway.
+  commits exactly the layout files. A pre-staged index is refused
+  rather than included; untracked dirt never enters an operator
+  commit. Seat turns (`launcher seat`) commit the whole mutation set
+  by design: in-domain dirt (the seat's allowed_paths, `.team/`) IS
+  swept into the turn commit - that is intentional, and the seat
+  refuses to start on anything outside its domain instead.
 - Session ids are lazy: rendering a prompt or constructing a seat has
   no write side effects. The per-clone id is minted on the seat's
   first action and stored at `.git/team-seat-<name>.instance`, stable
