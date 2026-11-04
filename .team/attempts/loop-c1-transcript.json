@@ -180,5 +180,53 @@
       "ok": true,
       "head": "cc13b0f83bb96a3a2917860ff004d5862470e219"
     }
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-7f7e8ba7-044c-42fb-9fc9-a67917c4fc3b",
+      "object": "chat.completion",
+      "created": 1793778537,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "Now push.",
+            "tool_calls": [
+              {
+                "id": "fc_fe3e6fe2-b2df-4845-b022-5931c27587ab",
+                "type": "function",
+                "function": {
+                  "name": "git_push",
+                  "arguments": "{}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.113617013,
+        "prompt_tokens": 1772,
+        "prompt_time": 0.082195612,
+        "completion_tokens": 19,
+        "completion_time": 0.043857073,
+        "total_tokens": 1791,
+        "total_time": 0.126052685,
+        "completion_tokens_details": {
+          "reasoning_tokens": 4
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_90620edd96",
+      "x_groq": {
+        "id": "req_01m6jrgmx3ej7sswr06mx998vd",
+        "seed": 173271844
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
