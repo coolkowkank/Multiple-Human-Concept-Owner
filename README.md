@@ -4,15 +4,15 @@
 
 *Latest update: 2026-11-04 15:23 EET.*
 
-![Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/4b3aeaeb42f4a9fb9597c19873643d16d7d52c0d/docs/progress/team.png)
+![Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/719431b008e7e010043abf0eeb5bcd66c7f5c98d/docs/progress/team.png)
 
 ### Project progress
 
 *As of 2026-11-04 15:23 EET. Weighted milestone progress is **47.5%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
 
-![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/4b3aeaeb42f4a9fb9597c19873643d16d7d52c0d/docs/progress/gantt.png)
+![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/719431b008e7e010043abf0eeb5bcd66c7f5c98d/docs/progress/gantt.png)
 
-![Progress S-curve](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/4b3aeaeb42f4a9fb9597c19873643d16d7d52c0d/docs/progress/s-curve.png)
+![Progress S-curve](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/719431b008e7e010043abf0eeb5bcd66c7f5c98d/docs/progress/s-curve.png)
 
 The large icon on each Gantt row is the accountable current owner (a role assignment, not authorship). Small icons are contributors. A legend under the chart gives names and roles. Telkomsel, Alex, Nora and Bill are project aliases for the four roles, not separate GitHub accounts. Nora (Researcher) uses the owner's @coolkowkank account through a dedicated Researcher token, with the Researcher role as commit author, so she has a role icon instead of an avatar.
 
