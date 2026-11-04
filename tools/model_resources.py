@@ -1,23 +1,52 @@
 #!/usr/bin/env python3
 """Team Resources (Ryan) mechanism: route health checks and cap-aware
-replacement selection. Stdlib only. This tool is deterministic and
-credential-free: it never calls a provider itself. A fetched models
-listing is read from a file; the credentialed fetch and any actual model
-call stay with the task's authorized operator flow.
+replacement selection. Stdlib only. Deterministic and credential-free:
+it never calls a provider itself. The credentialed fetch and any actual
+model call stay with the task's authorized operator flow.
 
-Authority model (owner's 2026-11-04 resource-fit grant):
-propose prints DECISION (automatic replacement choice authorized) only
-when ALL of: exact candidate id verified price-0 in the supplied fresh
-listing; candidate fits the job shape in the supply map; the task's
-existing attempt cap is unchanged (remaining > 0, no new calls beyond
-the task's own budget); no new credentials/access; route not excluded
-as money. Anything else prints COORDINATOR with the unresolved gap.
+Listings must be an envelope: {"fetched_at": ISO UTC, "source": str,
+"data": [...]}. A fresh catalog proves PRICE only - never quota health.
+Health = a dated last-success; quota is unknown until an actual task
+response. A same-day date is NOT proof a route works right now.
+
+Cap classification (from the ACTUAL response, not assumption):
+  cap-ambiguous       - generic 429 (rate window, concurrency, request
+                        size): route cools down, provider NOT poisoned,
+                        no retry hammering.
+  cap-org-confirmed   - only with evidence naming the provider policy /
+                        response that shows org-wide exhaustion: blocks
+                        ALL routes of that provider. Never clears by
+                        date guesses (no local-midnight reset); clears
+                        only via a later successful call.
+
+Authority model (owner's 2026-11-04 resource-fit grant): propose prints
+DECISION only when ALL fit: exact id price-0 in a listing fetched <= 30
+min ago with a named source; candidate working per record and fits the
+job shape; route not cooling down; provider not org-blocked; task's
+remaining attempts > 0; no new access. Anything else prints
+COORDINATOR with the unresolved gap. DECISION = route selection only,
+never credentialed execution.
 """
 import json, sys, datetime
+
+FRESH_LISTING_MAX_AGE_MIN = 30
 
 def load(path):
     with open(path) as f:
         return json.load(f)
+
+def listing_age_ok(listing):
+    """Envelope freshness: fetched_at present, source named, fetched
+    within FRESH_LISTING_MAX_AGE_MIN minutes (UTC ISO)."""
+    try:
+        if not listing.get("source"):
+            return False
+        ts = datetime.datetime.fromisoformat(
+            listing["fetched_at"].replace("Z", "+00:00"))
+        age = datetime.datetime.now(datetime.timezone.utc) - ts
+        return age <= datetime.timedelta(minutes=FRESH_LISTING_MAX_AGE_MIN)
+    except (KeyError, ValueError, TypeError):
+        return False
 
 def price_zero(listing, model_id):
     """True only if the EXACT id exists in the listing with all-zero
@@ -47,10 +76,18 @@ def cmd_record_event(record_path, route_id, result, evidence):
     if r is None:
         print("COORDINATOR unknown route id " + route_id); return 1
     today = datetime.date.today().isoformat()
+    rec.setdefault("provider_blocks", {})
     if result == "ok":
         r["status"] = "working"
-    elif result == "cap":
+        # a later success is the ONLY thing that clears an org block
+        rec["provider_blocks"].pop(r["provider"], None)
+    elif result == "cap-ambiguous":
+        r["status"] = "cooldown"
+    elif result == "cap-org-confirmed":
         r["status"] = "capped"
+        rec["provider_blocks"][r["provider"]] = {
+            "since": today, "evidence": evidence,
+            "clears": "only via a later successful call (no date guesses)"}
     elif result == "error":
         r["status"] = "uncallable"
     else:
@@ -74,21 +111,32 @@ def cmd_propose(record_path, listing_path, job_shape, failed_route,
         print("COORDINATOR no recorded backup for job shape "
               + job_shape); return 1
     listing = load(listing_path) if listing_path and listing_path != "-" else None
+    if listing is not None and not listing_age_ok(listing):
+        listing = None
+    blocks = rec.get("provider_blocks", {})
     fit, gaps = [], []
     for cid in cands:
         r = get_route(rec, cid)
         if r is None or r["status"] != "working":
             gaps.append(cid + ": not working per record"); continue
-        if listing is not None and not price_zero(listing, cid):
-            gaps.append(cid + ": not price-0 in fresh listing"); continue
+        if r["provider"] in blocks:
+            gaps.append(cid + ": provider " + r["provider"]
+                        + " org-capped since "
+                        + blocks[r["provider"]]["since"]); continue
         if listing is None:
-            gaps.append(cid + ": no fresh listing supplied; price "
-                        "unverified"); continue
+            gaps.append(cid + ": no fresh listing (envelope <= "
+                        + str(FRESH_LISTING_MAX_AGE_MIN)
+                        + "min with source); price unverified"); continue
+        if not price_zero(listing, cid):
+            gaps.append(cid + ": not price-0 in fresh listing"); continue
         fit.append(cid)
     if len(fit) == 1:
+        r = get_route(rec, fit[0])
         print("DECISION use " + fit[0] + " for " + job_shape
               + " (replaces " + failed_route + "; within existing task"
-              + " attempt cap; verified price-0; no new access)")
+              + " attempt cap; verified price-0 in fresh listing; no new"
+              + " access. Last success: " + r.get("evidence", "unknown")
+              + " - quota UNKNOWN until the actual call response)")
         return 0
     if not fit:
         print("COORDINATOR no fit replacement: " + "; ".join(gaps))
