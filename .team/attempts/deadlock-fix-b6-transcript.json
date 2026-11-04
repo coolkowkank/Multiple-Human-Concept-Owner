@@ -62,5 +62,16 @@
       "ok": false,
       "error": "old_string not found (exact byte match required); no change made"
     }
+  },
+  {
+    "api_error": {
+      "kind": "api",
+      "status": "429",
+      "detail": {
+        "message": "Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01m5navq21edybnz2d1tg8r3br` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Used 3559, Requested 5645. Please try again in 9.03s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
+        "type": "tokens",
+        "code": "rate_limit_exceeded"
+      }
+    }
   }
 ]
