@@ -45,15 +45,25 @@ overall PASS.
 | R4 | Outside-domain dirt failed the guard only after mutation, leaving advanced uncommitted state | verified (`a0b1b699` review, scoped; in-domain dirt is intentionally swept, not isolated) |
 
 R1-R4 **verified (scoped)** by the independent review of `a0b1b699`
-(76 tests, installed-hook CLI). The same review found N1, now fixed:
+(76 tests, installed-hook CLI), non-regressed at `bc9eb48`. The
+`a0b1b699` review found N1, fixed in `3017bbd` and **verified
+(scoped)** by the independent review of `bc9eb48` (82 tests,
+installed-hook): the original SeatError surfaces, the error-record
+commit is LOG-only (no sweep), the index stays clean, recovery
+works, pre-staged record refusal preserves the index, and a guard
+rejection unstages its own LOG append. Caveat from that review: an
+unstaged LOG append may remain when the record is refused - not a
+blanket no-effect.
 
 | ID | Finding | State |
 | --- | --- | --- |
-| N1 | Loop mode (no `--once`): the error-record commit used `commit_all` with a guard-rejected message - swept dirt, masked the original SeatError behind a BusError, left staged residue blocking `respond`. `--once` was unaffected | fixed-unverified (LOG-only `commit_paths` + `TURN:` token message + original error re-raised; regression covers hook, index cleanliness, and respond not blocked) |
+| N1 | Loop mode (no `--once`): the error-record commit used `commit_all` with a guard-rejected message - swept dirt, masked the original SeatError behind a BusError, left staged residue blocking `respond`. `--once` was unaffected | verified-scoped (`bc9eb48` review; fix `3017bbd`: LOG-only `commit_paths` + `TURN:` token message + original error re-raised) |
+| M1 | The N1 LOG-only error commit moves head, so a queued response bound to the pre-error head goes stale; discard/requeue recovers | open-minor (documented interaction from the `bc9eb48` review; the head binding is intentionally NOT weakened - discard with `--discard-stale` and requeue) |
 
-Not a clean pass: the review confirms scoped fixes only. Remote
-provider runs, loop-mode endurance, and crash/restart cycles remain
-unproven.
+Not a clean pass: the reviews confirm scoped fixes only. The newer
+adapter changes (max_tokens a29f7c5, reasoning_effort bc9eb48) are
+fixture-tested but NOT peer-verified. Remote provider runs, loop-mode
+endurance, and crash/restart cycles remain unproven.
 
 ## Provider routes (credential-level validation only)
 
@@ -70,7 +80,9 @@ in the owner's vault, never in the repo.
 ## Proven vs not
 
 Proven: queue mechanism - cross-clone handoffs, leases, stale
-refusal + recovery, conformance checks (77 tests). One bounded Groq
+refusal + recovery, conformance checks. Test counts are pinned per
+code state: 82 tests green at `bc9eb48` (2026-11-04, developer run;
+independently reproduced in the `bc9eb48` review). One bounded Groq
 live exchange in a scratch repo (artifacts exported here, not a live
 push to this repo).
 
@@ -80,9 +92,12 @@ autonomy.
 
 ## Next actions
 
-1. Independent review of the N1 fix (later head).
-2. Then, under a fresh explicit go-ahead: bounded live cycle on the
-   fixed head, live-1 protocol, hard stop.
+1. Under a fresh explicit go-ahead: bounded live cycle on the
+   reviewed head, live-1 protocol, hard stop.
+2. Resolve M1 (queued response goes head-stale after a LOG-only error
+   commit): today the operator discards with `--discard-stale` and
+   requeues; decide whether the runtime should offer that recovery
+   itself - without weakening the head binding.
 3. Open gaps before any unattended claim: cooperative local leases;
    best-effort relay; models may not close cycles; unsandboxed
    `verify_command` shell; manual prompt-size budgeting. Closed from

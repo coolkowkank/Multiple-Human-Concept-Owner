@@ -25,7 +25,9 @@ the current truth with exact commit refs.
 
 - Working branch: `team-launcher`. Code `launcher/`, tests `tests/`,
   docs `docs/`, evidence interface `tools/artifact-conformance/`.
-- Run tests: `python3 -m unittest discover -s tests` (currently 78).
+- Run tests: `python3 -m unittest discover -s tests` (82 green at
+  `bc9eb48`, 2026-11-04; repin when code changes, don't leave a bare
+  count).
 - Commits require a prefix: `TURN: <seat>` for runtime turns, or
   `operator:` / `human:` / `supervisor:` (pre-commit guard).
 - `.team/STATE.json`: `status` running/done, `turn`, `turn_seq`.
