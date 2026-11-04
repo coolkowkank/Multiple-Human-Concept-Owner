@@ -4,7 +4,6 @@
       "role": "builder",
       "allowed_paths": [
         "launcher/token_est.py",
-        "launcher/prompts.py",
         "tests/test_token_est.py"
       ],
       "adapter": {

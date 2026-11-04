@@ -1,36 +1,22 @@
-# Batch: token estimate helper (new files only)
+# Batch: standalone token estimation module
 
-Create exactly two NEW files. Do not modify, delete or rewrite any
-existing file. Keep the module under 60 lines, stdlib only.
+Write a small standalone Python utility module and its unit tests.
+Nothing else exists for you to change; this batch is the whole task.
 
-1. `launcher/token_est.py`:
-   - `estimate_tokens(text: str) -> int`: ceil(len(text) / 4), the
-     launcher's documented chars/4 heuristic. Empty string -> 0.
-   - `measure_prompt(system: str, task: str) -> dict`: returns
-     {"system_chars": int, "task_chars": int, "total_chars": int,
-      "est_tokens": int} where est_tokens = estimate_tokens of the
-     combined text.
-   - Module docstring naming the estimate an estimate, never a
-     rate-fit claim.
+Files to create:
 
-2. `tests/test_token_est.py` (unittest, mirror existing test style):
-   - 400 chars -> 100 tokens; empty string -> 0; non-multiple-of-4
-     rounds up; measure_prompt returns all four keys with consistent
-     totals.
+1. `launcher/token_est.py` (stdlib only, under 60 lines):
+   - `estimate_tokens(text: str) -> int`: ceil(len(text) / 4). Empty
+     string -> 0.
+   - `measure_prompt(system: str, task: str) -> dict` with keys
+     system_chars, task_chars, total_chars, est_tokens (est_tokens
+     from estimate_tokens of the combined text).
+   - Module docstring stating the chars/4 figure is an estimate.
+
+2. `tests/test_token_est.py` (unittest):
+   - 400 chars -> 100 tokens; "" -> 0; 401 chars rounds up to 101;
+     measure_prompt returns consistent totals.
 
 verify_command: python3 -m unittest discover -s tests -v
-status_line: token estimate helper added
+status_line: token estimation module added
 handoff: null
-
-STRICT: the "writes" object in your reply must contain ONLY the keys
-"launcher/token_est.py" and "tests/test_token_est.py". Any other path
-(including launcher/prompts.py or launcher/cli.py) is rejected by the
-runtime and wastes the turn. The --measure CLI wiring is explicitly
-OUT of this batch.
-
-UPDATE (attempt 10): launcher/prompts.py is now an allowed path. You
-MAY place the helper there instead of launcher/token_est.py if you
-judge it belongs with the prompt utilities - write the file's FULL
-new content and keep every existing prompt string intact. If you use
-prompts.py, omit launcher/token_est.py. launcher/cli.py remains
-FORBIDDEN - the runtime rejects it and wastes the turn.
