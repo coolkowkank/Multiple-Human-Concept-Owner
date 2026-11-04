@@ -13,6 +13,7 @@ from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 
 here = os.path.dirname(os.path.abspath(__file__))
+import sys; sys.path.insert(0, here)
 d = json.load(open(os.path.join(here, "progress.json")))
 P = d["packages"]; asof = D.fromisoformat(d["as_of"][:16])
 t = lambda s: D.fromisoformat(s[:16])
@@ -95,4 +96,6 @@ for s_ in ("top","right"): ax.spines[s_].set_visible(False)
 ax.legend(fontsize=8, loc="upper left", frameon=False)
 ax.set_title("Progress S-curve (EET). No plan existed before "+asof.strftime("%b %d")+", so there is no planned-vs-actual history.", fontsize=9, loc="left")
 fig.tight_layout(); fig.savefig(os.path.join(here, "s-curve.svg")); fig.savefig(os.path.join(here, "s-curve.png"), dpi=130); plt.close(fig)
+import team_chart
+team_chart.render(here, asof.strftime("%Y-%m-%d %H:%M EET"))
 print("actual", actual)
