@@ -23,3 +23,11 @@ Follow-up (offline): the transport now classifies timeout, network, HTTP,
 malformed (stage, error class, status, content type, body length and a coarse
 body kind; no response text) and writes only allowlisted fields to the ledger. See
 tests/test_ryan_cycle.py class Diag.
+
+## Follow-up 2026-11-04 20:09 EET
+
+Operator-controlled single diagnostic (reviewed transport: max_tokens 2048,
+reasoning_effort low). Result: ok, cost 0, 1 request, 1207/1423/2630 tokens.
+This does not identify the cause of the first unknown outcome and is not an
+external provider recovery signal. Requests consumed in total: 2 of the first
+qualification envelope of 6 (4 remain); no other call is authorised.

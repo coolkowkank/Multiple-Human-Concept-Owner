@@ -4,6 +4,14 @@ Status: PAUSED after the first live attempt (see incident-1.md): one
 allocation request ended with an unknown outcome. No assignment exists and
 nothing is running. Earlier text below describes the design.
 
+Update 2026-11-04 20:09 EET: the operator authorised ONE bounded diagnostic
+Researcher attempt (cause of the earlier unknown outcome still unknown, no
+provider clearance claimed). It returned a well-formed draft: HTTP ok, cost 0,
+prompt 1207 / completion 1423 (reasoning 798) / total 2630 tokens, one request.
+The output is UNVERIFIED model output (runs/research-model-vs-harness/). The
+model is not qualified. The pipeline is PAUSED again by policy: no verifier,
+review, retry or schedule runs without a report and a new operator decision.
+
 Update 2026-11-04 19:54 EET: the operator assigned provisional models
 (researcher nvidia/nemotron-3-ultra-550b-a55b, verifier and Ryan review
 novita/ling-3.1-flash) with `assign_manual()`, no model call. See

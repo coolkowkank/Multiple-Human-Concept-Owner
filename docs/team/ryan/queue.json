@@ -2,7 +2,7 @@
   "questions": [
     {
       "id": "jobdesc-46cb0655",
-      "status": "open",
+      "status": "held",
       "attempts": {},
       "question": "Which of these job-description passages (largest blocks or repeated wording) can be shortened or merged without removing a duty or a safety check? Each finding names the passage id, what can be cut, and a shorter wording. Cite packet ids only.",
       "packet": [
@@ -55,13 +55,16 @@
           "passage": "- `check-price <listing.json> <model-id>`: PASS only when the EXACT id\n  is present with all-zero prices; paid prefixed variants never match.\n- `record-event <record.json> <route> ok|cap-ambiguous|cap-org-confirmed|error\n  <evidence>`: dated status update; an ambiguous cap cools only that\n  route, an org-confirmed cap blocks the whole provider pool until a\n  later success, never a date guess.\n- `propose <record.json> <listing.json|-> <job-shape> <failed-route>\n  <remaining-attempts>`: prints DECISION (automatic replacement choice,\n  authorized under the owner's 2026-11-04 resource-fit grant) O [truncated: 600 of 1508 chars shown]"
         }
       ],
-      "kind": "jobdesc-efficiency"
+      "kind": "jobdesc-efficiency",
+      "note": "held for the one-diagnostic window; not runnable"
     },
     {
       "id": "research-model-vs-harness",
       "kind": "research",
-      "status": "packet-ready-route-paused",
-      "attempts": {},
+      "status": "drafted",
+      "attempts": {
+        "researcher": 1
+      },
       "question": "How much does model selection change task performance when the harness (prompts, tools, scaffolding) is held fixed, and which model-harness interactions matter? Keep published findings separate from anything tested on this project.",
       "packet": [
         {
@@ -137,7 +140,57 @@
           "passage": "F2PF 28% -> 49%, solves 43 -> 72, 169 tasks, 20,480 window"
         }
       ],
-      "note": "Source packet loaded (zero calls). Not runnable while the pipeline is PAUSED; no model is assigned. Excluded on purpose: arXiv 2607.22585 (internal inconsistencies). Findings from a run are model output, not verified fact."
+      "note": "Researcher draft exists (1 request, ok, cost 0). UNVERIFIED model output. Next: verification review only on a new operator decision.",
+      "findings": [
+        {
+          "id": "C1",
+          "claim": "Swapping the model flips task outcomes more (22% at median) than swapping the harness (13%) or rerunning the same configuration (13%) on the hard45 subset.",
+          "sources": [
+            "P3"
+          ],
+          "status": "SUPPORTED_BY_PACKET"
+        },
+        {
+          "id": "C2",
+          "claim": "Model rankings reverse across harnesses: Claude scores 36/63 vs GPT 31/63 in OpenHands, but PI records 19/63 for Claude and 38/63 for GPT.",
+          "sources": [
+            "P1"
+          ],
+          "status": "SUPPORTED_BY_PACKET"
+        },
+        {
+          "id": "C3",
+          "claim": "Harness equivalence (CC vs mini-SWE within 5 percentage points) holds only for two Qwen models; OpenCode loses up to 9.2 percentage points relative to the other harnesses.",
+          "sources": [
+            "P4"
+          ],
+          "status": "SUPPORTED_BY_PACKET"
+        },
+        {
+          "id": "C4",
+          "claim": "Model contrasts (Opus vs GPT) show wide confidence intervals (Opus -1.25 pp CI [-10,+7.5]; GPT +1.25 pp CI [-4.4,+6.9]) that do not establish equivalence or give a transportable probability of superiority.",
+          "sources": [
+            "P5"
+          ],
+          "status": "SUPPORTED_BY_PACKET"
+        },
+        {
+          "id": "C5",
+          "claim": "OpenCode's harness advantage shrinks from about 6 to 2.67 percentage points as tool calls increase from 39.87 to 72.23.",
+          "sources": [
+            "P7"
+          ],
+          "status": "SUPPORTED_BY_PACKET"
+        },
+        {
+          "id": "C6",
+          "claim": "Across 7 rerun pairs of 5 crossed models, model swaps flip 16% of task outcomes.",
+          "sources": [
+            "P3"
+          ],
+          "status": "SUPPORTED_BY_PACKET"
+        }
+      ]
     }
   ]
 }
