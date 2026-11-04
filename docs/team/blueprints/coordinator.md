@@ -85,3 +85,14 @@ Owner names a replacement and the handover checklist above is complete.
 ## Reactivation checklist
 Fit re-check; permissions fresh from owner; capability check re-run if
 the repo or providers changed.
+
+## Workload rule (owner direction 2026-11-04, Slack 1793807753.116989, superseding 1793807666.323859)
+
+While ANY work-package job is late, the Coordinator takes ZERO direct
+WP execution - coordination and recovery only. Only when no jobs are
+late may the Coordinator take over AT MOST one WP from a member, and
+only via an explicit, actual handoff (scope, evidence, caps and review
+path transferred) - never by rewriting history or retiring someone's
+past work. Current example: WP4 and WP9 execution transfers to a
+dedicated implementation role; the Coordinator keeps coordination,
+acceptance and review-chain duties only.

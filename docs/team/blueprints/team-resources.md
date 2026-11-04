@@ -16,14 +16,16 @@
 
 ## Proposal review chain (owner direction 2026-11-04, Slack 1793807405.061099)
 
-Ryan's proposals route: Coordinator Assistant (Sam) first when an
-assistant is active; if not approved -> Coordinator; if not approved
--> owner. No auto-adoption, ever. An unresolved review escalates up;
-nobody invents a sign-off. Sam's current qualification is narrow
-(fixed-template status drafts) and does NOT cover workflow-review
-verdicts, so until a reviewer is qualified for this shape proposals
-start at the Coordinator. Money, security/access changes and merges
-stay owner-only regardless of the chain.
+Ryan's proposals route: Coordinator Assistant (Sam) FIRST, as the
+owner directed; if Sam does not approve -> Coordinator; if the
+Coordinator does not approve -> owner. No auto-adoption, ever. Sam's
+current qualification is narrow (fixed-template status drafts) and
+does NOT cover workflow-review verdicts, so today Sam cannot actually
+approve or reject these proposals: the proposal is marked "pending Sam
+review - reviewer not qualified for this shape" and escalates to the
+Coordinator WITH THAT REASON recorded. That is an escalation, never an
+invented Sam verdict and never a silent bypass. Money, security/access
+changes and merges stay owner-only regardless of the chain.
 
 ## Support (owner direction 2026-11-04, Slack 1793807522.615389)
 
