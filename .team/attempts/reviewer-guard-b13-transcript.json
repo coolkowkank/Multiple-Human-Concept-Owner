@@ -19,5 +19,53 @@
       "x-ratelimit-reset-tokens": "10.469s"
     },
     "call": 3
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-4414ab4b-1c77-4907-996e-ab0ebdbefb00",
+      "object": "chat.completion",
+      "created": 1793800578,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "We need to edit runtime.py to add checks. Let's view repo.",
+            "tool_calls": [
+              {
+                "id": "fc_b98565c2-8972-4846-9998-8aaea86e4db8",
+                "type": "function",
+                "function": {
+                  "name": "edit_file",
+                  "arguments": "{\"new_string\":\"if response.get(\\\"status_line\\\", \\\"\\\").startswith(\\\"DONE\\\"):\\n            # NEW: verify QC verdict before marking done\",\"old_string\":\"if response.get(\\\"status_line\\\", \\\"\\\").startswith(\\\"DONE\\\"):\",\"path\":\"launcher/runtime.py\"}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.062838878,
+        "prompt_tokens": 1032,
+        "prompt_time": 0.094444474,
+        "completion_tokens": 99,
+        "completion_time": 0.21465851,
+        "total_tokens": 1131,
+        "total_time": 0.309102984,
+        "completion_tokens_details": {
+          "reasoning_tokens": 15
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_0708ac49a5",
+      "x_groq": {
+        "id": "req_01m6kdh99gepbbvwfz4k08vkkb",
+        "seed": 357360402
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
