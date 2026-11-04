@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04T15:23:00+02:00",
+ "as_of": "2026-11-04T15:25:00+02:00",
  "timezone": "EET (UTC+2), same as commit timestamps",
  "rules": "Weighted milestone progress, not independently verified completion. Milestone done = 100% of weight (tests pass or an independent review passed). Partial = 50%. In progress / not started = 0%. Weights are judgment calls. Commits alone never count.",
  "packages": [
@@ -194,7 +194,7 @@
   },
   "researcher": {
    "label": "Researcher role",
-   "role": "Literature research agent. Uses @coolkowkank via a dedicated Researcher token; role icon. Trial model planned, not active",
+   "role": "Research agent. Uses @coolkowkank via a dedicated Researcher token. Model: Nemotron-3 Ultra 550B, for verified-source synthesis",
    "icon": "avatars/researcher-role.png",
    "alias": "Nora"
   }

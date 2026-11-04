@@ -30,9 +30,11 @@ No plan or schedule existed before 2026-11-04 14:40 EET, so there is no planned-
 
 ## Owners (PIC)
 
+Team chart levels: owner on top, Coordinator one level below, all other roles one level below the Coordinator. The Builder and reviewer feedback loop is drawn as workflow arrows, separate from the levels.
+
 Project aliases: Telkomsel (Coordinator), Alex (Builder), Nora (Researcher), Bill (Independent reviewer, Christina's existing project name). They are display names only; account, model and status facts are unchanged.
 
-The large icon is the accountable current owner by role assignment, not by who authored commits. Small icons are contributors. The shared bot account is not a unique model identity, and the Researcher uses a role icon instead of an avatar. Since 15:10 it publishes through the owner's dedicated token with the Researcher role as commit author and the owner as committer. That is a publishing route, not a new GitHub account, and earns no product credit. Planned trial model for Nora: Nemotron-3 Ultra 550B on the Requesty free route (live check returned success at zero reported cost). It is not active, and research quality is unproven until a trial passes.
+The large icon is the accountable current owner by role assignment, not by who authored commits. Small icons are contributors. The shared bot account is not a unique model identity, and the Researcher uses a role icon instead of an avatar. Since 15:10 it publishes through the owner's dedicated token with the Researcher role as commit author and the owner as committer. That is a publishing route, not a new GitHub account, and earns no product credit. Model for Nora: Nemotron-3 Ultra 550B on the Requesty free route, for verified-source synthesis with citations reviewed. A 3-request trial returned zero reported cost with good reasoning and format, but some citations were wrong or unverified, so it is not trusted for finding references on its own. This earns no research-quality pass and no extra milestone credit.
 
 ## Publishing the images
 
