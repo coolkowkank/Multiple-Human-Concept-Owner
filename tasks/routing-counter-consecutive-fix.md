@@ -45,3 +45,15 @@ the reviewer to assess - do not build a fallback.
 Full suite green (operator runs it after you commit), honest commit message
 ('TURN: builder' line), push (push gate applies; if refused as gated, retry
 in a later round - the operator opens it after the suite passes).
+
+## F3 roster verification - RESOLVED by coordinator offline read (2026-11-04)
+The reissue path (supervisor.py lines 138-142) writes state["turn"] =
+"coordinator" with NO roster check. default_roster() (cli.py:278-290)
+includes a coordinator seat, but it is installed only when init runs with
+--default-roster; init_layout accepts a caller-supplied roster, so
+coordinator-in-roster is NOT a guaranteed invariant. A roster without a
+coordinator seat makes the routing-failure reissue write a turn to a
+nonexistent seat, which deadlocks silently (no process consumes it).
+Flagged for the reviewer to assess per the task's open question; no
+fallback built here. Verification method: offline read of
+origin/live/builder-deadlock-fix supervisor.py + cli.py, no execution.
