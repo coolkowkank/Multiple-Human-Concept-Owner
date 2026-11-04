@@ -141,5 +141,17 @@
       },
       "service_tier": "on_demand"
     }
+  },
+  {
+    "tool_call": "edit_file",
+    "args": {
+      "new_string": "if self._routing_failure_count > 0:\n                self._routing_failure_count = 0",
+      "old_string": "if self._routing_failure_count > 0:",
+      "path": "launcher/supervisor.py"
+    },
+    "result": {
+      "ok": false,
+      "error": "old_string not found (exact byte match required); no change made"
+    }
   }
 ]
