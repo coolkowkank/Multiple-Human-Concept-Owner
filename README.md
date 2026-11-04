@@ -1,15 +1,17 @@
 # Autonomous AI-Human Teamwork - Work in Progress and Intended Operating Model
 
-## Current Project Team
+## Project Under Construction
+
+**[Open the project site](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/)** - menu to the team, Legacy Members, timeline, and Gantt chart with S-curve. Updated hourly when the project evidence changes.
+
+<details>
+<summary><b>Project Under Construction</b> - current team, timeline, Legacy Members, Gantt and S-curve (click to expand)</summary>
+
+### Current Project Team
 
 *Latest update: 2026-11-04 16:26 EET. [Static full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/team/) (GitHub Pages, selectable text, responsive cards; the picture below is the fallback). Active members and vacant roles are shown separately; "not project-configured" means no documented model or provider.*
 
-<details open>
-<summary><b>Current Project Team</b> - hierarchy chart (click to collapse)</summary>
-
 ![Current Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/543d4ccc8d6895baf920756264aef87e462b6a94/docs/progress/team.png)
-
-</details>
 
 ### Coordinator work timeline
 
@@ -21,9 +23,6 @@
 
 *As of 2026-11-04 15:58 EET. [Scrollable full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/legacy-members/) (sideways and down, header and first column stay put). Full table with instance IDs, blueprints and rules: [registry](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/registry.md). `*` marks an instance with repo evidence of work. A vacant role has no active member.*
 
-<details>
-<summary><b>Legacy Members</b> - 5 active, 2 vacant roles, 3 reference-project contributors with unknown status (click to expand)</summary>
-
 | Role | Member | Status | Assignment | Model / provider | Blueprint | Parallels |
 | --- | --- | --- | --- | --- | --- | --- |
 | Coordinator | Telkomsel | active | coordination, assignments, acceptance | not project-configured | - | 1* |
@@ -34,8 +33,6 @@
 | Team Resources | Maya | vacant | none until qualified | unassigned | [team-resources](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/team-resources.md) | - |
 | Coordinator Assistant | unassigned | vacant | none until assigned | unassigned | [coordinator-assistant](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/coordinator-assistant.md) | - |
 | Reference-project members (Bill-QC, joe-agent, Claude) | - | unknown | none here | - | leads only, see registry | - |
-
-</details>
 
 ### Project progress
 
@@ -50,6 +47,8 @@
 The large icon on each Gantt row is the accountable current owner (a role assignment, not authorship). Small icons are contributors. A legend under the chart gives names and roles. Telkomsel, Alex, Nora and Bill are project aliases for the four roles, not separate GitHub accounts. Nora (Researcher) uses the owner's @coolkowkank account through a shared research token that Eva (Evidence verifier) may also use, by the owner's grant, with the role as commit author, so each has a role icon instead of an avatar.
 
 Only milestones backed by passing tests or an independent review count. The dashed lines are tentative estimates, not commitments or predictions of clock times. The pink baseline was frozen at 14:40 on 2026-11-04 and is never edited, so slips against it stay visible. No plan existed before that. See [how progress is measured](docs/progress/README.md).
+
+</details>
 
 *Repository: `coolkowkank/Multiple-Human-Concept-Owner` - a reusable blueprint for human-led AI project teams: roles, coordination, handoffs, independent review, and project setup.*
 
