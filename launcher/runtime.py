@@ -124,6 +124,7 @@ class Seat:
 
     def act_once(self):
         """Take the turn if it is ours. Returns True if we acted."""
+        self._turn_calls = 0  # new turn: reset the global call budget
         self.bus.pull()  # see handoffs published by other clones/machines
         state = self.bus.state()
         if state.get("turn") != self.name:
@@ -250,48 +251,98 @@ class Seat:
     # not follow the response contract" - the only failures a
     # format-correction round can heal. Provider/HTTP/key errors are
     # never re-asked here (429 backoff lives in the adapter).
-    _FORMAT_ERROR_PREFIXES = ("model output is not JSON",
-                              "no parseable JSON fence")
+    _FORMAT_ERROR_PREFIXES = ("model output is not JSON",)
 
-    # Adapter-call budget per turn: at most 3 - the initial call, ONE
+    # Global per-turn complete() budget (see comment below). Shared
+    # across Bus.transact retry attempts because it lives on the seat
+    # instance, reset only when a NEW turn starts in act_once.
+    TURN_COMPLETE_BUDGET = 3
+
+    # Adapter-call budget: at most 3 complete() calls PER TURN, GLOBAL
+    # across Bus.transact retry attempts - the initial call, ONE
     # format-correction round (contract-format failures only), and ONE
-    # path-guard correction round (forbidden write paths). The two
-    # correction rounds can compose: a format-corrected reply can still
-    # fail the path guard and use the path round.
+    # path-guard correction round (forbidden write paths); the two
+    # corrections can compose. Before this cap was global (pre-490f21e
+    # review, 2026-11-04), a lost push race re-invoked mutate() and
+    # could regenerate up to 3 calls per transact attempt x 3 attempts
+    # = 9 complete calls/turn. Now a transact retry that would exceed
+    # the per-turn budget fails closed instead of re-calling the model
+    # without bound; the turn ends honestly and the operator re-runs.
+    # HTTP requests are a separate layer: each complete() may make up
+    # to max_retries+1 (default 4) HTTP requests on persistent 429, so
+    # the theoretical per-turn HTTP ceiling is 12 requests, retry-
+    # dependent - NOT live-verified (peer is checking HTTP counts
+    # separately). Do not quote "3 HTTP calls"; 3 is the complete()
+    # budget, not a request count.
     # Raw model output is LOCAL-ONLY evidence (review 2026-11-04): it
     # may carry private input, secrets, or copied context, so it must
-    # never be auto-staged into public turn commits. Exclusion is
-    # enforced via .git/info/exclude (local, uncommitted, works on
-    # repos created before this rule existed) - `git add -A` sweeps
-    # skip ignored untracked files and `git status --porcelain` stays
-    # clean, so the preflight dirt check is unaffected. Publishing any
-    # raw payload requires an explicit reviewed/redacted opt-in.
+    # never be auto-staged into public turn commits. It lives in
+    # .git/local-evidence/raw/ - git-private, outside the worktree, so
+    # no `git add -A` or path guard can ever stage it (an earlier
+    # .git/info/exclude approach, c84214b, only ignored UNTRACKED
+    # files: a tracked .team/raw file would still have been swept).
+    # Safety before every write: the destination must resolve inside
+    # the evidence dir (no symlink escape) and an existing file with
+    # different content is never overwritten (a -vN suffix preserves
+    # both). On an unsafe destination the write is REFUSED and the
+    # refusal is recorded in the note instead of the path. Publishing
+    # any raw payload requires an explicit reviewed/redacted opt-in.
     # Consequence for reporting: a failed turn is "zero mutation" only
     # in git-state/app-code terms - it can still leave these local
-    # untracked side-effect files.
+    # side-effect files.
+    _EVIDENCE_DIR = os.path.join(".git", "local-evidence", "raw")
+
     def _preserve_raw(self, state, exc, attempt):
         raw = getattr(exc, "raw", None)
         if raw is None:
             return None
-        exclude = os.path.join(self.bus.repo, ".git", "info", "exclude")
-        os.makedirs(os.path.dirname(exclude), exist_ok=True)
-        existing = ""
-        if os.path.exists(exclude):
-            with open(exclude) as fh:
-                existing = fh.read()
-        if ".team/raw/" not in existing.splitlines():
-            with open(exclude, "a") as fh:
-                fh.write(".team/raw/\n")
-        path = (f".team/raw/{self.name}-seq{state['turn_seq']}"
-                f"-attempt-{attempt}.txt")
-        self._write(self.bus.repo, path, raw)
-        return path
+        base = os.path.join(self.bus.repo, self._EVIDENCE_DIR)
+        try:
+            os.makedirs(base, exist_ok=True)
+            gitdir = os.path.realpath(os.path.join(self.bus.repo,
+                                                   ".git"))
+            if not os.path.realpath(base).startswith(gitdir + os.sep):
+                raise OSError("evidence dir is not git-private "
+                              "(symlink escape?)")
+            name = (f"{self.name}-seq{state['turn_seq']}"
+                    f"-attempt-{attempt}.txt")
+            path = os.path.join(base, name)
+            version = 2
+            while os.path.islink(path) or (
+                    os.path.exists(path)
+                    and open(path).read() != raw):
+                path = os.path.join(
+                    base, name.replace(".txt", f"-v{version}.txt"))
+                version += 1
+            if not os.path.exists(path):
+                with open(path, "w") as fh:
+                    fh.write(raw)
+            return os.path.join(self._EVIDENCE_DIR,
+                                os.path.basename(path))
+        except OSError as exc2:
+            return f"<raw preservation REFUSED: unsafe destination: {exc2}>"
+
+    def _complete(self, system, prompt):
+        """One adapter complete() against the GLOBAL per-turn budget.
+
+        Fail-closed on a lost commit race: a transact retry re-invokes
+        the mutation, but the budget refuses regeneration past 3 calls
+        instead of letting retries multiply model calls uncontrolled.
+        """
+        self._turn_calls = getattr(self, "_turn_calls", 0) + 1
+        if self._turn_calls > self.TURN_COMPLETE_BUDGET:
+            raise SeatError(
+                f"{self.name} exhausted the per-turn adapter-call "
+                f"budget ({self.TURN_COMPLETE_BUDGET}, global across "
+                "commit-race retries) - refusing uncontrolled "
+                "regeneration; the turn ends here, re-run it")
+        return self.adapter.complete(system, prompt)
 
     def _call_adapter(self, state):
         system, task = self.build_prompt(state)
         corrections = []
         try:
-            response = self.adapter.complete(system, task)
+            response = self._complete(system, task)
         except AdapterError as exc:
             if not str(exc).startswith(self._FORMAT_ERROR_PREFIXES):
                 raise SeatError(
@@ -310,7 +361,7 @@ class Seat:
                 "matching the contract and nothing else - no prose, "
                 "no fences, no tool calls.")
             try:
-                response = self.adapter.complete(system, correction)
+                response = self._complete(system, correction)
             except AdapterError as exc2:
                 second_raw = self._preserve_raw(state, exc2, 2)
                 saved = [p for p in (first_raw, second_raw) if p]
@@ -353,7 +404,7 @@ class Seat:
             "contract, writing ONLY inside your allowed paths; leave "
             "every other file untouched.")
         try:
-            retry = self.adapter.complete(system, correction)
+            retry = self._complete(system, correction)
         except AdapterError as exc:
             raise SeatError(
                 f"adapter failed for {self.name} on the correction "

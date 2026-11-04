@@ -97,7 +97,13 @@ class MockAdapter(Adapter):
         self.calls.append({"system": system, "prompt": prompt})
         if self.script_path:
             self._peeked = _peek_queue(self.script_path)
-            return json.loads(self._peeked)
+            try:
+                return json.loads(self._peeked)
+            except json.JSONDecodeError as exc:
+                raise AdapterError(
+                    f"queued response at {self.script_path} is not "
+                    f"valid JSON: {exc} - NOT consumed; fix or remove "
+                    f"the bad line", raw=self._peeked) from exc
         i = len(self.calls) - 1
         if callable(self.script):
             return self.script(system, prompt, i)
@@ -127,7 +133,17 @@ class QueueAdapter(Adapter):
 
     def complete(self, system, prompt):
         self._peeked = _peek_queue(self.path)
-        return json.loads(self._peeked)
+        # M2 (peer review of 7d40565): a hand-edited malformed line
+        # must surface as a normalized AdapterError (handled by the
+        # seat loop), not a raw JSONDecodeError escaping it. The line
+        # is NOT consumed - peek-only - so the queue is preserved.
+        try:
+            return json.loads(self._peeked)
+        except json.JSONDecodeError as exc:
+            raise AdapterError(
+                f"queued response at {self.path} is not valid JSON: "
+                f"{exc} - NOT consumed; fix or remove the bad line",
+                raw=self._peeked) from exc
 
     def consume(self):
         if self._peeked is None:
@@ -257,27 +273,39 @@ class HttpAdapter(Adapter):
 def parse_response(text):
     """Extract the seat's JSON response from model output.
 
-    STRICT ONLY: a bare JSON object or one inside a ```json fence.
-    Anything else is a protocol error the runtime records instead of
-    guessing - free-prose salvage was rejected on review (2026-11-04):
-    text outside the object can carry intent ("cancel that", a second
-    instruction), so dropping it silently is unsafe even with exactly
-    one balanced object. Recovery lives in the seat's explicit
-    format-correction round, where the model re-answers and the reply
-    is revalidated strictly.
+    STRICT ONLY: the whole reply is one bare JSON object, or exactly
+    one ```json fence with nothing but whitespace around it. Anything
+    else is a protocol error the runtime records instead of guessing -
+    free-prose salvage and first-parseable-fence picking were both
+    rejected on review (2026-11-04): text outside the object can carry
+    intent ("cancel that", a second instruction), so dropping it
+    silently is unsafe even with exactly one balanced object. Recovery
+    lives in the seat's explicit format-correction round, where the
+    model re-answers and the reply is revalidated strictly.
     """
     text = text.strip()
     if "```" in text:
-        for block in text.split("```")[1::2]:
-            block = block.strip()
-            if block.startswith("json"):
-                block = block[4:].strip()
-            try:
-                return json.loads(block)
-            except json.JSONDecodeError:
-                continue
-        raise AdapterError("no parseable JSON fence in model output",
-                           raw=text)
+        # N2 (peer review of 7d40565, 2026-11-04, reproduced): the
+        # ENTIRE reply must be exactly one fence plus whitespace -
+        # picking the first parseable fence out of a larger message
+        # discards outside prose that can carry intent ("Actually
+        # cancel that; do not apply.") and silently applies the rest.
+        parts = text.split("```")
+        if len(parts) != 3 or parts[0].strip() or parts[2].strip():
+            raise AdapterError(
+                "model output is not JSON: expected exactly one json "
+                "fence (plus surrounding whitespace) or one bare "
+                "object; prose outside the fence and multiple fences "
+                "are rejected, never picked through", raw=text)
+        block = parts[1].strip()
+        if block.startswith("json"):
+            block = block[4:].strip()
+        try:
+            return json.loads(block)
+        except json.JSONDecodeError as exc:
+            raise AdapterError(
+                f"model output is not JSON: fenced block: {exc}",
+                raw=text) from exc
     try:
         return json.loads(text)
     except json.JSONDecodeError as exc:

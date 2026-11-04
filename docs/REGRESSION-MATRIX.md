@@ -15,10 +15,17 @@ Pinned to the commit this file ships in. Live evidence below comes from
 | truncated JSON | 1 | format-correction round (same path) | same |
 | unexpected tool call | 1 | -- | prompt: no tool calling |
 
-## Call budget (per act_once, documented in runtime.py)
+## Call budget (ENFORCED global per-turn, review-corrected 2026-11-04)
 
-At most 3 adapter calls: 1 initial + at most ONE format-correction + at
-most ONE path-guard correction. The two corrections can compose.
+At most 3 adapter complete() calls PER TURN, global across Bus.transact
+race retries: 1 initial + at most ONE format-correction + at most ONE
+path-guard correction (the two compose). Before this correction, the 3
+were per transact attempt and a lost push race could re-invoke the
+model (source ceiling 9 complete/turn). Now a retry that would exceed
+3 fails closed (fixtures: race recount + excess-regeneration refusal).
+HTTP is a separate layer: up to max_retries+1 (4) requests per
+complete -> theoretical 12 HTTP/turn, retry-dependent, NOT
+live-verified. Never quote "3 HTTP calls".
 Raw model output is preserved unmodified under .team/raw/ before and
 after corrections (attempt-<n>.txt), with file paths - never content -
 in SeatError/success notes. No silent dropping of model output;

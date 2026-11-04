@@ -356,13 +356,14 @@ class SeatTests(unittest.TestCase):
             seat = self._seat_with_callable(repo, bus, fn)
             self.assertTrue(seat.act_once())
             path = os.path.join(
-                repo, ".team", "raw", "builder-seq0-attempt-1.txt")
+                repo, ".git", "local-evidence", "raw",
+                "builder-seq0-attempt-1.txt")
             self.assertTrue(os.path.exists(path))
             self.assertEqual(open(path).read(), raw_text)
             body = bus.log()[-1]["body"]
             # path reported, content not
             self.assertIn("raw preserved", body)
-            self.assertIn(".team/raw/builder-seq0-attempt-1.txt", body)
+            self.assertIn("builder-seq0-attempt-1.txt", body)
             self.assertNotIn(marker, body)
             # local-only: never staged into the public turn commit
             tree = subprocess.run(
@@ -409,13 +410,223 @@ class SeatTests(unittest.TestCase):
                           str(ctx.exception))
             for n in (1, 2):
                 path = os.path.join(
-                    repo, ".team", "raw", f"builder-seq0-attempt-{n}.txt")
+                    repo, ".git", "local-evidence", "raw",
+                    f"builder-seq0-attempt-{n}.txt")
                 self.assertTrue(os.path.exists(path))
                 self.assertEqual(open(path).read(), f"garbage attempt {n}")
             tree = subprocess.run(
                 ["git", "-C", repo, "ls-tree", "-r", "--name-only",
                  "HEAD"], capture_output=True, text=True).stdout
             self.assertNotIn(".team/raw/", tree)
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)
+
+    def test_raw_preservation_refused_on_symlinked_evidence_dir(self):
+        raw_text = "raw output that must not escape"
+
+        def fn(system, prompt, i):
+            if i == 0:
+                raise AdapterError("model output is not JSON: Extra data",
+                                   raw=raw_text)
+            return {"summary": "fixed", "writes": {"src/a": "b"},
+                    "verify_command": None, "handoff": None,
+                    "status_line": "ok"}
+
+        seats = {"builder": seat_spec([], ["src/"])}
+        repo, bus = make_repo(seats=seats)
+        try:
+            outside = tempfile.mkdtemp()
+            target = os.path.join(outside, "escaped.txt")
+            os.makedirs(os.path.join(repo, ".git", "local-evidence"),
+                        exist_ok=True)
+            os.symlink(outside,
+                       os.path.join(repo, ".git", "local-evidence",
+                                    "raw"))
+            seat = self._seat_with_callable(repo, bus, fn)
+            # the turn still heals via the correction round, but the
+            # raw write is REFUSED and the refusal is on record
+            self.assertTrue(seat.act_once())
+            self.assertFalse(os.path.exists(target))
+            self.assertFalse(os.path.exists(
+                os.path.join(outside, "builder-seq0-attempt-1.txt")))
+            self.assertIn("raw preservation REFUSED",
+                          bus.log()[-1]["body"])
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)
+
+    def test_raw_preservation_never_overwrites_different_content(self):
+        counter = {"n": 0}
+
+        def fn(system, prompt, i):
+            counter["n"] += 1
+            raise AdapterError("model output is not JSON: nope",
+                               raw=f"raw payload {counter['n']}")
+
+        seats = {"builder": seat_spec([], ["src/"])}
+        repo, bus = make_repo(seats=seats)
+        try:
+            seat = self._seat_with_callable(repo, bus, fn)
+            with self.assertRaises(SeatError):
+                seat.act_once()
+            base = os.path.join(repo, ".git", "local-evidence", "raw")
+            first = os.path.join(base, "builder-seq0-attempt-1.txt")
+            self.assertEqual(open(first).read(), "raw payload 1")
+            # same attempt index on a fresh run must not overwrite
+            seat2 = self._seat_with_callable(repo, bus, fn)
+            with self.assertRaises(SeatError):
+                seat2.act_once()
+            self.assertEqual(open(first).read(), "raw payload 1")
+            versions = sorted(os.listdir(base))
+            self.assertTrue(any("-v2" in v for v in versions),
+                            f"expected a -v2 sibling, got {versions}")
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)
+
+    def test_legacy_tracked_raw_file_untouched_by_new_preservation(self):
+        raw_text = "new raw payload"
+
+        def fn(system, prompt, i):
+            if i == 0:
+                raise AdapterError("model output is not JSON: Extra data",
+                                   raw=raw_text)
+            return {"summary": "fixed", "writes": {"src/a": "b"},
+                    "verify_command": None, "handoff": None,
+                    "status_line": "ok"}
+
+        seats = {"builder": seat_spec([], ["src/"])}
+        repo, bus = make_repo(seats=seats)
+        try:
+            # a .team/raw file TRACKED by an older version stays as-is;
+            # we never rewrite history or delete it (needs approval)
+            legacy = os.path.join(repo, ".team", "raw", "legacy.txt")
+            os.makedirs(os.path.dirname(legacy), exist_ok=True)
+            with open(legacy, "w") as fh:
+                fh.write("legacy tracked content")
+            subprocess.run(["git", "-C", repo, "add",
+                            ".team/raw/legacy.txt"], check=True)
+            subprocess.run(["git", "-C", repo, "commit", "-m",
+                            "human: legacy raw"], check=True,
+                           capture_output=True)
+            seat = self._seat_with_callable(repo, bus, fn)
+            self.assertTrue(seat.act_once())
+            self.assertEqual(open(legacy).read(),
+                             "legacy tracked content")
+            self.assertTrue(os.path.exists(os.path.join(
+                repo, ".git", "local-evidence", "raw",
+                "builder-seq0-attempt-1.txt")))
+            status = subprocess.run(
+                ["git", "-C", repo, "status", "--porcelain"],
+                capture_output=True, text=True).stdout
+            self.assertNotIn("local-evidence", status)
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)
+
+    def test_malformed_queue_line_normalized_not_consumed(self):
+        seats = {"builder": {
+            "role": "builder", "allowed_paths": ["src/"],
+            "adapter": {"type": "queue",
+                        "path": ".team/queues/builder.jsonl"}}}
+        repo, bus = make_repo(seats=seats)
+        try:
+            qpath = os.path.join(repo, ".team", "queues",
+                                 "builder.jsonl")
+            os.makedirs(os.path.dirname(qpath), exist_ok=True)
+            with open(qpath, "w") as fh:
+                fh.write("{hand edited, not json\n")
+            state = bus.state()
+            state["turn"] = "builder"
+            bus.write_state(state)
+            bus.commit_all("human: go")
+            seat = Seat(bus, "builder")
+            with self.assertRaises(SeatError) as ctx:
+                seat.act_once()
+            # M2: normalized AdapterError -> SeatError, no raw
+            # JSONDecodeError escaping the loop's SeatError handler
+            self.assertIn("not valid JSON", str(ctx.exception))
+            self.assertIn("NOT consumed", str(ctx.exception))
+            with open(qpath) as fh:
+                self.assertEqual(fh.read(), "{hand edited, not json\n")
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)
+
+    def test_turn_call_budget_global_across_commit_races(self):
+        calls = []
+
+        def fn(system, prompt, i):
+            calls.append(prompt)
+            return {"summary": "work", "writes": {"src/a": "b"},
+                    "verify_command": None, "handoff": None,
+                    "status_line": "ok"}
+
+        seats = {"builder": seat_spec([], ["src/"])}
+        repo, bus = make_repo(seats=seats)
+        try:
+            seat = self._seat_with_callable(repo, bus, fn)
+            # simulate a lost push race: commit lands locally, push
+            # fails, confirm_landed says no -> transact resets and
+            # re-invokes the mutation
+            real_push = bus.push
+            failures = {"n": 0}
+
+            def flaky_push():
+                failures["n"] += 1
+                if failures["n"] <= 2:
+                    raise BusError("simulated lost push race")
+                return real_push()
+
+            bus.push = flaky_push
+            bus._confirm_landed = lambda: False
+            # budget is 3 GLOBAL: two lost races consume 2 calls, the
+            # third attempt's first call would be call 3... it fits,
+            # but its own push is the third and succeeds
+            self.assertTrue(seat.act_once())
+            self.assertEqual(len(calls), 3)
+            self.assertEqual(failures["n"], 3)
+            body = bus.log()[-1]["body"]
+            self.assertIn("work", body)
+            # no duplicate effects: exactly one turn commit for seq 1
+            state = bus.state()
+            self.assertEqual(state["turn_seq"], 1)
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)
+
+    def test_turn_call_budget_fail_closed_on_excess_regeneration(self):
+        calls = []
+
+        def fn(system, prompt, i):
+            calls.append(prompt)
+            if i % 2 == 0:
+                raise AdapterError("model output is not JSON: bad",
+                                   raw=f"bad attempt {i + 1}")
+            return {"summary": "healed", "writes": {"src/a": "b"},
+                    "verify_command": None, "handoff": None,
+                    "status_line": "ok"}
+
+        seats = {"builder": seat_spec([], ["src/"])}
+        repo, bus = make_repo(seats=seats)
+        try:
+            seat = self._seat_with_callable(repo, bus, fn)
+            failures = {"n": 0}
+            real_push = bus.push
+
+            def flaky_push():
+                failures["n"] += 1
+                if failures["n"] <= 1:
+                    raise BusError("simulated lost push race")
+                return real_push()
+
+            bus.push = flaky_push
+            bus._confirm_landed = lambda: False
+            with self.assertRaises(SeatError) as ctx:
+                seat.act_once()
+            # attempt 1: call 1 (format fail) + call 2 (correction
+            # heals) -> mutation applied -> push race lost; attempt 2:
+            # call 3 (format fail) -> correction would be call 4 ->
+            # budget refuses, fail closed instead of regenerating
+            self.assertIn("per-turn adapter-call budget",
+                          str(ctx.exception))
+            self.assertEqual(len(calls), 3)
+            self.assertEqual(bus.state()["turn"], "builder")
         finally:
             shutil.rmtree(repo, ignore_errors=True)
 
@@ -512,12 +723,48 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(parse_response('{"a": 1}'), {"a": 1})
 
     def test_fenced_json(self):
-        self.assertEqual(parse_response('blah\n```json\n{"a": 2}\n```\n'),
+        self.assertEqual(parse_response('```json\n{"a": 2}\n```'),
+                         {"a": 2})
+        # surrounding whitespace is fine
+        self.assertEqual(parse_response('  \n```json\n{"a": 2}\n```\n '),
                          {"a": 2})
 
     def test_garbage_raises(self):
         with self.assertRaises(AdapterError):
             parse_response("not json at all")
+
+    # N2 (peer review of 7d40565, reproduced): text outside the object
+    # can carry intent, so anything but exactly one fence + whitespace
+    # or one bare object is a protocol error - never picked through.
+    def test_fenced_object_with_cancel_prose_rejected(self):
+        payload = ('Actually cancel that; do not apply.\n'
+                   '```json\n{"a": 1}\n```\n')
+        with self.assertRaises(AdapterError):
+            parse_response(payload)
+
+    def test_fenced_object_with_trailing_prose_rejected(self):
+        payload = '```json\n{"a": 1}\n```\nWait, disregard all that.'
+        with self.assertRaises(AdapterError):
+            parse_response(payload)
+
+    def test_multiple_fences_rejected(self):
+        payload = '```json\n{"a": 1}\n```\n```json\n{"a": 2}\n```'
+        with self.assertRaises(AdapterError):
+            parse_response(payload)
+
+    def test_bad_first_fence_good_second_rejected(self):
+        payload = '```json\n{bad}\n```\n```json\n{"a": 1}\n```'
+        with self.assertRaises(AdapterError):
+            parse_response(payload)
+
+    def test_good_first_fence_bad_second_rejected(self):
+        payload = '```json\n{"a": 1}\n```\n```json\n{bad}\n```'
+        with self.assertRaises(AdapterError):
+            parse_response(payload)
+
+    def test_single_bad_fence_rejected_no_fallback(self):
+        with self.assertRaises(AdapterError):
+            parse_response('```json\n{bad}\n```')
 
 
 class SupervisorTests(unittest.TestCase):

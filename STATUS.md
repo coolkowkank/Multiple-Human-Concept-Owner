@@ -59,6 +59,8 @@ blanket no-effect.
 | --- | --- | --- |
 | N1 | Loop mode (no `--once`): the error-record commit used `commit_all` with a guard-rejected message - swept dirt, masked the original SeatError behind a BusError, left staged residue blocking `respond`. `--once` was unaffected | verified-scoped (`bc9eb48` review; fix `3017bbd`: LOG-only `commit_paths` + `TURN:` token message + original error re-raised) |
 | M1 | The N1 LOG-only error commit moves head, so a queued response bound to the pre-error head goes stale; discard/requeue recovers | open-minor (documented interaction from the `bc9eb48` review; the head binding is intentionally NOT weakened - discard with `--discard-stale` and requeue) |
+| N2 | Fence parser discarded outside prose: `Actually cancel that; do not apply.` + a valid fenced object parsed and APPLIED; prefix/suffix prose ignored; a bad first fence with a good second silently skipped | fixed-unverified: whole reply must now be exactly one ```json fence + whitespace or one bare object; outside prose, multiple fences and bad-first/good-second all fail closed (adversarial fixtures incl. the peer's cancel repro, no effects). NO "parser strict" PASS claimed - peer verification pending |
+| M2 | Hand-edited malformed queue line: raw JSONDecodeError escaped the loop's SeatError handler (no mutation, queue preserved, but unhandled) | fixed-unverified: normalized to AdapterError -> SeatError, line NOT consumed (fixture pins message + intact queue) |
 
 Not a clean pass: the reviews confirm scoped fixes only. The newer
 adapter changes (max_tokens a29f7c5, reasoning_effort bc9eb48) are
@@ -82,9 +84,32 @@ in the owner's vault, never in the repo.
 Proven: queue mechanism - cross-clone handoffs, leases, stale
 refusal + recovery, conformance checks. Test counts are pinned per
 code state: 82 tests green at `bc9eb48` (2026-11-04, developer run;
-independently reproduced in the `bc9eb48` review). One bounded Groq
+independently reproduced in the `bc9eb48` review); 95 at `7d40565`
+(independently reproduced in the peer review, 43.5s). One bounded Groq
 live exchange in a scratch repo (artifacts exported here, not a live
 push to this repo).
+
+Call-budget correction (peer review of `7d40565`, source-derived):
+"3 adapter calls" was PER TRANSACTION ATTEMPT, not per turn -
+Bus.transact's default 3 attempts could re-invoke the model after a
+lost push race (ceiling 9 complete calls/turn; HTTP max_retries=3 adds
+up to 4 requests per complete call, theoretical 36 HTTP/turn, never
+live-verified). Now enforced: a GLOBAL per-turn budget of 3 complete
+calls shared across race retries; a retry that would exceed it fails
+closed instead of regenerating (fixtures: race recount, budget
+refusal; theoretical HTTP ceiling becomes 12/turn, retry-dependent,
+still not live-verified - the peer is checking HTTP counts separately;
+do not quote "3 HTTP calls" anywhere).
+
+Raw-output privacy (flagged in review of `c84214b`): raw model output
+may carry private input/secrets. Preservation moved out of the
+worktree to git-private `.git/local-evidence/raw/` with symlink-escape
+and no-overwrite guards; nothing is auto-staged into public commits;
+publication needs an explicit reviewed/redacted opt-in. Grounded
+check: `git log --all -- .team/raw` is EMPTY on every branch of this
+repo (full clone incl. live/*, evidence/*, rehearsal/*) - no raw
+payload was ever committed. "Zero mutation" on a failed turn is
+git-state/app-code scoped: local untracked evidence files can remain.
 
 Not proven: unattended/parallel operation, live models closing cycles
 (no DONE status line observed), multi-day runs, heterogeneous
