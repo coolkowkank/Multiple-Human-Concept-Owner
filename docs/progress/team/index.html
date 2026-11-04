@@ -1,12 +1,63 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Current Project Team</title>
-<style>body{font:15px/1.5 system-ui,sans-serif;margin:0;padding:16px;background:#fcfbf9;color:#1a1a2e}
-h1{font-size:22px;margin:0 0 6px}p{color:#5a6272;margin:4px 0 12px;max-width:760px}
-.box{overflow:auto;border:1px solid #ddd;border-radius:10px;background:#fff;max-height:80vh}
-.box img{display:block;width:1180px;max-width:none}
-@media(min-width:1260px){.box img{margin:0 auto}}</style></head><body>
+<style>
+:root{--ink:#1a1a2e;--mut:#5a6272;--line:#b4b8c6;--hair:#e2dfd8}
+*{box-sizing:border-box}body{font:15px/1.5 system-ui,sans-serif;margin:0;padding:16px;background:#fcfbf9;color:var(--ink)}
+main{max-width:1100px;margin:0 auto}h1{font-size:24px;margin:0 0 4px}h2{font-size:16px;margin:26px 0 8px}
+.mut{color:var(--mut)}p{margin:4px 0 10px}
+.tier{display:flex;flex-direction:column;align-items:center}
+.link{width:2px;height:26px;background:var(--line);position:relative}
+.link span{position:absolute;left:10px;top:3px;font-size:12px;color:#8a8fa3;white-space:nowrap}
+.card{background:#fff;border:1px solid var(--hair);border-radius:12px;padding:12px 14px;text-align:center}
+.card.top{width:min(360px,100%)}
+.av{width:64px;height:64px;border-radius:50%;border:2px solid #777;display:block;margin:0 auto 6px;object-fit:cover}
+.av.chk{background:#2a9d8f;color:#fff;font-size:30px;line-height:60px;font-weight:700}
+.role{font-weight:700;font-size:16px}.handle{font-style:italic;color:var(--mut);font-size:13px}
+.ln{font-size:13px;color:var(--mut)}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px 40px;width:100%;position:relative;padding-top:14px;border-top:2px solid var(--line);margin-top:0}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:10px;position:relative}
+.pair .loop{grid-column:1/-1;text-align:center;font-size:12px;color:#8a8fa3}
+.pairs{display:grid;grid-template-columns:1fr 1fr;gap:18px;width:100%;border-top:2px solid var(--line);padding-top:14px}
+.b{display:inline-block;min-width:22px;height:18px;line-height:18px;border-radius:9px;color:#fff;font-size:10px;font-weight:700;text-align:center;padding:0 5px;margin-right:4px;vertical-align:middle}
+.Gq{background:#e8553d}.Ce{background:#1d6fb8}.Rq{background:#8b7ec8}
+.vac{border-style:dashed;background:#faf9f6;text-align:left}
+.vacs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tag{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;margin-left:6px}
+.act{background:#e3f1e6;color:#1f6b33}.vc{background:#eee;color:#555}
+@media(max-width:700px){.pairs,.vacs,.pair{grid-template-columns:1fr}}
+a{color:#1a5fb4}
+</style></head><body><main>
 <h1>Current Project Team</h1>
-<p>Large icon = accountable owner by role. Provider badges are stylized letter marks. "Not project-configured" means the project does not document a model or provider. A vacant role has no active member. Scroll sideways and down; the page is a view of <a href="../team.png">team.png</a>, updated when the team changes.</p>
-<div class="box"><img src="../team.png" alt="Current Project Team hierarchy chart: active members and vacant roles, with model and provider where the project documents them"></div>
-<p><a href="../../../README.md">README</a> | <a href="../legacy-members/">Legacy Members</a> | <a href="../charts/">Gantt and S-curve</a> | <a href="../timeline/">Timeline</a></p>
-</body></html>
+<p class="mut">Static page, updated when the team changes. Large avatar = role holder. "Not project-configured" means the project does not document a model or provider. Active members and vacant roles are listed separately.</p>
+
+<div class="tier">
+ <div class="card top"><img class="av" src="../avatars/coolkowkank.png" alt=""><div class="role">Project owner</div><div class="handle">@coolkowkank</div><div class="ln">Decision authority: merges, spend, access</div></div>
+ <div class="link"><span>direction + gates</span></div>
+ <div class="card top"><img class="av" src="../avatars/instinct-telkomsel.png" alt=""><div class="role">Telkomsel - Coordinator <span class="tag act">active</span></div><div class="handle">@instinct-telkomsel</div><div class="ln">Plans, assigns work, tracks progress</div><div class="ln">Model: not project-configured</div></div>
+ <div class="link"></div>
+ <div class="pairs">
+  <div class="pair">
+   <div class="card"><img class="av" src="../avatars/researcher-role.png" alt=""><div class="role">Nora - Researcher <span class="tag act">active</span></div><div class="handle">Uses @coolkowkank</div><div class="ln">shared research token</div><div class="ln"><span class="b Rq">Rq</span>Nemotron-3 Ultra 550B (free)</div><div class="ln">synthesis; citations reviewed</div></div>
+   <div class="card"><div class="av chk" aria-hidden="true">&#10003;</div><div class="role">Eva - Evidence verifier <span class="tag act">active</span></div><div class="handle">Uses @coolkowkank</div><div class="ln">shared research token</div><div class="ln"><span class="b Rq">Rq</span>Gemma 4 31B (free), trialed</div><div class="ln">runtime integration pending</div></div>
+   <div class="loop">&#8644; sources + claims / returns unsupported</div>
+  </div>
+  <div class="pair">
+   <div class="card"><img class="av" src="../avatars/coolkowkank-bot.png" alt=""><div class="role">Alex - Builder <span class="tag act">active</span></div><div class="handle">@coolkowkank-bot</div><div class="ln"><span class="b Gq">Gq</span>gpt-oss-120b (free plan)</div><div class="ln">via shared bot account</div></div>
+   <div class="card"><img class="av" src="../avatars/instinct-christina.png" alt=""><div class="role">Bill - Independent reviewer <span class="tag act">active</span></div><div class="handle">@instinct-christina</div><div class="ln">Reviews the Builder's pinned commits</div><div class="ln">Model: not project-configured</div></div>
+   <div class="loop">&#8644; review request / verdicts</div>
+  </div>
+ </div>
+</div>
+
+<h2>Vacant roles (no active member)</h2>
+<div class="vacs">
+ <div class="card vac"><b>Team Resources</b><span class="tag vc">vacant</span><div class="ln">Maya is defined for this role; none active until qualified.</div></div>
+ <div class="card vac"><b>Coordinator Assistant</b><span class="tag vc">vacant</span><div class="ln">Unassigned; none active until assigned.</div></div>
+</div>
+
+<h2>Provider pool</h2>
+<p class="ln"><span class="b Gq">Gq</span>1) Groq: Builder &nbsp; <span class="b Ce">Ce</span>2) Cerebras: on hold &nbsp; <span class="b Rq">Rq</span>3) Requesty: free route, Nora and Eva trials. Badges are stylized letter marks.</p>
+<p class="ln">On demand, not staffed: Architect, Independent QC, Records. The Coordinator keeps responsibility for accepting reviewed work.</p>
+<p class="ln">Builder commits go through @coolkowkank-bot. Researcher commits: role author, owner @coolkowkank as committer. Sources: docs/developers.md and the team roster on the team-launcher branch (<a href="https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/registry.md">registry</a>).</p>
+<p class="ln"><a href="https://github.com/coolkowkank/Multiple-Human-Concept-Owner#readme">README</a> | <a href="../legacy-members/">Legacy Members</a> | <a href="../charts/">Gantt and S-curve</a> | <a href="../timeline/">Timeline</a></p>
+</main></body></html>

@@ -2,7 +2,7 @@
 
 ## Current Project Team
 
-*Latest update: 2026-11-04 16:26 EET. [Scrollable full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/team/) (GitHub Pages). Active members and vacant roles are shown separately; "not project-configured" means no documented model or provider.*
+*Latest update: 2026-11-04 16:26 EET. [Static full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/team/) (GitHub Pages, selectable text, responsive cards; the picture below is the fallback). Active members and vacant roles are shown separately; "not project-configured" means no documented model or provider.*
 
 <details open>
 <summary><b>Current Project Team</b> - hierarchy chart (click to collapse)</summary>
