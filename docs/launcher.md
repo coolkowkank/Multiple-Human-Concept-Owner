@@ -53,6 +53,24 @@ gate queue. Stdlib-only Python 3.10+: nothing to install.
   session the supervisor does not manage). This is where AI from
   different platforms joins the same team.
 
+## Staging, session ids and queue binding
+
+- `launcher respond` stages ONLY the seat's queue file. An unrelated
+  dirty or untracked file elsewhere in the worktree is never swept
+  into the queue commit. Seat turns (`launcher seat`) commit the whole
+  mutation set by design - the bus refuses to pull into a dirty tree,
+  so unrelated work must not live in a seat's clone anyway.
+- Session ids are lazy: rendering a prompt or constructing a seat has
+  no write side effects. The per-clone id is minted on the seat's
+  first action and stored at `.git/team-seat-<name>.instance`, stable
+  for that clone afterwards.
+- Queue binding: `respond` stamps each queued response with the
+  `turn`, `turn_seq` and head it was reasoned against. The runtime
+  refuses to apply a response whose binding no longer matches the bus
+  (a stale response is left in the queue for the operator to
+  re-reason), instead of silently replaying it. The marker is removed
+  before the response is applied, so it never persists into STATE.
+
 ## Commands
 
 ```sh

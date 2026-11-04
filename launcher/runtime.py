@@ -42,7 +42,11 @@ class Seat:
         self.relay = relay
         self.webhook = webhook
         self._relay_seq = 0
-        self.instance_id = instance_id or self._session_id()
+        # Session id is created lazily on first seat action: rendering a
+        # prompt (or constructing a Seat) must not mint
+        # .git/team-seat-<name>.instance as a side effect (live-1
+        # review finding). Once minted it stays stable for this clone.
+        self.instance_id = instance_id
         self._load_roster_entry(bus, name)
 
     def _session_id(self):
@@ -85,6 +89,8 @@ class Seat:
     # -- lease: one active session per seat ----------------------------
 
     def claim_lease(self, state):
+        if not self.instance_id:
+            self.instance_id = self._session_id()
         lease = state["leases"].get(self.name)
         if lease and lease["holder"] != self.instance_id:
             age = time.time() - lease.get("claimed_at", 0)
@@ -111,6 +117,22 @@ class Seat:
                 return False
             self.claim_lease(state)
             response = self._call_adapter(state)
+            binding = response.pop("_queue", None)
+            if binding is not None:
+                # `launcher respond` stamps the turn/turn_seq the response
+                # was reasoned against. Applying it after the bus moved
+                # would replay a stale batch (live-1 major finding), so
+                # refuse and leave the queue for the operator instead.
+                if (binding.get("turn") != state.get("turn")
+                        or binding.get("turn_seq") != state.get("turn_seq")):
+                    raise SeatError(
+                        "queued response is stale: bound to "
+                        f"turn={binding.get('turn')!r} "
+                        f"seq={binding.get('turn_seq')} but the bus is at "
+                        f"turn={state.get('turn')!r} "
+                        f"seq={state.get('turn_seq')} - re-render with "
+                        "`launcher prompt` and re-queue with "
+                        "`launcher respond`")
             self._apply(state, response)
             consume = getattr(self.adapter, "consume", None)
             if consume:

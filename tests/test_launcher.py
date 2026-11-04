@@ -765,7 +765,11 @@ class SeatSessionIdTests(unittest.TestCase):
         repo, bus = make_repo(seats={"builder": seat_spec([], ["src/"])})
         self.addCleanup(shutil.rmtree, repo, True)
         a = Seat(bus, "builder")
+        # lazy: constructing (or rendering a prompt) must not mint the id
+        self.assertIsNone(a.instance_id)
+        a.claim_lease(bus.state())  # first seat action mints it
         b = Seat(bus, "builder")
+        b.claim_lease(bus.state())  # same clone resumes the same id
         self.assertEqual(a.instance_id, b.instance_id)
         self.assertTrue(os.path.exists(
             os.path.join(repo, ".git", "team-seat-builder.instance")))
@@ -821,16 +825,110 @@ class SeatSessionIdTests(unittest.TestCase):
         state = bus.state()
         state["turn"] = "builder"
         state["status"] = "running"
-        state["leases"]["builder"] = {"holder": Seat(bus, "builder").instance_id,
-                                      "claimed_at": time.time()}
+        seat1 = Seat(bus, "builder")
+        seat1.claim_lease(state)  # mints this clone's id and holds the lease
         bus.write_state(state)
         seat2 = Seat(Bus(clone, "team-work"), "builder")
-        self.assertNotEqual(seat2.instance_id,
-                            state["leases"]["builder"]["holder"])
         with self.assertRaises(SeatError):
-            seat2.claim_lease(state)
-        # after the lease TTL the same second session may take over
+            seat2.claim_lease(state)  # fresh lease blocks the second session
+        # after the lease TTL the same second session may take over,
+        # with its OWN id - the copied marker makes it a distinct session
         state["leases"]["builder"]["claimed_at"] = 0
         seat2.claim_lease(state)
         self.assertEqual(state["leases"]["builder"]["holder"],
                          seat2.instance_id)
+        self.assertNotEqual(seat2.instance_id, seat1.instance_id)
+
+
+class QueueBindingRegressionTests(unittest.TestCase):
+    """live-1 review findings: each test pins one confirmed defect fix."""
+
+    def _queue_repo(self):
+        seats = {
+            "builder": {"role": "builder", "allowed_paths": ["src/"],
+                        "adapter": {"type": "queue",
+                                    "path": ".team/queues/builder.jsonl"}},
+            "reviewer": {"role": "reviewer", "allowed_paths": ["review/"],
+                         "adapter": {"type": "mock", "script": []}},
+        }
+        repo, bus = make_repo(seats=seats)
+        self.addCleanup(shutil.rmtree, repo, True)
+        return repo, bus
+
+    def _respond(self, repo, name="builder", payload=None):
+        from launcher.cli import main as cli_main
+        payload = payload or {"summary": "work", "writes": {},
+                              "verify_command": None, "handoff": "reviewer",
+                              "status_line": "done"}
+        path = os.path.join(repo, "resp.json")
+        with open(path, "w") as fh:
+            json.dump(payload, fh)
+        cli_main(["respond", name, "--repo", repo, "--branch", "team-work",
+                  "--file", path])
+
+    def test_stale_queued_response_refused_and_preserved(self):
+        repo, bus = self._queue_repo()
+        state = bus.state()
+        state["turn"] = "builder"
+        bus.write_state(state)
+        bus.commit_all("operator: turn to builder")
+        self._respond(repo)
+        # the bus moves on: two turns pass, turn comes back to builder
+        state = bus.state()
+        state["turn_seq"] = state["turn_seq"] + 2
+        bus.write_state(state)
+        bus.commit_all("operator: two turns passed elsewhere")
+        seat = Seat(bus, "builder")
+        with self.assertRaises(SeatError) as ctx:
+            seat.act_once()
+        self.assertIn("stale", str(ctx.exception))
+        # queue line preserved for the operator, state untouched
+        with open(os.path.join(repo, ".team/queues/builder.jsonl")) as fh:
+            self.assertNotEqual(fh.read().strip(), "")
+        self.assertEqual(bus.state()["turn_seq"], state["turn_seq"])
+
+    def test_fresh_binding_applies_and_marker_not_persisted(self):
+        repo, bus = self._queue_repo()
+        state = bus.state()
+        state["turn"] = "builder"
+        bus.write_state(state)
+        bus.commit_all("operator: turn to builder")
+        self._respond(repo)
+        self.assertTrue(Seat(bus, "builder").act_once())
+        state = bus.state()
+        self.assertEqual(state["turn"], "reviewer")
+        self.assertNotIn("_queue", json.dumps(state))
+
+    def test_respond_stages_only_the_queue_file(self):
+        repo, bus = self._queue_repo()
+        state = bus.state()
+        state["turn"] = "builder"
+        bus.write_state(state)
+        bus.commit_all("operator: turn to builder")
+        with open(os.path.join(repo, "unrelated.txt"), "w") as fh:
+            fh.write("untracked operator scratch")
+        self._respond(repo)
+        show = git(repo, "show", "--name-only", "--format=", "HEAD").stdout
+        self.assertIn(".team/queues/builder.jsonl", show)
+        self.assertNotIn("unrelated.txt", show)
+        # the scratch file stays untracked, not swept in
+        status = git(repo, "status", "--porcelain").stdout
+        self.assertIn("?? unrelated.txt", status)
+
+    def test_prompt_does_not_mint_session_file(self):
+        repo, bus = self._queue_repo()
+        seat = Seat(bus, "builder")
+        self.assertIsNone(seat.instance_id)
+        marker = os.path.join(repo, ".git", "team-seat-builder.instance")
+        self.assertFalse(os.path.exists(marker))
+        # first seat action mints it and it stays stable
+        state = bus.state()
+        state["turn"] = "builder"
+        bus.write_state(state)
+        bus.commit_all("operator: turn to builder")
+        self._respond(repo)
+        self.assertTrue(seat.act_once())
+        self.assertTrue(os.path.exists(marker))
+        with open(marker) as fh:
+            first = fh.read().strip()
+        self.assertEqual(seat.instance_id, first)

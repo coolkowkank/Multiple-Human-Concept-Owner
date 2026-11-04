@@ -146,13 +146,34 @@ def cmd_respond(args):
     if not isinstance(response, dict):
         print("response must be one JSON object", file=sys.stderr)
         sys.exit(1)
+    # Bind the response to the bus state it was reasoned against
+    # (live-1 major finding: an unbound queued response could be
+    # applied silently after the bus moved). The runtime refuses the
+    # apply when turn/turn_seq have moved on.
+    state = bus.state()
+    head = subprocess.run(["git", "-C", bus.repo, "rev-parse", "HEAD"],
+                          capture_output=True, text=True).stdout.strip()
+    response["_queue"] = {"turn": state.get("turn"),
+                          "turn_seq": state.get("turn_seq"),
+                          "head": head}
     os.makedirs(os.path.dirname(path) or bus.repo, exist_ok=True)
     with open(path, "a") as fh:
         fh.write(json.dumps(response) + "\n")
-    bus.commit_all(f"operator: response queued for {args.name}")
-    print(f"queued response for {args.name}; run "
-          f"`python3 -m launcher seat {args.name} --repo {bus.repo} "
-          f"--branch {bus.branch} --once` to take the turn")
+    rel = os.path.relpath(path, bus.repo)
+    bus.commit_paths(f"operator: response queued for {args.name}", [rel])
+    current = subprocess.run(
+        ["git", "-C", bus.repo, "branch", "--show-current"],
+        capture_output=True, text=True).stdout.strip()
+    hint_branch = current or bus.branch
+    extra = ""
+    if current and current != bus.branch:
+        extra = (f" [note: checkout is on {current!r}, respond used "
+                 f"--branch {bus.branch!r}]")
+    print(f"queued response for {args.name} (bound to "
+          f"turn={state.get('turn')!r} seq={state.get('turn_seq')} "
+          f"head={head[:12]}); run `python3 -m launcher seat {args.name} "
+          f"--repo {bus.repo} --branch {hint_branch} --once` to take "
+          f"the turn{extra}")
 
 
 def _cmd_serve(args):

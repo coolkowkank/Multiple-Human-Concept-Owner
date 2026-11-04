@@ -43,6 +43,14 @@ waive or require a fix (see Stated limits in templates/qc-verdict.md).>
 <What the team may not resolve itself and must always escalate to the
 owners, regardless of the standing delegations.>
 
+## Definition of finished
+
+<The objective checks that make a cycle complete: which commands must
+exit 0, which artifacts must exist and pass their conformance checker,
+and the closing condition (a DONE status_line that sets status=done and
+turn=null). The conformance tooling rejects a running cycle that claims
+completion, so state the checks here instead of implying them.>
+
 ## Status
 
 <One line, kept current by the Coordinator: whose turn, what is done, what

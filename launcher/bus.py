@@ -104,6 +104,17 @@ class Bus:
         _git(self.repo, "commit", "-m", message)
         return True
 
+    def commit_paths(self, message, paths):
+        """Commit ONLY the named paths. Unlike commit_all (git add -A),
+        an unrelated dirty file elsewhere in the worktree is never
+        swept into the commit (live-1 review finding)."""
+        _git(self.repo, "add", "--", *paths)
+        if _git(self.repo, "diff", "--cached", "--quiet",
+                check=False).returncode == 0:
+            return False
+        _git(self.repo, "commit", "-m", message)
+        return True
+
     def transact(self, message, mutate):
         """Pull, mutate working tree, commit, push; retry on races.
 
