@@ -1,5 +1,5 @@
 {
-  "turn": null,
+  "turn": "builder",
   "turn_seq": 1,
   "turn_since": "2026-11-04T07:09:11Z",
   "status": "running",
