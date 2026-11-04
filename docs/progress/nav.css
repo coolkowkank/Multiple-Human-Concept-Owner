@@ -5,3 +5,5 @@
 .sitenav a:hover{color:#fff;background:#25254a}
 .sitenav a[aria-current="page"]{color:#fff;border-bottom-color:#e8b84a;font-weight:600}
 @media(max-width:700px){.sitenav .in{flex-wrap:wrap;overflow:visible;gap:0;padding:0 6px}.sitenav b{flex:0 0 100%;padding:8px 6px 0;font-size:13px}.sitenav a{padding:10px 9px;min-height:40px}}
+
+.updateclock{max-width:1068px;margin:12px auto;padding:12px 16px;border:1px solid #ddd9d3;border-radius:8px;background:#fff;color:#251f21;font:14px/1.5 system-ui,sans-serif}.updateclock b{display:block;font-size:16px}.updateclock p{margin:6px 0;color:#585254}.updateclock summary{cursor:pointer;min-height:44px;padding-top:10px}.updateclock details p{font-size:13px}@media(max-width:700px){.updateclock{margin:10px 12px;padding:12px}.updateclock b{font-size:15px}}
