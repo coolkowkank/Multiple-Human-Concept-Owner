@@ -408,6 +408,16 @@ def run_tool(name, args):
             head = subprocess.run(["git", "-C", REPO, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
             return {"ok": True, "head": head}
         if name == "git_push":
+            # Operator test-verification gate (2026-11-04 rule: the changed
+            # worktree's tests must actually run green BEFORE publish; a
+            # compile pass is not verification). When PUSH_GATE_FILE is set
+            # and absent, refuse loudly; the MODEL retries after the gate
+            # opens. Gate creation is always an operator act after running
+            # the suite; the model cannot create it (path outside its
+            # writable set).
+            gate = os.environ.get("PUSH_GATE_FILE")
+            if gate and not os.path.isfile(gate):
+                return {"ok": False, "error": "push gated: operator test verification pending; do other work or retry git_push in a later round"}
             p = subprocess.run(["git", "-C", REPO, "push", "origin", f"HEAD:{BRANCH}"], capture_output=True, text=True)
             out = (p.stdout + p.stderr).replace(KEY, "[REDACTED]")
             if p.returncode != 0:

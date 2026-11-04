@@ -338,6 +338,16 @@ class ExecutorCase(unittest.TestCase):
         self.assertEqual(ns["_retry_hint_s"]({"message": "... Please try again in 9.03s. ..."}), 9.03)
         self.assertIsNone(ns["_retry_hint_s"]({"message": "other"}))
 
+
+    def test_push_gate_blocks_until_operator_opens(self):
+        ns = self.load()
+        gate = os.path.join(self.tmp, "push-gate")
+        os.environ["PUSH_GATE_FILE"] = gate
+        self.addCleanup(lambda: os.environ.pop("PUSH_GATE_FILE", None))
+        r = ns["run_tool"]("git_push", {})
+        self.assertFalse(r["ok"])
+        self.assertIn("gated", r["error"])
+
     def test_precommit_compile_guard_blocks_broken_python(self):
         ns = self.load()
         # the executor stages docs/ tasks/ launcher/ tests/ as one pathspec
