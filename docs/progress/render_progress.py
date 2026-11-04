@@ -56,12 +56,12 @@ for s_ in ("top","right"): ax.spines[s_].set_visible(False)
 h = [Patch(color=COL[k], label=LAB[k]) for k in COL] + [Patch(facecolor="none", edgecolor="#555", hatch="////", label="Forecast (not a commitment)"), Line2D([0],[0], marker="D", color="w", markerfacecolor="#c62828", markersize=6, label="Baseline end, frozen "+d["baseline"]["set_at"][11:16])]
 ax.legend(handles=h, fontsize=7, loc="lower center", bbox_to_anchor=(.5, 1.0), ncol=3, frameon=False)
 ax.set_title("Gantt chart (times in EET). Solid = observed in repo evidence. Hatched = forecast.", fontsize=9, loc="left", pad=34)
-fig.tight_layout(rect=(0, 0.17, 0.92, 1))
+fig.tight_layout(rect=(0, 0.21, 0.92, 1))
 for n, (k, v) in enumerate(ppl.items()):
-    yy = 0.135 - n*0.032
+    yy = 0.17 - n*0.032
     fig.add_artist(AnnotationBbox(OffsetImage(icons[k], zoom=0.17), (0.035, yy), xycoords="figure fraction", frameon=False))
     fig.text(0.06, yy, v.get("alias","")+" ("+v["label"]+"): "+v["role"] if v.get("alias") else v["label"]+": "+v["role"], fontsize=8, va="center")
-fig.text(0.02, 0.165, d.get("pic_note",""), fontsize=7, color="#555")
+fig.text(0.02, 0.202, d.get("pic_note",""), fontsize=7, color="#555")
 fig.savefig(os.path.join(here, "gantt.svg")); fig.savefig(os.path.join(here, "gantt.png"), dpi=130); plt.close(fig)
 
 # S-curve
