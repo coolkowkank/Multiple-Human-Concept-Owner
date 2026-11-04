@@ -1,0 +1,235 @@
+{
+ "kind": "mechanical-text-match-not-a-verdict-not-Eva",
+ "claims": 13,
+ "needs_human_or_model_review": 8,
+ "rows": [
+  {
+   "id": "M1.1",
+   "tag": "M1",
+   "cited_passages": [
+    "P1",
+    "P2"
+   ],
+   "quotes": [],
+   "numbers_present": [
+    "31",
+    "36",
+    "63"
+   ],
+   "numbers_absent": [
+    "49.21%",
+    "57.14%",
+    "7.94"
+   ],
+   "review": true
+  },
+  {
+   "id": "M1.2",
+   "tag": "M1",
+   "cited_passages": [
+    "P1",
+    "P2"
+   ],
+   "quotes": [],
+   "numbers_present": [
+    "19",
+    "38",
+    "60.32%",
+    "63"
+   ],
+   "numbers_absent": [
+    "30.16",
+    "30.16%"
+   ],
+   "review": true
+  },
+  {
+   "id": "M1.3",
+   "tag": "M1",
+   "cited_passages": [
+    "P1",
+    "P2"
+   ],
+   "quotes": [],
+   "numbers_present": [
+    "4"
+   ],
+   "numbers_absent": [
+    "3",
+    "5"
+   ],
+   "review": true
+  },
+  {
+   "id": "M1.4",
+   "tag": "M1",
+   "cited_passages": [
+    "P1",
+    "P2"
+   ],
+   "quotes": [],
+   "numbers_present": [
+    "19.94",
+    "4.66",
+    "52.38%",
+    "60.32%"
+   ],
+   "numbers_absent": [
+    "4.3"
+   ],
+   "review": true
+  },
+  {
+   "id": "M3.1",
+   "tag": "M3",
+   "cited_passages": [
+    "P3",
+    "P4"
+   ],
+   "quotes": [],
+   "numbers_present": [
+    "13%",
+    "16%",
+    "22",
+    "22%",
+    "5",
+    "56%",
+    "7"
+   ],
+   "numbers_absent": [],
+   "review": false
+  },
+  {
+   "id": "M3.2",
+   "tag": "M3",
+   "cited_passages": [
+    "P3",
+    "P4"
+   ],
+   "quotes": [],
+   "numbers_present": [],
+   "numbers_absent": [],
+   "review": false
+  },
+  {
+   "id": "M3.3",
+   "tag": "M3",
+   "cited_passages": [
+    "P3",
+    "P4"
+   ],
+   "quotes": [],
+   "numbers_present": [
+    "5",
+    "9.2"
+   ],
+   "numbers_absent": [
+    "3",
+    "444",
+    "445"
+   ],
+   "review": true
+  },
+  {
+   "id": "M5.1",
+   "tag": "M5",
+   "cited_passages": [
+    "P5",
+    "P6"
+   ],
+   "quotes": [],
+   "numbers_present": [
+    "1.25",
+    "10,",
+    "4.4",
+    "6.9",
+    "7.5"
+   ],
+   "numbers_absent": [],
+   "review": false
+  },
+  {
+   "id": "M5.2",
+   "tag": "M5",
+   "cited_passages": [
+    "P5",
+    "P6"
+   ],
+   "quotes": [],
+   "numbers_present": [
+    "256",
+    "80"
+   ],
+   "numbers_absent": [
+    "0.8",
+    "17.2",
+    "19",
+    "23.7",
+    "30%",
+    "61",
+    "9.0",
+    "9.4%"
+   ],
+   "review": true
+  },
+  {
+   "id": "M5.3",
+   "tag": "M5",
+   "cited_passages": [
+    "P5",
+    "P6"
+   ],
+   "quotes": [],
+   "numbers_present": [
+    "1.25"
+   ],
+   "numbers_absent": [
+    "0.6"
+   ],
+   "review": true
+  },
+  {
+   "id": "M5.4",
+   "tag": "M5",
+   "cited_passages": [
+    "P5",
+    "P6"
+   ],
+   "quotes": [],
+   "numbers_present": [],
+   "numbers_absent": [],
+   "review": false
+  },
+  {
+   "id": "M2.1",
+   "tag": "M2",
+   "cited_passages": [
+    "P7"
+   ],
+   "quotes": [],
+   "numbers_present": [
+    "39.87",
+    "72.23"
+   ],
+   "numbers_absent": [],
+   "review": false
+  },
+  {
+   "id": "M2.2",
+   "tag": "M2",
+   "cited_passages": [
+    "P7"
+   ],
+   "quotes": [],
+   "numbers_present": [
+    "2.67",
+    "6"
+   ],
+   "numbers_absent": [
+    "19.4",
+    "22.8"
+   ],
+   "review": true
+  }
+ ]
+}

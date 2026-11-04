@@ -433,7 +433,11 @@ def build_prompt(role, q):
                 "UNVERIFIED. SUPPORTED needs a source id from that "
                 "finding and a quote copied EXACTLY (verbatim substring) "
                 "from that packet passage.\nPacket:\n%s\n"
-                "Findings:\n%s\n%sReply with ONE JSON object: "
+                "Findings:\n%s\n%sOutput format: your ENTIRE reply is the "
+                "JSON object and nothing else - no analysis text, no "
+                "preface, no code fence; the first character is {. One "
+                "verdict per finding id, in order; keep each evidence "
+                "under 25 words. Reply with ONE JSON object: "
                 '{"verdicts":[{"id":"C1","verdict":"SUPPORTED|'
                 'NOT_SUPPORTED|UNVERIFIED","source":"P1","quote":"exact '
                 'text","evidence":"..."}]}') % (
@@ -546,14 +550,22 @@ def lineage_of(q):
 
 
 def lineage_counts(store, queue, q):
-    """Reserved requests per role across every queue item of the same
-    lineage (a packet version cannot reset attempts); max with the
-    item's own counters."""
-    ids = {x["id"] for x in queue["questions"]
-           if lineage_of(x) == lineage_of(q)}
+    """Reserved requests per role for q's lineage. The lineage is
+    PERSISTED on each reservation, so deleting or re-parenting a queue
+    item cannot hide past requests. Older reserves without the field
+    fall back to the queue mapping. A qid whose ledger lineage differs
+    from its current lineage raises Halt."""
+    L = lineage_of(q)
+    ids = {x["id"] for x in queue["questions"] if lineage_of(x) == L}
     n = {}
     for e in store.ledger():
-        if e["phase"] == "reserved" and e.get("qid") in ids:
+        if e["phase"] != "reserved" or "role" not in e:
+            continue
+        el = e.get("lineage")
+        if e.get("qid") == q["id"] and el is not None and el != L:
+            raise Halt("lineage of %s changed (%s -> %s)"
+                       % (q["id"], el, L))
+        if el == L or (el is None and e.get("qid") in ids):
             n[e["role"]] = n.get(e["role"], 0) + 1
     for k, v in q.get("attempts", {}).items():
         n[k] = max(n.get(k, 0), v)
@@ -622,7 +634,8 @@ def step(root, post, list_models, now, record):
                 raise Halt("verifier not independent: " + why_not)
         rid = "%s-%s-%d" % (qid, role, len(store.ledger()))
         store.append({"phase": "reserved", "rid": rid, "ts": iso(now),
-                      "qid": qid, "role": role, "model": model})
+                      "qid": qid, "role": role, "model": model,
+                      "lineage": lineage_of(q)})
         q["attempts"][role] = q["attempts"].get(role, 0) + 1
         store.save_queue(queue)
         n = q["attempts"][role]

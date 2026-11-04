@@ -49,3 +49,18 @@ drops the model: re-trial before any substitution.
   coordinator spot-checks the surrounding source context.
 - No code changes were made for this role; roster wiring, if wanted, is
   Builder work with its own tests and review.
+
+## Offline tooling (2026-11-04, not Eva, no model)
+
+`tools/eva_check.py` is a deterministic text-match pre-check and a queue
+intake for publications. It marks each claim's quoted strings FOUND /
+IN_OTHER_SOURCE / NOT_FOUND and lists numbers PRESENT / ABSENT in the cited
+passages. It is NOT a verdict: absent numbers can be computed or taken from
+elsewhere, present numbers are not checked for units, denominators or context.
+`intake` builds a HELD queue item (status held, attempts {}, kind verify) in
+the shape the runner's Verifier role reads; it cannot run until an operator
+changes its status and a verifier model is assigned and qualified. Eva remains
+assigned but blocked and not wired (route cooldown, no qualified model).
+`docs/team/eva-precheck-rw6-v2packet.json` is the mechanical report for the
+published RW6 note against the 9-passage packet (13 claims, how many need
+review is in the file); it shows which numbers the packet does not cover.

@@ -134,6 +134,54 @@ class Pipeline(Base):
         # a2 and a share lineage L: 'a' is not a NEW cycle if a2 started
         self.assertEqual(rc.ledger_gate(st, self.t, "a")[0], "ok")
 
+    def test_lineage_persisted_survives_delete_and_reparent(self):
+        self.seed(qid="a")
+        for i in range(2):
+            self.store.append({"phase": "reserved", "rid": "p%d" % i,
+                               "ts": rc.iso(self.t - 9000 + i), "qid": "gone",
+                               "role": "researcher", "model": "m",
+                               "lineage": "L"})
+            self.store.append({"phase": "result", "rid": "p%d" % i,
+                               "ts": rc.iso(self.t - 9000 + i),
+                               "outcome": "ok"})
+        q = self.store.queue()
+        q["questions"][0]["lineage"] = "L"     # 'gone' is not in the queue
+        self.store.save_queue(q)
+        out = self.run_step([ok(R_OK)])
+        self.assertEqual((out["action"], out["calls"]), ("needs-human", 0))
+        # re-parent: ledger says qid a belonged to L, queue now says M
+        self.setUp()
+        self.seed(qid="a")
+        self.store.append({"phase": "reserved", "rid": "z", "ts":
+                           rc.iso(self.t - 9000), "qid": "a",
+                           "role": "researcher", "model": "m",
+                           "lineage": "L"})
+        self.store.append({"phase": "result", "rid": "z", "ts":
+                           rc.iso(self.t - 9000), "outcome": "ok"})
+        q = self.store.queue()
+        q["questions"][0]["lineage"] = "M"
+        self.store.save_queue(q)
+        with self.assertRaises(rc.Halt):
+            self.run_step([ok(R_OK)])
+        self.assertEqual(self.calls, [])
+
+    def test_reservation_records_lineage(self):
+        self.seed()
+        self.run_step([ok(R_OK)])
+        r = [e for e in self.store.ledger() if e["phase"] == "reserved"][0]
+        self.assertEqual(r["lineage"], "q1")
+
+    def test_verifier_prompt_contract_is_format_only(self):
+        self.seed()
+        self.run_step([ok(R_OK)])
+        pr = self.calls and rc.build_prompt(
+            "verifier", self.store.queue()["questions"][0])
+        self.assertIn("ENTIRE reply is the JSON object", pr)
+        self.assertIn("first character is {", pr)
+        self.assertLessEqual(len(pr.encode()), rc.MAX_INPUT_BYTES)
+        for w in ("NOT_SUPPORTED because", "C6 is", "wrong", "known"):
+            self.assertNotIn(w, pr.replace("NOT_SUPPORTED|", ""))
+
     def test_per_role_effort_and_ceilings(self):
         self.assertEqual(rc.EFFORT, {"researcher": "low", "verifier": "none",
                                      "ryan": "low"})
