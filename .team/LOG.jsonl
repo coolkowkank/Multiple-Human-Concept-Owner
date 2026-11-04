@@ -7,3 +7,4 @@
 {"ts": "2026-11-04T11:19:30Z", "seat": "supervisor", "kind": "stall", "body": "turn stalled on coordinator; restarting seat"}
 {"ts": "2026-11-04T11:19:35Z", "seat": "supervisor", "kind": "restart", "body": "seat coordinator exited -15; restart 1"}
 {"ts": "2026-11-04T11:19:52Z", "seat": "coordinator", "kind": "handoff", "body": "Assigning implementation verification to QC", "turn_seq": 3}
+{"ts": "2026-11-04T11:19:55Z", "seat": "supervisor", "kind": "stall", "body": "turn stalled on qc; restarting seat"}
