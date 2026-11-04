@@ -65,6 +65,8 @@ trig("6dd99bd","17:40","Escalation-latch revision: changes required again","Inci
 trig("bbb310d","18:12","WP8a corrected source publication","Independent full-PDF checks passed; corrected F2/F3 scan and REFERENCES published. Frozen citation/number/class/limits criterion accepted at 18:13. Prior partial and lateness history retained; not Eva-model authorship, no WP8b or autonomy credit.",lane=R)
 trig("63de5d0","18:12","WP4/WP9 execution transferred","Recovery Executor operator role assigned, no project model configured. Historical Coordinator outputs retain attribution; acceptance gaps unchanged.",lane=TD)
 trig("561f2e5","18:10","Latch v5 published; narrow offline review accepted at 18:14","Operator-authored lifecycle delta. Independent 36-case review and adversarial probes accepted. 203-case full suite developer-reported. Not remote delivery, live concurrency or autonomy certification.")
+trig("ac42a04","18:20","WP9 audit error-semantics follow-up","Independently accepted at 18:25: 18 focused and 214 full-suite tests reproduced. Offline opt-in, unwired, no savings or WP9 completion.",lane=TD)
+trig("9a0dc94","18:30","WP4 pure completion predicate hardening","Independent acceptance: 21 focused tests and three probes. Pure fail-closed predicate only, unwired; no runtime provenance, manifest integration or unattended Reviewer proof.",lane=TD)
 OVERRIDE={"trg-2024e2d":"Finding published 16:39. Addressed by candidate 26ff4bc (17:19), which an independent review accepted. Earlier text superseded: the stall was an escalation gap, fixed offline.","trg-91e928d":"Closed failed (batch closeout 16:20): no commit or push, remote unchanged, guard unbuilt. Earlier status 'running' is superseded."}
 ev=[old.get(e["id"],e) for e in ev]
 for k,v in old.items():
@@ -72,5 +74,5 @@ for k,v in old.items():
 for e in ev:
     if e["id"] in OVERRIDE: e["status"]=OVERRIDE[e["id"]]
 ev.sort(key=lambda e:(e["day"],e["time"]))
-json.dump(dict(asOf="2026-11-04T18:16",timezone="Europe/Helsinki",note="Recorded events use commit times. Planned items are not events. A check that finds no change leaves no record.",events=ev),open(out,"w"),indent=1)
+json.dump(dict(asOf="2026-11-04T18:50",timezone="Europe/Helsinki",note="Recorded events use commit times. Planned items are not events. A check that finds no change leaves no record.",events=ev),open(out,"w"),indent=1)
 print(len(ev),"events")

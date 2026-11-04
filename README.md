@@ -21,7 +21,7 @@
 
 ### Legacy Members
 
-*As of 2026-11-04 18:23 EET. [Scrollable full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/legacy-members/) (sideways and down, header and first column stay put). Full table with instance IDs, blueprints and rules: [registry](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/registry.md). `*` marks an instance with repo evidence of work. Backup coverage for model failures is a known gap.*
+*As of 2026-11-04 18:50 EET. [Scrollable full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/legacy-members/) (sideways and down, header and first column stay put). Full table with instance IDs, blueprints and rules: [registry](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/registry.md). `*` marks an instance with repo evidence of work. Backup coverage for model failures is a known gap.*
 
 | Role | Member | Status | Assignment | Model / provider | Blueprint | Parallels |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -36,7 +36,7 @@
 
 ### Project progress
 
-*As of 2026-11-04 18:23 EET. Weighted milestone progress is **62.5%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
+*As of 2026-11-04 18:50 EET. Weighted milestone progress is **62.5%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
 
 **Research work packages: RW1-RW6**. Researcher plan and dependencies are tracked separately from WP milestone credit. Dates are evidenced publications/replays, not continuous work time; no RW deadlines were specified. [Plan](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/Research_lab/research/PLAN.md) · [Status and dependencies](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/charts/)
 

@@ -1,8 +1,10 @@
 {
- "content_as_of":"2026-11-04T18:23:44+02:00",
- "next_check_at":"2026-11-04T18:49:29+02:00",
- "schedule_recorded_at":"2026-11-04T18:33:44+02:00",
- "schedule_expires_at":"2026-11-05T14:38:28+02:00",
- "cadence":"Hourly evidence check; publish only when something changes",
- "notice":"This is the recorded next check, not a promise that new content will be published then. Sam model execution is not confirmed by this timer. The published page cannot see an uncommitted check or a deployment waiting in GitHub."
+ "content_as_of": "2026-11-04T18:50:15+02:00",
+ "next_check_at": "2026-11-04T19:49:42+02:00",
+ "schedule_recorded_at": "2026-11-04T18:50:15+02:00",
+ "schedule_expires_at": "2026-11-05T14:38:28+02:00",
+ "cadence": "Hourly evidence check; publish only when something changes",
+ "notice": "This is the recorded next check, not a promise that new content will be published then. Sam model execution is not confirmed by this timer. The published page cannot see an uncommitted check or a deployment waiting in GitHub.",
+ "last_check_at": "2026-11-04T18:50:15+02:00",
+ "check_result": "New offline review evidence recorded; no milestone score change"
 }

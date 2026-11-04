@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04T18:23:44+02:00",
+ "as_of": "2026-11-04T18:50:15+02:00",
  "timezone": "EET (UTC+2), same as commit timestamps",
  "rules": "Weighted milestone progress, not independently verified completion. Milestone done = 100% of weight (tests pass or an independent review passed). Partial = 50%. In progress / not started = 0%. Weights are judgment calls. Commits alone never count.",
  "packages": [
@@ -58,7 +58,7 @@
    "start": "2026-11-04T13:12",
    "end": "2026-11-04T13:21",
    "credit_at": "2026-11-04T13:21",
-   "evidence": "live/requesty-tinylib-experiment reached DONE, but needed manual recovery and skipped Reviewer Current execution transferred to Recovery Executor (operator, no project model configured), registry 63de5d0 available at 7c5b753. Earlier Telkomsel work retains its historical attribution. Acceptance gaps unchanged. Fresh proof must include Reviewer and QC on the same application pin, unattended; the 55e7c7e reviewer-skip branch is task-only and latch v5 does not implement that guard.",
+   "evidence": "live/requesty-tinylib-experiment reached DONE, but needed manual recovery and skipped Reviewer Current execution transferred to Recovery Executor (operator, no project model configured), registry 63de5d0 available at 7c5b753. Earlier Telkomsel work retains its historical attribution. Acceptance gaps unchanged. Fresh proof must include Reviewer and QC on the same application pin, unattended; the 55e7c7e reviewer-skip branch is task-only and latch v5 does not implement that guard. UPDATE 18:30: pure completion predicate 9a0dc94 independently accepted, 21 focused tests plus three probes. Fails closed on missing/stale/mismatched evidence. No runtime integration or execution-provenance certification; pure tests do not prove unattended Reviewer participation or complete WP4. Separate integrated WIP 9d8cbe1 (recovery/wp4-integrated-offline): actual runtime hook, opt-in host-only, legacy CLI unguarded. Independent 18:48 review found blocking durable-DONE behavior when confirmation and invalidation both fail. Structural fix in progress; not accepted, no live proof or new credit.",
    "forecast_end": "2026-11-05T12:00",
    "pic": [
     "recovery-executor"
@@ -155,7 +155,7 @@
    "status": "in_progress",
    "start": "2026-11-04T14:33",
    "forecast_end": "2026-11-04T20:00",
-   "evidence": "Delta-only handoff rule adopted. One run (batch 7) logged 11037 prompt + 570 completion = 11607 tokens: composition only, not proof of savings or of redundant context. Savings not yet measured Current execution transferred to Recovery Executor (operator, no project model configured), registry 63de5d0 available at 7c5b753. Earlier Telkomsel work retains its historical attribution. Acceptance gaps unchanged. Recovery Executor prompt-source audit 3cb4fcc independently accepted offline, opt-in and unwired (16 focused/212 suite). Follow-up ac42a04 published, error-semantics review pending. Request-ID join and matched comparison remain pending; no savings.",
+   "evidence": "Delta-only handoff rule adopted. One run (batch 7) logged 11037 prompt + 570 completion = 11607 tokens: composition only, not proof of savings or of redundant context. Savings not yet measured Current execution transferred to Recovery Executor (operator, no project model configured), registry 63de5d0 available at 7c5b753. Earlier Telkomsel work retains its historical attribution. Acceptance gaps unchanged. Recovery Executor prompt-source audit 3cb4fcc independently accepted offline, opt-in and unwired (16 focused/212 suite). Follow-up ac42a04 published, error-semantics review pending. Request-ID join and matched comparison remain pending; no savings. UPDATE 18:25: follow-up ac42a04 independently accepted (18 focused/214 full suite reproduced), prior audit-write failure findings closed. Still offline, opt-in, unwired; request-ID join and matched savings comparison pending. No measured savings or completion credit.",
    "pic": [
     "recovery-executor"
    ],
@@ -208,7 +208,7 @@
   "recovery-executor": {
    "label": "Recovery Executor",
    "alias": "Recovery",
-   "role": "Current WP4/WP9 operator execution; no project model configured; historical Telkomsel attribution retained",
+   "role": "Current WP4/WP9 execution; model not configured; historical Telkomsel attribution retained",
    "icon": "avatars/recovery-executor.png"
   }
  },
