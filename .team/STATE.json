@@ -1,13 +1,13 @@
 {
-  "turn": "coordinator",
-  "turn_seq": 6,
-  "turn_since": "2026-11-04T11:21:25Z",
-  "status": "running",
-  "status_line": "ACs verified; project complete.",
+  "turn": null,
+  "turn_seq": 7,
+  "turn_since": "2026-11-04T11:21:41Z",
+  "status": "done",
+  "status_line": "DONE - All acceptance criteria met.",
   "leases": {
     "coordinator": {
       "holder": "coordinator-32a14394",
-      "claimed_at": 1793791217.602138
+      "claimed_at": 1793791289.3028529
     },
     "builder": {
       "holder": "builder-d21f29f3",
