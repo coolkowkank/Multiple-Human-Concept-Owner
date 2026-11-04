@@ -104,3 +104,23 @@ class GuardedOfflineTests(unittest.TestCase):
     def test_nonpositive_caps_refused(self):
         for values in ({'max_turns': 0}, {'max_seconds': 0}, {'max_turns': True}):
             with self.assertRaises(ValueError): self.run_cycle(**values)
+
+
+    def test_actual_cycle_prompt_sources_counted_without_content(self):
+        rows = []
+        result = self.run_cycle(prompt_audits=rows)
+        self.assertEqual(result['result'], 'done')
+        self.assertEqual([r['seat'] for r in rows], ['coordinator', 'builder', 'reviewer', 'qc', 'coordinator'])
+        self.assertTrue(all(r['provider_tokens'] is None for r in rows))
+        self.assertTrue(all(r['outcome'] == 'mock_adapter_returned' for r in rows))
+        for row in rows:
+            for field in ('system', 'task'):
+                self.assertEqual(sum(s['chars'] for s in row[field]['sources']), row[field]['chars'])
+        text = json.dumps(rows)
+        self.assertNotIn('add(2,3)==5', text)
+        self.assertNotIn('def add', text)
+        self.assertGreater(rows[-1]['task']['chars'], rows[0]['task']['chars'])
+
+    def test_observer_is_optional_and_wrong_type_refused(self):
+        with self.assertRaises(ValueError): self.run_cycle(prompt_audits={})
+        self.assertEqual(self.run_cycle()['result'], 'done')

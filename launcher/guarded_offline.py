@@ -14,7 +14,7 @@ from .runtime import Seat
 from .completion_session import CompletionSession
 
 
-def run_guarded_offline(repo, branch, *, verify_argv, max_turns=8, max_seconds=60):
+def run_guarded_offline(repo, branch, *, verify_argv, max_turns=8, max_seconds=60, prompt_audits=None):
     if type(max_turns) is not int or max_turns < 1 or max_turns > 100:
         raise ValueError('offline turn cap must be an integer from 1 to 100')
     if type(max_seconds) is not int or max_seconds < 1 or max_seconds > 300:
@@ -62,7 +62,46 @@ def run_guarded_offline(repo, branch, *, verify_argv, max_turns=8, max_seconds=6
     guard = CompletionSession(verify_argv, pin,
                               verification_is_side_effect_free=True, reviews_write_artifacts=False)
     run_id = uuid.uuid4().hex
-    seats = {name: Seat(bus, name, instance_id=run_id + '-' + name,
+    seat_class = Seat
+    if prompt_audits is not None:
+        if not isinstance(prompt_audits, list):
+            raise ValueError('prompt_audits must be a host list')
+        from .prompt_audit import render_audited_prompt, audit_parts
+        class AuditedMockSeat(Seat):
+            def build_prompt(self, state):
+                system, task = super().build_prompt(state)
+                context = dict(seat=self.name, role=self.role,
+                    brief=self._read(self.bus.repo, '.team/brief.md'), state=state,
+                    recent_log=self.bus.log(limit=20), batch=self.spec.get('batch'))
+                audited_system, audited_task, report = render_audited_prompt(**context)
+                if (system, task) != (audited_system, audited_task):
+                    raise ValueError('actual runtime prompt differs from audited sources')
+                self._audit_base = (system, task, report)
+                return system, task
+
+            def _complete(self, system, prompt):
+                original_system, original_task, report = self._audit_base
+                if system != original_system or not prompt.startswith(original_task):
+                    raise ValueError('unaccounted actual adapter input')
+                import copy
+                row = copy.deepcopy(report)
+                suffix = prompt[len(original_task):]
+                if suffix:
+                    row['base_task_sources'] = row['task']
+                    row['task'] = audit_parts([('base_task', original_task),
+                                              ('correction_suffix', suffix)], prompt)
+                row.update(seat=self.name, invocation=len(prompt_audits) + 1,
+                           outcome='attempted_mock_adapter_call')
+                prompt_audits.append(row)
+                try:
+                    result = super()._complete(system, prompt)
+                except Exception:
+                    row['outcome'] = 'mock_adapter_error'
+                    raise
+                row['outcome'] = 'mock_adapter_returned'
+                return result
+        seat_class = AuditedMockSeat
+    seats = {name: seat_class(bus, name, instance_id=run_id + '-' + name,
                         completion_session=guard) for name in roster}
     first = next(name for name, spec in roster.items() if spec['role'] == 'coordinator')
     def seed():
