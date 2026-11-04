@@ -23,7 +23,7 @@ row; the numbering is never reused after retirement.
 | Instance | Role | Member | Status | Assignment (current) | Model / provider | Blueprint | Parallels | Last verified |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | coordinator-1 | Coordinator | Telkomsel (@instinct-telkomsel) | active | team coordination, assignments, acceptance prep | not project-configured | [coordinator](blueprints/coordinator.md) | 1* | 2026-11-04 (coordination commits on team-launcher) |
-| builder-1 | Builder | Alex (@coolkowkank-bot) | active | reviewer-skip guard (batch 7, in flight) | Groq openai/gpt-oss-120b, free tier | [builder](blueprints/builder.md) | 1* | 2026-11-04 (batches 1-7 records) |
+| builder-1 | Builder | Alex (@coolkowkank-bot) | active | reviewer-skip guard UNBUILT - batch 7 closed failed, held pending harness review | Groq openai/gpt-oss-120b, free tier | [builder](blueprints/builder.md) | 1* | 2026-11-04 (batches 1-7 records) |
 | reviewer-1 | Independent reviewer | Bill (@instinct-christina) | active | pinned-commit peer review | not project-configured | - | 1* | 2026-11-04 (WP7 review exchange) |
 | researcher-1 | Researcher | Nora | active | sourced literature findings, Research_lab | Nemotron-3 Ultra 550B via Requesty free route | [researcher](blueprints/researcher.md) | 1* | 2026-11-04 (RW5, author corrections 61143ba) |
 | verifier-1 | Evidence verifier | Eva | active | citation/evidence verification of Research_lab publications | google/gemma-4-31b-it via Requesty free route | [evidence-verifier](blueprints/evidence-verifier.md) | 1* | 2026-11-04 (reviews 3ecde66, 3aff4c6) |
