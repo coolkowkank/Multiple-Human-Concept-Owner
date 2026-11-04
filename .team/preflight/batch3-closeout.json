@@ -1,0 +1,43 @@
+{
+  "batch": 3,
+  "attempt": "deadlock-fix-b9",
+  "closed_utc": "2026-11-04T12:54:30Z",
+  "budget": {"cap": 6, "used": 6, "reset": false,
+    "ledger": "durable flock ledger /tmp/budget-ledger-batch3.json",
+    "seqs": [
+      {"seq": 1, "cause": "crashed launch: executor regression 93b3552 dropped edit_file; provider tool_use_failed; operator-seeded honest count"},
+      {"seq": 2, "cause": "prose-only round halted run (pre-nudge-fix); 0 actions"},
+      {"seq": 3, "cause": "relaunch round 1"},
+      {"seq": 4, "cause": "relaunch round 2"},
+      {"seq": 5, "cause": "edit_file + follow-up rounds"},
+      {"seq": 6, "cause": "git_commit succeeded; budget exhausted before push retry"}
+    ]},
+  "result": {
+    "model_commit": "45cec13eaf9dc0477f55b545042ffa453a00f20e",
+    "branch": "live/builder-deadlock-fix",
+    "author": "Groq (gpt-oss-120b model) <350571665+coolkowkank-bot@users.noreply.github.com>",
+    "change": "tests/test_deadlock_fix.py only: stall_timeout=3600, TZ save/restore with tzset, complementary must-stall test",
+    "operator_suite": "164/164 OK in changed worktree at pinned head",
+    "pushed": false,
+    "push_blocker": "budget exhausted; model needs 1-2 requests to retry git_push against the opened gate"
+  },
+  "gate": {
+    "file": "/tmp/push-gate-b9",
+    "head": "45cec13eaf9dc0477f55b545042ffa453a00f20e",
+    "worktree_sha256": "5d79ab214bc92042086c584e3c7ab41fffe90c3b20abe877de6d5dd4a9c13eb6",
+    "approved_utc": "2026-11-04T12:54:11Z",
+    "invalidates_on": "any new commit or any tracked/untracked content change in the worktree"
+  },
+  "executor_preflight": {
+    "sha256": "d461f3e7b37d12a5886fda0af9f2f56ba870e5e817f5dcbbaf03aac7f7dc137b",
+    "published_commit": "09677fd6b72962d7c3e7cf17b0c7afeea4c13328",
+    "disk_equals_tested_equals_published": true,
+    "tools": ["write_file", "edit_file", "git_commit", "git_push"],
+    "suite_at_launch": "180/180 OK on team-launcher"
+  },
+  "offline_rehearsal": "edit->commit->gated-push verified with mocked api, zero provider calls (/tmp/rehearse, disposable)",
+  "lessons": [
+    "budget cap must reserve the post-gate push retry, or the model cannot publish its own green commit",
+    "prose-only rounds are now nudged (09677fd), not fatal"
+  ]
+}
