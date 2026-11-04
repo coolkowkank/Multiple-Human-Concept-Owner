@@ -22,10 +22,13 @@ a separate artifact with its own style.
   github.com/<login>.png, cached in diagrams/.avatars/, not committed); under each node
   a bold role name, an italic @handle, and one or two gray scope lines; thin curved gray
   arrows carry the hand-off labels; a small legend box sits top-left.
-- Models are icon nodes (purple "AI" circle), never GitHub accounts, and never appear in
-  a contributors graph.
-- Shared machine accounts (e.g. @coolkowkank-bot) are infrastructure: a footer note at
-  most, never a team node.
+- The Builder seat is a model drawn as an icon node (purple "AI" circle); models never
+  appear in a contributors graph.
+- Owner decision 2026-11-04: label the Builder node @coolkowkank-bot - the shared
+  machine account the Builder has access to and acts through - and keep the model name
+  (Groq gpt-oss-120b) as a scope line. Never write "no GitHub account". The bot account
+  is the Builder's GitHub identity, not a separate team seat; a short footer explains
+  what the account does (authenticates model pushes, committer identity).
 - Content rules: current occupants only - no unused seats, no adapter details, no
   historical contributors. The independent reviewer is drawn as a PEER exchange with the
   Coordinator (review requests one way, verdicts the other), never as a subordinate

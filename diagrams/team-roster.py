@@ -1,8 +1,9 @@
 # Current-team chart for coolkowkank/Multiple-Human-Concept-Owner.
 # Visual grammar: the owner's reference team-chart style (see diagrams/CHART-STYLE.md) -
 # white background, circular GitHub avatars, bold role names + italic handles below each
-# node, thin curved labeled hand-off arrows, legend box. Models are icon nodes, never
-# GitHub accounts; shared machine accounts are infrastructure, not team members.
+# node, thin curved labeled hand-off arrows, legend box. The Builder seat is a model
+# (icon node) labeled with the shared machine account it acts through (@coolkowkank-bot),
+# with the model name kept on the node; never write "no GitHub account".
 # Regenerate: python3 diagrams/team-roster.py  (writes docs/team-roster.png)
 import os
 import matplotlib
@@ -119,9 +120,9 @@ text(REV[0], REV[1]+REV[2]+50, "@instinct-christina", 16.5, GRAY, style="italic"
 text(REV[0], REV[1]+REV[2]+82, "Peer-verifies pinned commits", 15)
 # Builder labels
 text(BLD[0], BLD[1]+BLD[2]+18, "Builder", 21, INK, "bold")
-text(BLD[0], BLD[1]+BLD[2]+50, "Groq gpt-oss-120b (free plan)", 16.5, GRAY, style="italic")
-text(BLD[0], BLD[1]+BLD[2]+82, "Scoped tasks - edits, commits, pushes", 15)
-text(BLD[0], BLD[1]+BLD[2]+110, "via its own tool calls - NOT a GitHub account", 15)
+text(BLD[0], BLD[1]+BLD[2]+50, "@coolkowkank-bot", 16.5, GRAY, style="italic")
+text(BLD[0], BLD[1]+BLD[2]+82, "Model: Groq gpt-oss-120b (free plan)", 15)
+text(BLD[0], BLD[1]+BLD[2]+110, "Scoped tasks - edits, commits, pushes via its own tool calls", 15)
 
 # Arrows
 arrow((OWN[0]-60, OWN[1]+40), (COR[0]+30, COR[1]-60), rad=0.25, shrink=78)
@@ -137,8 +138,8 @@ text(560, 905, "scoped tasks", 14.5, ARROW)
 text(560, 932, "<-> reviewed output", 14.5, ARROW)
 
 # Footer: shared machine account is infrastructure, not a team member
-text(40, H-64, "Shared machine account @coolkowkank-bot: authenticates model pushes,", 13, GRAY, ha="left")
-text(40, H-38, "committer identity on model commits. Infrastructure, not a team member.", 13, GRAY, ha="left")
+text(40, H-64, "@coolkowkank-bot is the shared machine account the Builder acts through:", 13, GRAY, ha="left")
+text(40, H-38, "it authenticates model pushes and is the committer identity on model commits.", 13, GRAY, ha="left")
 
 out = os.path.join(ROOT, "docs", "team-roster.png")
 fig.savefig(out, dpi=100)
