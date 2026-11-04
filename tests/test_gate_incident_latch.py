@@ -296,5 +296,62 @@ class V3ReviewReproCase(RealBusCase):
         self.assertTrue(self.head_pending_contains("gate-111"))
 
 
+class V4ReviewReproCase(RealBusCase):
+    """The two v4 REQUEST-CHANGES repros: exact current-row identity
+    and index preservation on the residue-recommit branch."""
+
+    def staged_pending_blob(self):
+        p = subprocess.run(
+            ["git", "-C", self.repo, "ls-files", "-s", "--",
+             GATES_PENDING], capture_output=True, text=True, check=True)
+        return p.stdout.strip()
+
+    def test_answered_old_gate_does_not_bless_uncommitted_new(self):
+        # old-M committed AND answered; new-M (new id, same question)
+        # appended but never committed
+        old = {"id": "gate-old-M", "ts": "2026-11-04T00:00:00Z",
+               "seat": "supervisor", "question": "incident M",
+               "options": [], "recommendation": None}
+        with open(os.path.join(self.repo, GATES_PENDING), "a") as fh:
+            fh.write(json.dumps(old) + "\n")
+        self.bus.answer_gate("gate-old-M", "restart the seat")
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-q", "-m", "old gate + answer")
+        new = {"id": "gate-new-M", "ts": "2026-11-04T00:00:01Z",
+               "seat": "supervisor", "question": "incident M",
+               "options": [], "recommendation": None}
+        with open(os.path.join(self.repo, GATES_PENDING), "a") as fh:
+            fh.write(json.dumps(new) + "\n")
+        before = self.commit_count()
+        # the answered historical row must NOT read the new row durable:
+        # the call must RECOMMIT the new row, not free-ride on old-M
+        self.assertTrue(self.sup._escalate("incident M"))
+        self.assertEqual(self.commit_count(), before + 1)
+        self.assertTrue(self.head_pending_contains("gate-new-M"))
+        # and a committed-then-answered row alone is never 'pending'
+        self.assertFalse(self.sup._gate_committed(old))
+
+    def test_failed_residue_recommit_preserves_prior_index(self):
+        residue = {"id": "gate-residue-2", "ts": "2026-11-04T00:00:00Z",
+                   "seat": "supervisor", "question": "incident R",
+                   "options": [], "recommendation": None}
+        with open(os.path.join(self.repo, GATES_PENDING), "a") as fh:
+            fh.write(json.dumps(residue) + "\n")  # worktree only
+        prior_blob = self.staged_pending_blob()
+        self.install_rejecting_hook()
+        try:
+            self.assertFalse(self.sup._escalate("incident R"))
+        finally:
+            self.remove_rejecting_hook()
+        # prior index untouched, residue still in the worktree only
+        self.assertEqual(self.staged_pending_blob(), prior_blob)
+        with open(os.path.join(self.repo, GATES_PENDING)) as fh:
+            self.assertIn("gate-residue-2", fh.read())
+        self.bus.assert_index_clean("after failed residue recommit")
+        # recovery: the next call durably commits the residue
+        self.assertTrue(self.sup._escalate("incident R"))
+        self.assertTrue(self.head_pending_contains("gate-residue-2"))
+
+
 if __name__ == "__main__":
     unittest.main()

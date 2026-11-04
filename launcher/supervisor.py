@@ -20,7 +20,7 @@ import subprocess
 import sys
 import time
 
-from .bus import Bus, BusError, GATES_PENDING
+from .bus import Bus, BusError, GATES_ANSWERS, GATES_PENDING
 
 
 class Supervisor:
@@ -180,30 +180,37 @@ class Supervisor:
                     "a human must nudge or re-open that session"):
                 self._stalled_seats.add(turn)
 
-    def _gate_committed(self, gate):
-        """True when THIS gate is in HEAD's PENDING file, i.e. it
-        survives a crash or checkout. Exact parsed match on id (or
-        seat+question) - never a substring, which false-positives on
-        ids embedded in other rows. A matching WORKTREE row left by a
-        failed commit is not durable."""
+    def _head_rows(self, path):
         proc = subprocess.run(
-            ["git", "-C", self.bus.repo, "show", f"HEAD:{GATES_PENDING}"],
+            ["git", "-C", self.bus.repo, "show", f"HEAD:{path}"],
             capture_output=True, text=True)
         if proc.returncode != 0:
-            return False
+            return []
+        rows = []
         for line in proc.stdout.splitlines():
             line = line.strip()
-            if not line:
-                continue
-            try:
-                row = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if (row.get("id") == gate.get("id")
-                    or (row.get("seat") == gate.get("seat")
-                        and row.get("question") == gate.get("question"))):
-                return True
-        return False
+            if line:
+                try:
+                    rows.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+        return rows
+
+    def _gate_committed(self, gate):
+        """True only when THIS EXACT gate row (its own id) is committed
+        in HEAD's PENDING file AND not answered in HEAD's ANSWERS - the
+        current unanswered row's identity, never a historical row with
+        similar content and never a substring. Anything less is not
+        durable: a same-question row whose commit is missing, and a
+        committed-but-answered row, both read as NOT pending."""
+        gid = gate.get("id")
+        if not any(r.get("id") == gid
+                   for r in self._head_rows(GATES_PENDING)):
+            return False
+        if any(r.get("id") == gid
+               for r in self._head_rows(GATES_ANSWERS)):
+            return False
+        return True
 
     def _snapshot_pending(self):
         """Worktree bytes + staged blob of the PENDING file, so a
@@ -271,6 +278,10 @@ class Supervisor:
             print(f"supervisor: pending gates unreadable ({exc!r}); "
                   f"deferring escalation: {text}", flush=True)
             return False
+        # Snapshot BEFORE any mutation so BOTH commit paths (recommit
+        # of a matching residue row, commit of a new append) can restore
+        # the prior worktree/index state on failure.
+        snap = self._snapshot_pending()
         for gate in pending:
             if (gate.get("seat") == "supervisor"
                     and gate.get("question") == text):
@@ -283,11 +294,12 @@ class Supervisor:
                 try:
                     self.bus.commit_all("supervisor: escalation")
                 except BusError as exc:
+                    self._restore_pending(snap)
                     print(f"supervisor: gate commit failed ({exc}); "
-                          f"deferring escalation: {text}", flush=True)
+                          f"restored prior PENDING state, deferring: "
+                          f"{text}", flush=True)
                     return False
                 return self._gate_committed(gate)
-        snap = self._snapshot_pending()
         gate_id = self.bus.open_gate(
             "supervisor", text,
             options=["restart the seat", "stop the team"],
