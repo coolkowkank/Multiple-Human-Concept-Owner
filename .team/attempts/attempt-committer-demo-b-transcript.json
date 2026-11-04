@@ -53,5 +53,15 @@
       },
       "service_tier": "on_demand"
     }
+  },
+  {
+    "tool_call": "git_commit",
+    "args": {
+      "message": "chore: trigger builder commit\n\nTURN: builder"
+    },
+    "result": {
+      "ok": true,
+      "head": "5ca026180e6cacd762fc6ee357613552694f68fe"
+    }
   }
 ]
