@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04T15:17:00+02:00",
+ "as_of": "2026-11-04T15:21:00+02:00",
  "timezone": "EET (UTC+2), same as commit timestamps",
  "rules": "Weighted milestone progress, not independently verified completion. Milestone done = 100% of weight (tests pass or an independent review passed). Partial = 50%. In progress / not started = 0%. Weights are judgment calls. Commits alone never count.",
  "packages": [
@@ -177,22 +177,26 @@
   "instinct-telkomsel": {
    "label": "instinct-telkomsel",
    "role": "Coordinator: planning, scaffold and support, token controls, Requesty coordination",
-   "icon": "avatars/instinct-telkomsel.png"
+   "icon": "avatars/instinct-telkomsel.png",
+   "alias": "Telkomsel"
   },
   "instinct-christina": {
    "label": "instinct-christina",
    "role": "Independent reviewer; wrote the original blueprint (Christina's Instinct)",
-   "icon": "avatars/instinct-christina.png"
+   "icon": "avatars/instinct-christina.png",
+   "alias": "Bill"
   },
   "coolkowkank-bot": {
    "label": "coolkowkank-bot",
    "role": "Builder: Groq gpt-oss-120b via the shared project bot account (not a unique model identity)",
-   "icon": "avatars/coolkowkank-bot.png"
+   "icon": "avatars/coolkowkank-bot.png",
+   "alias": "Alex"
   },
   "researcher": {
    "label": "Researcher role",
    "role": "Literature research agent. No separate GitHub account; publishes as role author through the owner's authenticated account. Role icon, not an avatar",
-   "icon": "avatars/researcher-role.png"
+   "icon": "avatars/researcher-role.png",
+   "alias": "Nora"
   }
  },
  "pic_note": "Large icon = accountable current owner (role assignment, not authorship). Small icons = contributors.",

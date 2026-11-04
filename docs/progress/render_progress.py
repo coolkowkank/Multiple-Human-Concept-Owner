@@ -60,7 +60,7 @@ fig.tight_layout(rect=(0, 0.17, 0.92, 1))
 for n, (k, v) in enumerate(ppl.items()):
     yy = 0.135 - n*0.032
     fig.add_artist(AnnotationBbox(OffsetImage(icons[k], zoom=0.17), (0.035, yy), xycoords="figure fraction", frameon=False))
-    fig.text(0.06, yy, v["label"] + ": " + v["role"], fontsize=8, va="center")
+    fig.text(0.06, yy, v.get("alias","")+" ("+v["label"]+"): "+v["role"] if v.get("alias") else v["label"]+": "+v["role"], fontsize=8, va="center")
 fig.text(0.02, 0.165, d.get("pic_note",""), fontsize=7, color="#555")
 fig.savefig(os.path.join(here, "gantt.svg")); fig.savefig(os.path.join(here, "gantt.png"), dpi=130); plt.close(fig)
 
