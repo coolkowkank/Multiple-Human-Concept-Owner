@@ -9,9 +9,9 @@
 
 ### Current Project Team
 
-*Latest update: 2026-11-04 17:30 EET. [Static full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/team/) (GitHub Pages, selectable text, responsive cards; the picture below is the fallback). No role is currently vacant; Ryan has no qualified backup route yet, so replacement proposals go to the Coordinator; "not project-configured" means no documented model or provider.*
+*Latest update: 2026-11-04 17:34 EET. [Static full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/team/) (GitHub Pages, selectable text, responsive cards; the picture below is the fallback). No role is currently vacant; Ryan has no qualified backup route yet, so replacement proposals go to the Coordinator; "not project-configured" means no documented model or provider.*
 
-![Current Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/aadf4a1a5301e2eac44637d1c0c78a064757acfa/docs/progress/team.png)
+![Current Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/ca12f4494b584657c59b22151cbc110475564714/docs/progress/team.png)
 
 ### Coordinator work timeline
 
@@ -36,11 +36,11 @@
 
 ### Project progress
 
-*As of 2026-11-04 17:30 EET. Weighted milestone progress is **61.0%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
+*As of 2026-11-04 17:34 EET. Weighted milestone progress is **61.0%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
 
-![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/c7d1b9bc54b8a173d4a322bc7f9602a03230ad26/docs/progress/gantt.png)
+![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/ca12f4494b584657c59b22151cbc110475564714/docs/progress/gantt.png)
 
-![Progress S-curve](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/c7d1b9bc54b8a173d4a322bc7f9602a03230ad26/docs/progress/s-curve.png)
+![Progress S-curve](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/ca12f4494b584657c59b22151cbc110475564714/docs/progress/s-curve.png)
 
 **[Open the Gantt chart and S-curve as a page](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/charts/)** (click a row for status and evidence). The page and these pictures change only when the project evidence changes; a check that finds nothing new leaves them as they are.
 
