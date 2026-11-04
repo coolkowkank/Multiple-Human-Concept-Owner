@@ -120,5 +120,53 @@
       "ok": true,
       "head": "e056ae95ee103c8f1a5b9b619c989543b7d54c24"
     }
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-353c63ea-6cdd-4fcf-87ec-8ff0fd18862d",
+      "object": "chat.completion",
+      "created": 1793779335,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "Now push.",
+            "tool_calls": [
+              {
+                "id": "fc_b0b06074-747c-461b-970a-c972091fc532",
+                "type": "function",
+                "function": {
+                  "name": "git_push",
+                  "arguments": "{}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.022212933,
+        "prompt_tokens": 904,
+        "prompt_time": 0.052647135,
+        "completion_tokens": 19,
+        "completion_time": 0.04054696,
+        "total_tokens": 923,
+        "total_time": 0.093194095,
+        "completion_tokens_details": {
+          "reasoning_tokens": 4
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_5082008e34",
+      "x_groq": {
+        "id": "req_01m6js908key5t7c3285q1we48",
+        "seed": 1027387776
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
