@@ -6,19 +6,31 @@
         ".team/"
       ],
       "adapter": {
-        "type": "mock",
-        "script": []
+        "type": "http",
+        "base_url": "https://router.requesty.ai/v1",
+        "model": "google/gemma-4-31b-it",
+        "api_key_env": "REQUESTY_API_KEY",
+        "max_tokens": 4096,
+        "call_budget": 6,
+        "usage_log": "/tmp/exp-target-lib/.team/usage/coordinator.log",
+        "require_zero_cost": true
       }
     },
     "builder": {
       "role": "builder",
       "allowed_paths": [
-        "src/",
+        "tinylib/",
         "tests/"
       ],
       "adapter": {
-        "type": "mock",
-        "script": []
+        "type": "http",
+        "base_url": "https://router.requesty.ai/v1",
+        "model": "google/gemma-4-31b-it",
+        "api_key_env": "REQUESTY_API_KEY",
+        "max_tokens": 4096,
+        "call_budget": 6,
+        "usage_log": "/tmp/exp-target-lib/.team/usage/builder.log",
+        "require_zero_cost": true
       }
     },
     "reviewer": {
@@ -27,8 +39,14 @@
         "review/"
       ],
       "adapter": {
-        "type": "mock",
-        "script": []
+        "type": "http",
+        "base_url": "https://router.requesty.ai/v1",
+        "model": "google/gemma-4-31b-it",
+        "api_key_env": "REQUESTY_API_KEY",
+        "max_tokens": 4096,
+        "call_budget": 4,
+        "usage_log": "/tmp/exp-target-lib/.team/usage/reviewer.log",
+        "require_zero_cost": true
       }
     },
     "qc": {
@@ -37,8 +55,14 @@
         "review/"
       ],
       "adapter": {
-        "type": "mock",
-        "script": []
+        "type": "http",
+        "base_url": "https://router.requesty.ai/v1",
+        "model": "google/gemma-4-31b-it",
+        "api_key_env": "REQUESTY_API_KEY",
+        "max_tokens": 4096,
+        "call_budget": 2,
+        "usage_log": "/tmp/exp-target-lib/.team/usage/qc.log",
+        "require_zero_cost": true
       }
     },
     "records": {
@@ -47,8 +71,14 @@
         "records/"
       ],
       "adapter": {
-        "type": "mock",
-        "script": []
+        "type": "http",
+        "base_url": "https://router.requesty.ai/v1",
+        "model": "google/gemma-4-31b-it",
+        "api_key_env": "REQUESTY_API_KEY",
+        "max_tokens": 4096,
+        "call_budget": 2,
+        "usage_log": "/tmp/exp-target-lib/.team/usage/records.log",
+        "require_zero_cost": true
       }
     }
   }
