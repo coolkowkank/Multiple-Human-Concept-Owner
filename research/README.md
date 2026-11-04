@@ -19,3 +19,10 @@ One Markdown file per finding in `research/findings/YYYY-MM-DD-short-title.md`:
 New insights are reported to the coordinator automatically (via the project
 coordinator channel). Insights become prototype work only after coordinator
 assessment, testing and review - never by direct edit from this branch.
+
+## Seat model (trial-qualified 2026-11-04)
+Researcher seat runs nvidia/nemotron-3-ultra-550b-a55b via the Requesty
+free route (existing project credential, $0 per call confirmed). Scope:
+synthesis of supplied verified sources only; every generated citation
+requires semantic verification before publication. Trial record:
+research/findings/2026-11-04-nora-model-trial.md
