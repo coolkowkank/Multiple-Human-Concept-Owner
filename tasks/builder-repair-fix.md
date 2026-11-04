@@ -283,3 +283,25 @@ class TestDeadlockFix(unittest.TestCase):
 if __name__=='__main__':
     unittest.main()
 ```
+
+## Operator diagnosis (2026-11-04, before repair round)
+
+Verdict: TEST DEFECT, not an implementation defect. Do not "fix"
+launcher/supervisor.py's UTC handling - calendar.timegm parsing is correct.
+
+Evidence: test_no_stall_utc builds Supervisor(stall_timeout=1) but sets
+turn_since 5 seconds in the past, then asserts 'coordinator' is NOT stalled.
+Elapsed (5s) exceeds the test's own timeout (1s), so a correct implementation
+MUST mark it stalled. The test contradicts itself.
+
+Intended behavior being guarded: a 5-second-old turn must not be falsely
+stalled by a timezone misparse under TZ=Europe/Berlin (UTC+2). That guard
+only discriminates when stall_timeout is comfortably larger than 5s: a
+local-time misparse inflates elapsed by ~7200s.
+
+Required repair (preserves test intent, not a weakening):
+- In test_no_stall_utc, construct the Supervisor with stall_timeout=3600
+  (keep the TZ manipulation, the 5s-old turn_since, and the NotIn assertion).
+- Optionally add the complementary case: same setup but turn_since 3 hours
+  old MUST stall under UTC parsing (proves real stalls still detected).
+- Leave launcher/supervisor.py unchanged unless the suite shows otherwise.
