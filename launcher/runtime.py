@@ -254,7 +254,49 @@ class Seat:
             raise SeatError(f"adapter failed for {self.name}: {exc}") from exc
         if not isinstance(response, dict):
             raise SeatError(f"{self.name} returned a non-object response")
-        return response
+        if response.get("_queue") is not None:
+            # A queued response was reasoned outside this process and is
+            # bound to a stamped turn/seq/head; re-calling the adapter
+            # would replace it with an unbound live answer, so the
+            # correction round never applies to it. _apply's hard guard
+            # still refuses bad paths pre-mutation.
+            return response
+        bad = [p for p in (response.get("writes") or {})
+               if not self._path_allowed(p)]
+        if not bad:
+            return response
+        # One bounded correction round (observed need: Groq gpt-oss
+        # models repeatedly wrote outside allowed paths and wasted
+        # otherwise-usable turns, live/groq-dev-1 2026-11-04). The
+        # rejection goes back to the model once; a second violation
+        # fails the turn honestly. Nothing has been written yet - the
+        # pre-mutation refusal is preserved, and _apply still re-checks
+        # every path as the hard guard.
+        correction = (
+            f"{task}\n\nCORRECTION REQUIRED: your previous reply "
+            f"tried to write {bad}, outside your allowed paths "
+            f"{self.allowed_paths}. Reply again with the same JSON "
+            "contract, writing ONLY inside your allowed paths; leave "
+            "every other file untouched.")
+        try:
+            retry = self.adapter.complete(system, correction)
+        except AdapterError as exc:
+            raise SeatError(
+                f"adapter failed for {self.name} on the correction "
+                f"round: {exc}") from exc
+        if not isinstance(retry, dict):
+            raise SeatError(
+                f"{self.name} correction round returned a non-object "
+                "response")
+        still_bad = [p for p in (retry.get("writes") or {})
+                     if not self._path_allowed(p)]
+        if still_bad:
+            raise SeatError(
+                f"{self.name} still tried to write {still_bad} outside "
+                f"allowed paths {self.allowed_paths} after one "
+                "correction round - turn failed without mutation")
+        retry["_corrected"] = bad
+        return retry
 
     def _head_binding_clean(self, stamped):
         return head_binding_clean(self.bus.repo, stamped)
@@ -325,7 +367,12 @@ class Seat:
                 recommendation=gate.get("recommendation"))
 
         summary = response.get("summary", "(no summary)")
+        corrected = response.pop("_corrected", None)
         body = summary
+        if corrected:
+            body = (f"[path-guard correction round used; first reply "
+                    f" wrote outside allowed paths: {corrected}] "
+                    + body)
         if verify_cmd:
             body += (f" | verify: `{verify_cmd}` exit={exit_code}"
                      + (f" | tail: {' / '.join(tail)}" if tail else ""))

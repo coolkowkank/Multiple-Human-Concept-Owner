@@ -140,6 +140,58 @@ class SeatTests(unittest.TestCase):
         finally:
             shutil.rmtree(repo, ignore_errors=True)
 
+    def test_path_violation_gets_one_correction_round(self):
+        bad = {"summary": "wrong", "writes": {"etc/evil": "x"},
+               "verify_command": None, "handoff": None}
+        good = {"summary": "fixed", "writes": {"src/a": "b"},
+                "verify_command": None, "handoff": None,
+                "status_line": "ok"}
+        seats = {"builder": seat_spec([bad, good], ["src/"])}
+        repo, bus = make_repo(seats=seats)
+        try:
+            state = bus.state()
+            state["turn"] = "builder"
+            bus.write_state(state)
+            bus.commit_all("human: go")
+            seat = Seat(bus, "builder")
+            self.assertTrue(seat.act_once())
+            # exactly two adapter calls: initial + one correction round
+            self.assertEqual(len(seat.adapter.calls), 2)
+            self.assertIn("CORRECTION REQUIRED",
+                          seat.adapter.calls[1]["prompt"])
+            self.assertIn("etc/evil", seat.adapter.calls[1]["prompt"])
+            self.assertTrue(os.path.exists(
+                os.path.join(repo, "src", "a")))
+            self.assertFalse(os.path.exists(
+                os.path.join(repo, "etc", "evil")))
+            log = bus.log()
+            self.assertIn("correction round used", log[-1]["body"])
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)
+
+    def test_second_violation_fails_without_mutation(self):
+        bad1 = {"summary": "wrong", "writes": {"etc/a": "x"},
+                "verify_command": None, "handoff": None}
+        bad2 = {"summary": "still wrong", "writes": {"etc/b": "y"},
+                "verify_command": None, "handoff": None}
+        seats = {"builder": seat_spec([bad1, bad2], ["src/"])}
+        repo, bus = make_repo(seats=seats)
+        try:
+            state = bus.state()
+            state["turn"] = "builder"
+            bus.write_state(state)
+            bus.commit_all("human: go")
+            seat = Seat(bus, "builder")
+            with self.assertRaises(SeatError) as ctx:
+                seat.act_once()
+            self.assertIn("after one correction round", str(ctx.exception))
+            self.assertEqual(len(seat.adapter.calls), 2)
+            self.assertFalse(os.path.exists(os.path.join(repo, "etc")))
+            # turn not consumed: seq unchanged, no handoff log
+            self.assertEqual(bus.state()["turn_seq"], 0)
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)
+
     def test_unknown_handoff_rejected(self):
         seats = {"builder": seat_spec(
             [{"summary": "x", "writes": {"src/a": "b"},
