@@ -1,7 +1,7 @@
 {
-  "turn": "reviewer",
-  "turn_seq": 2,
-  "turn_since": "2026-11-03T23:51:45Z",
+  "turn": "qc",
+  "turn_seq": 3,
+  "turn_since": "2026-11-04T00:04:56Z",
   "status": "active",
   "status_line": "rehearsal window opens 01:50 EET (23:50 UTC)",
   "leases": {
