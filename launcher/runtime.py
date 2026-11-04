@@ -298,9 +298,27 @@ class Seat:
             return None
         base = os.path.join(self.bus.repo, self._EVIDENCE_DIR)
         try:
-            os.makedirs(base, exist_ok=True)
+            # N4 (peer review of e08769a): check the existing path
+            # components BEFORE creating anything, so a refusal has no
+            # side effects outside .git (an earlier version created
+            # the dir first and could leave an empty dir outside).
             gitdir = os.path.realpath(os.path.join(self.bus.repo,
                                                    ".git"))
+            probe = base
+            while not os.path.lexists(probe):
+                probe = os.path.dirname(probe)
+            # nearest existing component must resolve inside .git and
+            # no existing component on the way down may be a symlink
+            if not os.path.realpath(probe).startswith(gitdir + os.sep)                     and os.path.realpath(probe) != gitdir:
+                raise OSError("evidence path is not git-private "
+                              "(symlink escape?)")
+            cur = os.path.join(self.bus.repo, ".git")
+            for part in self._EVIDENCE_DIR.split(os.sep)[1:]:
+                cur = os.path.join(cur, part)
+                if os.path.islink(cur):
+                    raise OSError(f"evidence path component is a "
+                                  f"symlink: {cur}")
+            os.makedirs(base, exist_ok=True)
             if not os.path.realpath(base).startswith(gitdir + os.sep):
                 raise OSError("evidence dir is not git-private "
                               "(symlink escape?)")

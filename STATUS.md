@@ -61,6 +61,16 @@ blanket no-effect.
 | M1 | The N1 LOG-only error commit moves head, so a queued response bound to the pre-error head goes stale; discard/requeue recovers | open-minor (documented interaction from the `bc9eb48` review; the head binding is intentionally NOT weakened - discard with `--discard-stale` and requeue) |
 | N2 | Fence parser discarded outside prose: `Actually cancel that; do not apply.` + a valid fenced object parsed and APPLIED; prefix/suffix prose ignored; a bad first fence with a good second silently skipped | fixed-unverified: whole reply must now be exactly one ```json fence + whitespace or one bare object; outside prose, multiple fences and bad-first/good-second all fail closed (adversarial fixtures incl. the peer's cancel repro, no effects). NO "parser strict" PASS claimed - peer verification pending |
 | M2 | Hand-edited malformed queue line: raw JSONDecodeError escaped the loop's SeatError handler (no mutation, queue preserved, but unhandled) | fixed-unverified: normalized to AdapterError -> SeatError, line NOT consumed (fixture pins message + intact queue) |
+| N3 | Bare JSON object whose string value contains ``` was forced into the fence branch and burned a correction round | fixed-unverified: fence-form detection keys on the message START; bare path parses it directly (fixture) |
+| N4 | Symlink refusal ran AFTER makedirs, could leave an empty dir outside .git (no payload leak) | fixed-unverified: existing components checked before any mkdir; refusal has zero side effects (fixture: outside target stays empty) |
+
+Peer review of `e08769a` (2026-11-04, independent, read-only):
+**N2, M2, raw-privacy guards and the global 3-complete-call budget
+VERIFIED (scoped)** - 110 tests + 38 adversarial checks, 0 failures;
+2 simulated lost push races capped at 3 total complete calls. N3 and
+N4 above are that review's residual minors. Not an overall PASS:
+composition bounds remain theoretical (12 HTTP/turn, not live),
+TOCTOU between evidence-path check and write not exercised.
 
 Not a clean pass: the reviews confirm scoped fixes only. The newer
 adapter changes (max_tokens a29f7c5, reasoning_effort bc9eb48) are
@@ -85,7 +95,8 @@ Proven: queue mechanism - cross-clone handoffs, leases, stale
 refusal + recovery, conformance checks. Test counts are pinned per
 code state: 82 tests green at `bc9eb48` (2026-11-04, developer run;
 independently reproduced in the `bc9eb48` review); 95 at `7d40565`
-(independently reproduced in the peer review, 43.5s). One bounded Groq
+(independently reproduced in the peer review, 43.5s); 118+ at the
+current head (developer run).. One bounded Groq
 live exchange in a scratch repo (artifacts exported here, not a live
 push to this repo).
 

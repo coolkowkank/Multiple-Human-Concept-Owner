@@ -454,6 +454,35 @@ class SeatTests(unittest.TestCase):
         finally:
             shutil.rmtree(repo, ignore_errors=True)
 
+    def test_raw_symlink_refusal_leaves_no_side_effects_outside(self):
+        # N4 (peer review of e08769a): the refusal check runs BEFORE
+        # makedirs - nothing is created outside .git when the evidence
+        # path is compromised at the parent level.
+        raw_text = "payload that must not be written"
+
+        def fn(system, prompt, i):
+            if i == 0:
+                raise AdapterError("model output is not JSON: Extra data",
+                                   raw=raw_text)
+            return {"summary": "fixed", "writes": {"src/a": "b"},
+                    "verify_command": None, "handoff": None,
+                    "status_line": "ok"}
+
+        seats = {"builder": seat_spec([], ["src/"])}
+        repo, bus = make_repo(seats=seats)
+        try:
+            outside = tempfile.mkdtemp()
+            os.symlink(outside,
+                       os.path.join(repo, ".git", "local-evidence"))
+            seat = self._seat_with_callable(repo, bus, fn)
+            self.assertTrue(seat.act_once())
+            # refusal recorded, nothing created at the outside target
+            self.assertIn("raw preservation REFUSED",
+                          bus.log()[-1]["body"])
+            self.assertEqual(os.listdir(outside), [])
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)
+
     def test_raw_preservation_never_overwrites_different_content(self):
         counter = {"n": 0}
 
@@ -778,6 +807,14 @@ class ParseTests(unittest.TestCase):
     def test_groq_unicode_escape_accepted(self):
         self.assertEqual(parse_response('   {"u":"\\u2603"}\n'),
                          {"u": "\u2603"})
+
+    def test_bare_object_with_fence_marker_inside_string_accepted(self):
+        # N3 (peer review of e08769a): fence-form detection keys on the
+        # message START, not on any backtick anywhere - a valid bare
+        # object must not burn a correction round.
+        payload = '{"s": "this is a ``` not a fence"}'
+        self.assertEqual(parse_response(payload),
+                         {"s": "this is a ``` not a fence"})
 
     def test_groq_fence_marker_inside_string_rejected(self):
         # CORRECTED expectation (Groq said ACCEPT): the parser splits

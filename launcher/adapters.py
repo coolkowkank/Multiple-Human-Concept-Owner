@@ -284,7 +284,11 @@ def parse_response(text):
     model re-answers and the reply is revalidated strictly.
     """
     text = text.strip()
-    if "```" in text:
+    # N3 (peer review of e08769a): only treat the reply as fence-form
+    # when it STARTS with a fence. A bare JSON object whose string
+    # values contain ``` is valid JSON and must not be forced into the
+    # fence branch (that burned a correction round on valid output).
+    if text.startswith("```"):
         # N2 (peer review of 7d40565, 2026-11-04, reproduced): the
         # ENTIRE reply must be exactly one fence plus whitespace -
         # picking the first parseable fence out of a larger message
