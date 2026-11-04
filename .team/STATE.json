@@ -1,8 +1,13 @@
 {
-  "turn": "builder",
-  "turn_seq": 0,
-  "turn_since": null,
-  "status": "forming",
-  "status_line": "team forming",
-  "leases": {}
+  "turn": null,
+  "turn_seq": 1,
+  "turn_since": "2026-11-04T07:09:11Z",
+  "status": "running",
+  "status_line": "Created docs/response-contract.md",
+  "leases": {
+    "builder": {
+      "holder": "builder-2bfb3b05",
+      "claimed_at": 1793776149.9116626
+    }
+  }
 }
