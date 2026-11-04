@@ -319,5 +319,44 @@
       "x-ratelimit-reset-tokens": "11.445s"
     },
     "call": 5
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-bc71b94e-cb84-40d2-8aa9-39c2630dcc14",
+      "object": "chat.completion",
+      "created": 1793799787,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "I cannot proceed because I do not have access to the repository contents to make the required edits.",
+            "reasoning": "We need actual file content; cannot. Might be impossible. Probably repository not loaded. Given constraints, cannot proceed."
+          },
+          "logprobs": null,
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.1761994,
+        "prompt_tokens": 1452,
+        "prompt_time": 0.096421636,
+        "completion_tokens": 52,
+        "completion_time": 0.109993319,
+        "total_tokens": 1504,
+        "total_time": 0.206414955,
+        "completion_tokens_details": {
+          "reasoning_tokens": 24
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_49bfac06f1",
+      "x_groq": {
+        "id": "req_01m6kcs4swefftbn13y3bdnv78",
+        "seed": 1685726981
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
