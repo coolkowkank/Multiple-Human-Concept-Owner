@@ -1,0 +1,1 @@
+{"ts": "2026-11-04T05:20:51Z", "seat": "coordinator", "kind": "handoff", "body": "assigned batch 1 to reviewer: independent review of the 4f71227 diff | verify: `test -f .team/batch-1.md` exit=0", "turn_seq": 1}
