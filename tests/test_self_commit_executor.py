@@ -613,3 +613,132 @@ class ExecutorCase(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 
+
+
+class ExecutorHardeningCase(ExecutorCase):
+    """Offline tests for the 2026-11-04 support hardening (batch
+    reviewer-guard-b11/b11b failure modes): narrow unknown-tool provider
+    rejection recovery and records-push landed-check/single retry."""
+
+    @staticmethod
+    def _unknown_tool_payload(name="exec"):
+        err = {"message": f"Tool call validation failed: model attempted to call tool: "
+                          f"'{name}' which was not in request.tools",
+               "type": "invalid_request_error", "code": "tool_use_failed",
+               "failed_generation": json.dumps({"name": name, "arguments": {}})}
+        return json.dumps({"error": err}) + "\n400"
+
+    def _fake_curl(self, ns, responses):
+        class L(list):
+            pass
+        calls = L()
+        payloads = []
+        real_run = ns["subprocess"].run
+        queue = list(responses)
+        def run2(*a, **k):
+            if a and a[0] and "curl" in str(a[0][0]):
+                body = queue.pop(0)
+                calls.append(1)
+                payloads.append(json.loads(a[0][a[0].index("-d") + 1]))
+                return type("FP", (), {"returncode": 0, "stderr": "", "stdout": body})()
+            return real_run(*a, **k)
+        ns["subprocess"] = type("S", (), {"run": staticmethod(run2)})
+        calls.payloads = payloads
+        return calls
+
+    def test_unknown_tool_rejection_recovered_and_counted(self):
+        # rejection -> recovery note -> model writes a file -> prose x2 -> nudge halt.
+        # Every send (including the rejected one) is reserved+counted.
+        ns = self.load(max_calls=10)
+        sends = self._fake_curl(ns, [
+            self._unknown_tool_payload(),
+            json.dumps(self.msg(tool_calls=[self.tc("write_file", json.dumps({"path": "docs/x.md", "content": "hi"}))])) + "\n200",
+            json.dumps(self.msg(content="thinking")) + "\n200",
+            json.dumps(self.msg(content="still thinking")) + "\n200",
+            json.dumps(self.msg(content="more prose")) + "\n200",
+        ])
+        ns["main"]()
+        self.assertEqual(len(sends), 5)
+        rec = [e for e in ns["transcript"] if isinstance(e, dict) and "tool_recovery" in e]
+        self.assertEqual(len(rec), 1)
+        self.assertEqual(rec[0]["tool_recovery"]["n"], 1)
+        self.assertEqual(rec[0]["tool_recovery"]["provider_code"], "tool_use_failed")
+        conv = sends.payloads[1]["messages"]
+        note = [m["content"] for m in conv if m["role"] == "user" and "harness note" in m["content"]]
+        self.assertEqual(len(note), 1)
+        self.assertIn("provider rejection, not model output", note[0])
+        self.assertIn("ONLY these tools exist", note[0])
+        self.assertTrue(os.path.exists(os.path.join(self.repo, "docs", "x.md")))
+
+    def test_unknown_tool_rejection_aborts_after_cap(self):
+        # 2 recoveries max; the third rejection fails closed. Sends == ledger.
+        ns = self.load(max_calls=10)
+        sends = self._fake_curl(ns, [self._unknown_tool_payload()] * 4)
+        ns["main"]()
+        self.assertEqual(len(sends), 3)  # initial + 2 recoveries, then abort
+        rec = [e for e in ns["transcript"] if isinstance(e, dict) and "tool_recovery" in e]
+        self.assertEqual(len(rec), 3)
+
+    def test_other_400_stays_fatal(self):
+        # Narrow classification: a non-tool 400 (auth/schema/etc.) still raises.
+        ns = self.load()
+        err = {"message": "invalid api key", "type": "invalid_request_error"}
+        self._fake_curl(ns, [json.dumps({"error": err}) + "\n400"])
+        with self.assertRaises(RuntimeError):
+            ns["api"]([])
+
+    def test_push_retry_after_transient_failure(self):
+        # New checkpoint commit, push fails once, identical retry lands it.
+        ns = self.load()
+        ns["record"]({"round": 1, "kind": "x"})  # real save+push, remote == head
+        pushes = []
+        real_run = ns["subprocess"].run
+        def run2(*a, **k):
+            if a and a[0] and "push" in a[0]:
+                pushes.append(1)
+                if len(pushes) == 1:
+                    raise subprocess.CalledProcessError(1, a[0])
+            return real_run(*a, **k)
+        ns["subprocess"] = type("S", (), {"run": staticmethod(run2),
+                                          "CalledProcessError": subprocess.CalledProcessError})
+        ns["record"]({"round": 2, "kind": "x"})  # new commit; push fails once, retry lands
+        self.assertEqual(len(pushes), 2)
+        self.assertFalse(ns["PERSIST"]["halt"])
+        head = subprocess.run(["git", "-C", self.wt, "rev-parse", "HEAD"],
+                              capture_output=True, text=True).stdout.strip()
+        remote = subprocess.run(["git", "-C", self.wt, "ls-remote", "origin", "records"],
+                                capture_output=True, text=True).stdout.split()
+        self.assertEqual(remote[0], head)
+
+    def test_push_already_landed_not_duplicated(self):
+        # Post-send error: remote already has the exact head -> no duplicate push.
+        ns = self.load()
+        ns["record"]({"round": 1, "kind": "x"})  # real save+push
+        pushes = []
+        real_run = ns["subprocess"].run
+        def run2(*a, **k):
+            if a and a[0] and "push" in a[0]:
+                pushes.append(1)
+                raise subprocess.CalledProcessError(1, a[0])
+            return real_run(*a, **k)
+        ns["subprocess"] = type("S", (), {"run": staticmethod(run2),
+                                          "CalledProcessError": subprocess.CalledProcessError})
+        ns["save_transcript"]()  # no new commit (bytes already committed)
+        self.assertEqual(len(pushes), 1)  # one attempt, landed-check, no retry
+        self.assertFalse(ns["PERSIST"]["halt"])
+
+    def test_push_permanent_failure_stays_fail_closed(self):
+        # Head absent on remote, both attempts fail -> halt, no third attempt.
+        ns = self.load()
+        pushes = []
+        real_run = ns["subprocess"].run
+        def run2(*a, **k):
+            if a and a[0] and "push" in a[0]:
+                pushes.append(1)
+                raise subprocess.CalledProcessError(1, a[0])
+            return real_run(*a, **k)
+        ns["subprocess"] = type("S", (), {"run": staticmethod(run2),
+                                          "CalledProcessError": subprocess.CalledProcessError})
+        ns["record"]({"round": 1, "kind": "x"})
+        self.assertTrue(ns["PERSIST"]["halt"])
+        self.assertEqual(len(pushes), 2)  # initial + single retry, then fail-closed

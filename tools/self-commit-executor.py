@@ -56,6 +56,7 @@ MODEL = os.environ.get("PROVIDER_MODEL", "openai/gpt-oss-120b")
 API_URL = os.environ.get("PROVIDER_API_URL", "https://api.groq.com/openai/v1/chat/completions")
 MAX_ROUNDS = int(os.environ.get("MAX_ROUNDS", "6"))
 MAX_NUDGES = int(os.environ.get("MAX_NUDGES", "2"))  # prose-only rounds tolerated before halt
+MAX_TOOL_RECOVERIES = int(os.environ.get("MAX_TOOL_RECOVERIES", "2"))  # provider unknown-tool rejections recovered before fail-closed abort; every recovery re-sends (reserved+counted)
 MAX_CALLS = int(os.environ.get("MAX_CALLS", "6"))  # coordinator passes the loop's REMAINING global budget; every attempted provider request counts, including failed/error responses; the executor never retries
 CALLS = {"n": 0}
 # Zero-price routes only (owner rule for the Requesty gemma batch): when
@@ -143,8 +144,33 @@ def save_transcript():
                         "commit", "--quiet", "-m",
                         f"operator: {ATTEMPT} transcript checkpoint {CHECKPOINT['n']} (auto, per-event durability)"],
                        check=True, capture_output=True)
-    subprocess.run(["git", "-C", RECORDS_DIR, "push", "--quiet", "origin", "HEAD"], check=True, capture_output=True)
+    _records_push()
     PERSIST["saved"] = len(transcript)
+
+def _records_push():
+    """Push the checkpoint to the records remote. On failure, first check
+    whether the exact commit already landed (the error may have happened
+    after a successful send - observed live 2026-11-04, batch
+    reviewer-guard-b11). Only if absent, retry the identical non-force push
+    once. A second failure raises, preserving fail-closed semantics; no
+    blind duplicates, no history rewriting."""
+    try:
+        subprocess.run(["git", "-C", RECORDS_DIR, "push", "--quiet", "origin", "HEAD"],
+                       check=True, capture_output=True)
+        return
+    except subprocess.CalledProcessError:
+        pass
+    head = subprocess.run(["git", "-C", RECORDS_DIR, "rev-parse", "HEAD"],
+                          capture_output=True, text=True).stdout.strip()
+    branch = subprocess.run(["git", "-C", RECORDS_DIR, "rev-parse", "--abbrev-ref", "HEAD"],
+                            capture_output=True, text=True).stdout.strip()
+    remote = subprocess.run(["git", "-C", RECORDS_DIR, "ls-remote", "origin", branch],
+                            capture_output=True, text=True).stdout.split()
+    if remote and remote[0] == head:
+        return  # already landed; nothing to redo
+    subprocess.run(["git", "-C", RECORDS_DIR, "push", "--quiet", "origin", "HEAD"],
+                   check=True, capture_output=True)
+
 
 def record(event):
     transcript.append(event)
@@ -170,7 +196,9 @@ atexit.register(_atexit)
 SYSTEM = (f"You are the builder on repo Multiple-Human-Concept-Owner, branch {BRANCH}. "
           "You commit your own work with the provided tools: write_file (new or "
           "small files only), edit_file (exact-match edits to existing files), "
-          "git_commit, git_push. Be honest in commit messages: say you are Groq "
+          "git_commit, git_push. ONLY these four tools exist; a tool call with "
+          "any other name is rejected by the provider and wastes budget. "
+          "Be honest in commit messages: say you are Groq "
           "gpt-oss-120b committing via your own tool calls. The repo's local "
           "commit-msg hook REQUIRES your message to contain a line exactly like "
           "'TURN: builder' - include it or the commit is rejected. Never include secrets. "
@@ -194,6 +222,19 @@ RATE_HEADER_ALLOWLIST = {
     "x-ratelimit-remaining-requests", "x-ratelimit-remaining-tokens",
     "x-ratelimit-reset-requests", "x-ratelimit-reset-tokens",
     "retry-after"}
+
+def _is_unknown_tool_rejection(err):
+    """True ONLY for the provider's 'model named an undeclared tool' rejection
+    (observed live 2026-11-04, batch reviewer-guard-b11b: code tool_use_failed,
+    message 'attempted to call tool ... which was not in request.tools').
+    Auth faults, schema faults, other 400s stay fatal."""
+    if not isinstance(err, dict):
+        return False
+    msg = err.get("message") or ""
+    if err.get("code") == "tool_use_failed" and "not in request.tools" in msg:
+        return True
+    return err.get("type") == "invalid_request_error" and "not in request.tools" in msg
+
 
 def _rate_headers(header_text):
     out = {}
@@ -325,6 +366,12 @@ def api(messages):
             _store_reset_hint(_retry_hint_s(r["error"]))
         record({"api_error": {"kind": "api", "status": status.strip(), "detail": r["error"],
                               "rate_headers": rate_headers}})
+        if _is_unknown_tool_rejection(r.get("error")):
+            # Recoverable: the provider rejected the model's own generation for
+            # naming a tool outside the declared set. The raw failure is
+            # recorded above; main() decides the bounded recovery. Every retry
+            # is a fresh reserved+counted request.
+            return {"_unknown_tool_rejection": r["error"]}
         raise RuntimeError(f"API error: {r['error']}")
     if REQUIRE_ZERO_COST:
         cost = (r.get("usage") or {}).get("cost")
@@ -514,11 +561,28 @@ def main():
     record({"system": SYSTEM, "user": TASK})
     messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": TASK}]
     nudges = 0
+    tool_recoveries = 0
     for rnd in range(MAX_ROUNDS):
         if PERSIST["halt"]:
             print("HALT: transcript persistence failed; refusing further API calls (fail-closed)")
             return
         resp = api(messages)
+        if isinstance(resp, dict) and "_unknown_tool_rejection" in resp:
+            err = resp["_unknown_tool_rejection"]
+            tool_recoveries += 1
+            record({"tool_recovery": {"n": tool_recoveries,
+                                      "provider_code": err.get("code"),
+                                      "failed_generation_head": str(err.get("failed_generation"))[:200]}})
+            if tool_recoveries > MAX_TOOL_RECOVERIES:
+                print(f"abort: provider rejected {tool_recoveries} generations for unknown tool names; "
+                      f"budget spent, failing closed")
+                return
+            messages.append({"role": "user", "content":
+                "[harness note - provider rejection, not model output] Your previous "
+                "generation was rejected because it called a tool that does not exist. "
+                "ONLY these tools exist: write_file, edit_file, git_commit, git_push. "
+                "Re-issue your intended action using one of them."})
+            continue
         record({"api_response": resp})
         msg = resp["choices"][0]["message"]
         messages.append(msg)
