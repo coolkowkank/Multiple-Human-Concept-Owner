@@ -21,3 +21,9 @@ existing file. Keep the module under 60 lines, stdlib only.
 verify_command: python3 -m unittest discover -s tests -v
 status_line: token estimate helper added
 handoff: null
+
+STRICT: the "writes" object in your reply must contain ONLY the keys
+"launcher/token_est.py" and "tests/test_token_est.py". Any other path
+(including launcher/prompts.py or launcher/cli.py) is rejected by the
+runtime and wastes the turn. The --measure CLI wiring is explicitly
+OUT of this batch.
