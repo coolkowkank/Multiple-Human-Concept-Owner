@@ -50,5 +50,17 @@
       },
       "service_tier": "on_demand"
     }
+  },
+  {
+    "tool_call": "write_file",
+    "args": {
+      "content": "(placeholder)",
+      "path": "docs/self-commit-protocol.md"
+    },
+    "result": {
+      "ok": true,
+      "path": "docs/self-commit-protocol.md",
+      "bytes": 13
+    }
   }
 ]
