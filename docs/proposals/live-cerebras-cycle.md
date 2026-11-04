@@ -1,6 +1,11 @@
 # Proposal: first live adopter-AI cycle (bounded, free-only)
 
-Status: PROPOSED 2026-11-04, not run. Awaiting main's bounded GO.
+Status: ON HOLD 2026-11-04. Free Trial = $5 credits against a verified
+payment method (vendor docs), so this route spends credits - no approval
+yet. Whether the account's earlier 181-token qualification probe consumed
+credit is UNVERIFIED: the account ledger is only visible via the Cerebras
+console/account API, which this run has not accessed. All Cerebras use is
+paused until the account tier/ledger is checked and scope is settled.
 
 ## Exact concept and target
 - Concept (the whole .team/brief.md content): "Build a tiny Python

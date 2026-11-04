@@ -231,10 +231,16 @@ test. One adopter-path gap was found and fixed doing this: `launch` never
 issued the first turn token (the demo seeded it by hand); the supervisor
 now issues the first turn to the coordinator when the brief is present
 and the state is still forming, and stays forming (with a gate) when the
-brief is empty. The bounded free-only live proposal is
-docs/proposals/live-cerebras-cycle.md (not run): disposable LOCAL-ONLY
-target repo (no remote writes), five gpt-oss-120b seats on the Cerebras
-free tier, 20-request global cap split per seat and persisted across
-restarts via the usage logs, 1800s wall stop, DONE/ESCALATE/wall-kill
-stop conditions, read-only peer review of the record afterward. Legacy behavior is unchanged when the keys are absent - existing
+brief is empty. The bounded live proposal is
+docs/proposals/live-requesty-cycle.md (not run): disposable LOCAL-ONLY
+target repo (no remote writes), five seats on Requesty ZERO-PRICE models
+(google/gemma-4-31b-it - zero-price in the account's own model listing
+and "cost": 0 observed on this account's probes), 20-request global cap
+split per seat and persisted across restarts via the usage logs, 1800s
+wall stop, DONE/ESCALATE/wall-kill stop conditions, read-only peer
+review of the record afterward. The Cerebras variant
+(docs/proposals/live-cerebras-cycle.md) is ON HOLD: its free tier is
+$5 credits against a verified payment method, credits are spend, and
+whether this account's earlier probe consumed credit is unverified
+without a console/ledger check. Legacy behavior is unchanged when the keys are absent - existing
 rosters keep working, but unattended autonomous runs should set budgets.
