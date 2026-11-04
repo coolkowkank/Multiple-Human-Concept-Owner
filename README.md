@@ -2,11 +2,11 @@
 
 ## Project progress
 
-*As of 2026-11-04 14:48 EET. Weighted milestone progress is **40.0%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
+*As of 2026-11-04 14:50 EET. Weighted milestone progress is **40.0%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
 
-![Gantt chart](docs/progress/gantt.png?v=144840)
+![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/0aab96efd7d89371c3fb75e3bfe4eb26e8e1a12e/docs/progress/gantt.png)
 
-![Progress S-curve](docs/progress/s-curve.png?v=144840)
+![Progress S-curve](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/0aab96efd7d89371c3fb75e3bfe4eb26e8e1a12e/docs/progress/s-curve.png)
 
 The large icon on each Gantt row is the accountable current owner (a role assignment, not authorship). Small icons are contributors. A legend under the chart gives names and roles. The Researcher has no GitHub account, so it uses a role icon.
 
