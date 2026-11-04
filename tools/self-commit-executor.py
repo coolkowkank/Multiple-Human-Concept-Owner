@@ -40,7 +40,7 @@ checkpoint landing; earlier events survive on the records branch.
 
 Usage: GROQ_KEY_FILE=... RECORDS_DIR=... groq-harness.py REPO_PATH BRANCH ATTEMPT_ID TASK_FILE
 """
-import json, os, re, subprocess, sys, atexit
+import json, os, re, subprocess, sys, atexit, time, fcntl
 
 REPO, BRANCH, ATTEMPT, TASK_FILE = sys.argv[1:5]
 KEY = open(os.environ.get("PROVIDER_KEY_FILE", os.environ.get("GROQ_KEY_FILE", ""))).read().strip()
@@ -195,11 +195,90 @@ def _rate_headers(header_text):
             out[k] = v.strip()
     return out
 
+# Durable cross-launch request accounting (2026-11-04 batch lesson: the
+# deadlock-fix batch spent 16 provider requests against a 12 cap because
+# each launch's MAX_CALLS was derived from a LAUNCH count while runs made
+# 2-3 requests). When BUDGET_LEDGER is set it is the single durable
+# counter: every network attempt - success, error or probe - is reserved
+# BEFORE the request, under an flock, so concurrent launches cannot
+# double-spend. Hard stop at MAX_CALLS across all launches using the file.
+BUDGET_LEDGER = os.environ.get("BUDGET_LEDGER")
+MIN_CALL_INTERVAL_S = float(os.environ.get("MIN_CALL_INTERVAL_S", "0"))
+
+def _ledger_read(f):
+    f.seek(0)
+    try:
+        return json.load(f)
+    except Exception:
+        return {"used": 0, "history": []}
+
+def _pacing_wait_s(data, now, min_interval):
+    """Seconds to wait before the next request: the configured floor AND
+    any provider-supplied reset hint stored by an earlier rejection. A
+    floor only reduces self-collision; it cannot guarantee quota."""
+    wait = 0.0
+    last = data.get("last_call_epoch")
+    if last and min_interval > 0:
+        wait = max(wait, min_interval - (now - last))
+    hint_until = data.get("rate_reset_until_epoch")
+    if hint_until:
+        wait = max(wait, hint_until - now)
+    return max(0.0, wait)
+
+_RETRY_HINT_RE = re.compile(r"try again in ([0-9.]+)s", re.I)
+
+def _retry_hint_s(error_detail):
+    if not isinstance(error_detail, dict):
+        return None
+    m = _RETRY_HINT_RE.search(str(error_detail.get("message", "")))
+    if m:
+        return float(m.group(1))
+    return None
+
+def _reserve_call():
+    """Reserve one provider request. Raises (hard stop) when the budget is
+    exhausted. Applies pacing (sleeps) before returning."""
+    if not BUDGET_LEDGER:
+        if CALLS["n"] >= MAX_CALLS:
+            record({"budget_stop": {"used": CALLS["n"], "budget": MAX_CALLS}})
+            raise RuntimeError(f"API call budget exhausted ({CALLS['n']}/{MAX_CALLS}); refusing further provider requests")
+        CALLS["n"] += 1
+        return
+    with open(BUDGET_LEDGER, "a+") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            data = _ledger_read(f)
+            if data["used"] >= MAX_CALLS:
+                record({"budget_stop": {"used": data["used"], "budget": MAX_CALLS,
+                                        "ledger": BUDGET_LEDGER, "durable": True}})
+                raise RuntimeError(f"durable budget exhausted ({data['used']}/{MAX_CALLS} across all launches); refusing further provider requests")
+            wait = _pacing_wait_s(data, time.time(), MIN_CALL_INTERVAL_S)
+            data["used"] += 1
+            data["last_call_epoch"] = time.time() + wait
+            data["history"].append({"attempt": ATTEMPT, "seq": data["used"],
+                                    "reserved_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())})
+            f.seek(0); f.truncate(); json.dump(data, f); f.flush(); os.fsync(f.fileno())
+            CALLS["n"] = data["used"]
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
+    if wait > 0:
+        record({"pacing_wait": {"seconds": round(wait, 1), "min_interval": MIN_CALL_INTERVAL_S}})
+        time.sleep(wait)
+
+def _store_reset_hint(seconds):
+    if not BUDGET_LEDGER or seconds is None:
+        return
+    with open(BUDGET_LEDGER, "a+") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            data = _ledger_read(f)
+            data["rate_reset_until_epoch"] = time.time() + seconds
+            f.seek(0); f.truncate(); json.dump(data, f); f.flush(); os.fsync(f.fileno())
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
+
 def api(messages):
-    if CALLS["n"] >= MAX_CALLS:
-        record({"budget_stop": {"used": CALLS["n"], "budget": MAX_CALLS}})
-        raise RuntimeError(f"API call budget exhausted ({CALLS['n']}/{MAX_CALLS}); refusing further provider requests")
-    CALLS["n"] += 1  # counted BEFORE the request: failed/transport-blocked attempts consume budget too
+    _reserve_call()
     payload = {"model": MODEL, "messages": messages, "tools": TOOLS,
                "reasoning_effort": "low",
                "max_completion_tokens": int(os.environ.get("MAX_COMPLETION_TOKENS", "4096"))}
@@ -231,6 +310,8 @@ def api(messages):
         record({"api_error": {"kind": "http", "status": status.strip(), "body_head": safe}})
         raise RuntimeError(f"non-JSON HTTP {status.strip()}")
     if "error" in r:
+        if isinstance(r.get("error"), dict) and r["error"].get("code") == "rate_limit_exceeded":
+            _store_reset_hint(_retry_hint_s(r["error"]))
         record({"api_error": {"kind": "api", "status": status.strip(), "detail": r["error"],
                               "rate_headers": rate_headers}})
         raise RuntimeError(f"API error: {r['error']}")
@@ -299,6 +380,24 @@ def run_tool(name, args):
         if name == "git_commit":
             msg = args.get("message", "")
             if CRED.search(msg): return {"ok": False, "error": "credential-pattern message refused"}
+            # Mechanical guard (never repairs): staged/changed Python files
+            # must compile - a corrupt file is returned to the MODEL to fix,
+            # never pushed (b5 lesson: a double-escaped supervisor.py was
+            # committed broken). Disable only via PRECOMMIT_COMPILE_CHECK=0.
+            if os.environ.get("PRECOMMIT_COMPILE_CHECK", "1") not in ("0", "false"):
+                candidates = []
+                for base in ("launcher", "tests"):
+                    for root, _dirs, files in os.walk(os.path.join(REPO, base)):
+                        for fn in files:
+                            if fn.endswith(".py"):
+                                candidates.append(os.path.join(root, fn))
+                for full in candidates:
+                    rel = os.path.relpath(full, REPO)
+                    c = subprocess.run([sys.executable, "-c",
+                                        "import py_compile, sys; py_compile.compile(sys.argv[1], cfile='/tmp/pccheck.pyc', doraise=True)",
+                                        full], capture_output=True, text=True)
+                    if c.returncode != 0:
+                        return {"ok": False, "error": f"pre-commit compile check failed for {rel}: {(c.stderr or c.stdout)[-400:]} - fix YOUR file content and retry"}
             author_name = MODEL_AUTHOR.split(" <", 1)[0]
             trailer = f"\n\nCommitted-by: {author_name} via own tool calls"
             subprocess.run(["git", "-C", REPO, "add", "--", "docs/", "tasks/", "launcher/", "tests/"], capture_output=True)

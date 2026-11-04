@@ -293,6 +293,66 @@ class ExecutorCase(unittest.TestCase):
 
     # -- allowlisted rate-header diagnostics (operator infra) --
 
+
+    # -- durable cross-launch budget ledger (16-of-12 overrun lesson) --
+
+    def test_durable_ledger_shared_across_launches_hard_stop(self):
+        ledger = os.path.join(self.tmp, "budget.json")
+        os.environ["BUDGET_LEDGER"] = ledger
+        try:
+            ns1 = self.load(max_calls=2)
+            ns1["_reserve_call"](); ns1["_reserve_call"]()
+            self.assertEqual(ns1["CALLS"]["n"], 2)
+            # a SECOND launch (fresh namespace) shares the same counter
+            ns2 = self.load(max_calls=2)
+            with self.assertRaises(RuntimeError):
+                ns2["_reserve_call"]()
+            data = json.load(open(ledger))
+            self.assertEqual(data["used"], 2)
+            self.assertEqual(len(data["history"]), 2)
+        finally:
+            del os.environ["BUDGET_LEDGER"]
+
+    def test_ledger_reservation_precedes_request_for_error_paths(self):
+        # counting happens in _reserve_call BEFORE any network attempt, so
+        # errors and probes consume budget; covered structurally by api()
+        # calling _reserve_call first (see source) and by the counter test.
+        ledger = os.path.join(self.tmp, "budget.json")
+        os.environ["BUDGET_LEDGER"] = ledger
+        try:
+            ns = self.load(max_calls=1)
+            ns["_reserve_call"]()
+            with self.assertRaises(RuntimeError):
+                ns["_reserve_call"]()
+        finally:
+            del os.environ["BUDGET_LEDGER"]
+
+    def test_pacing_wait_honors_floor_and_reset_hint(self):
+        ns = self.load()
+        now = 1000.0
+        data = {"last_call_epoch": 990.0}
+        self.assertEqual(ns["_pacing_wait_s"](data, now, 65.0), 55.0)
+        data = {"last_call_epoch": 990.0, "rate_reset_until_epoch": 1200.0}
+        self.assertEqual(ns["_pacing_wait_s"](data, now, 65.0), 200.0)
+        self.assertEqual(ns["_pacing_wait_s"]({}, now, 65.0), 0.0)
+        self.assertEqual(ns["_retry_hint_s"]({"message": "... Please try again in 9.03s. ..."}), 9.03)
+        self.assertIsNone(ns["_retry_hint_s"]({"message": "other"}))
+
+    def test_precommit_compile_guard_blocks_broken_python(self):
+        ns = self.load()
+        # the executor stages docs/ tasks/ launcher/ tests/ as one pathspec
+        # set; all four exist in the real repo, so mirror that here
+        for d in ("docs", "tasks", "launcher", "tests"):
+            os.makedirs(os.path.join(self.repo, d), exist_ok=True)
+        bad = os.path.join(self.repo, "tests", "bad.py")
+        open(bad, "w").write("def broken(:\n")
+        r = ns["run_tool"]("git_commit", {"message": "m\n\nTURN: builder"})
+        self.assertFalse(r["ok"])
+        self.assertIn("compile", r["error"])
+        open(bad, "w").write("x = 1\n")
+        r = ns["run_tool"]("git_commit", {"message": "m\n\nTURN: builder"})
+        self.assertTrue(r["ok"], r)
+
     def test_rate_headers_allowlist_only(self):
         ns = self.load()
         hdrs = ("HTTP/2 429\r\n"
