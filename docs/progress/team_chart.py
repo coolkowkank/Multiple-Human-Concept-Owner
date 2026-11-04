@@ -46,7 +46,7 @@ def render(here, updated):
     labels(COR,"Telkomsel - Coordinator","@instinct-telkomsel","Plans, assigns work,","tracks progress")
     labels(BLD,"Alex - Builder","@coolkowkank-bot","Groq gpt-oss-120b (free plan)","via shared bot account")
     labels(REV,"Bill - Independent reviewer","@instinct-christina","Reviews the Builder's pinned commits")
-    labels(RES,"Nora - Researcher","role; no separate account","Literature and public-system","R&D; proposes, no product edits")
+    labels(RES,"Nora - Researcher","Uses @coolkowkank","dedicated Researcher token","Trial model planned, not active")
     arrow((OWN[0]-60,OWN[1]+8),(COR[0]+8,COR[1]-58),"direction + gates",-70,-30,0.1)
     arrow((OWN[0]+60,OWN[1]+8),(REV[0]-8,REV[1]-58),"direction + gates",80,-30,-0.1)
     arrow((COR[0]+52,COR[1]-8),(BLD[0]-46,BLD[1]-8),"assigns tasks",0,-24)

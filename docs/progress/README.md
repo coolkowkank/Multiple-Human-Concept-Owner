@@ -32,7 +32,7 @@ No plan or schedule existed before 2026-11-04 14:40 EET, so there is no planned-
 
 Project aliases: Telkomsel (Coordinator), Alex (Builder), Nora (Researcher), Bill (Independent reviewer, Christina's existing project name). They are display names only; account, model and status facts are unchanged.
 
-The large icon is the accountable current owner by role assignment, not by who authored commits. Small icons are contributors. The shared bot account is not a unique model identity, and the Researcher has no separate GitHub account, so it uses a role icon. Since 15:10 it publishes through the owner's dedicated token with the Researcher role as commit author and the owner as committer. That is a publishing route, not a new identity, and earns no product credit.
+The large icon is the accountable current owner by role assignment, not by who authored commits. Small icons are contributors. The shared bot account is not a unique model identity, and the Researcher uses a role icon instead of an avatar. Since 15:10 it publishes through the owner's dedicated token with the Researcher role as commit author and the owner as committer. That is a publishing route, not a new GitHub account, and earns no product credit. Planned trial model for Nora: Nemotron-3 Ultra 550B on the Requesty free route (live check returned success at zero reported cost). It is not active, and research quality is unproven until a trial passes.
 
 ## Publishing the images
 
