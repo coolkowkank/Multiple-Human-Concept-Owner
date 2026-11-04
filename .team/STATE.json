@@ -1,9 +1,9 @@
 {
-  "turn": "qc",
-  "turn_seq": 3,
-  "turn_since": "2026-11-04T11:19:52Z",
+  "turn": "coordinator",
+  "turn_seq": 4,
+  "turn_since": "2026-11-04T11:20:16Z",
   "status": "running",
-  "status_line": "Moving to QC to verify implementation and test results",
+  "status_line": "QC verifying ACs",
   "leases": {
     "coordinator": {
       "holder": "coordinator-32a14394",
@@ -12,6 +12,10 @@
     "builder": {
       "holder": "builder-d21f29f3",
       "claimed_at": 1793790784.7963538
+    },
+    "qc": {
+      "holder": "qc-56fb2c2f",
+      "claimed_at": 1793791200.4109776
     }
   }
 }
