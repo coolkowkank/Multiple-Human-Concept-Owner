@@ -47,6 +47,11 @@ the current truth with exact commit refs.
 
 ## Claims discipline
 
+- Live-model TURN commits land in scratch test repos; this repo's
+  evidence branches hold exported artifacts. Never describe exported
+  evidence as a live provider pushing to this repo.
+
+
 Mechanism fixes are not autonomy. Mark results open / fixed-unverified
 / verified honestly; an independent review moves states, not the
 implementer.

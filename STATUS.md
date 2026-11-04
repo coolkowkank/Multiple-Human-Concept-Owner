@@ -55,7 +55,7 @@ in the owner's vault, never in the repo.
 
 | Provider | State |
 | --- | --- |
-| Groq | Free plan owner-confirmed; `/models` OK; bounded 2-turn live test passed with honest termination gap ([evidence/groq-1](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/tree/evidence/groq-1/evidence/groq-1)); `openai/gpt-oss-20b` observed 8000 TPM / 1000 RPD |
+| Groq | Free plan owner-confirmed; `/models` OK; bounded 2-turn live test passed with honest termination gap ([evidence/groq-1](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/tree/evidence/groq-1/evidence/groq-1)); `openai/gpt-oss-20b` observed 8000 TPM / 1000 RPD. Note: the model's TURN commits landed in a scratch test repo; this repo holds exported artifacts only - NOT proof of a live provider pushing to this repo |
 | Requesty | `/models` OK (808 models, free tier present); free tier 200 req/day + 20/min per org, shared pool, no card, no expiry (vendor docs); no inference yet |
 | Cerebras | `/models` OK (`qwen-3.8-27b`, `gpt-oss-120b`); plan/credits not established; no inference |
 | Gemini | Free tier exists per vendor docs (AI Studio; free content may train products); no key collected |
@@ -63,8 +63,9 @@ in the owner's vault, never in the repo.
 ## Proven vs not
 
 Proven: queue mechanism - cross-clone handoffs, leases, stale
-refusal + recovery, conformance checks (70 tests). One bounded Groq
-live exchange.
+refusal + recovery, conformance checks (77 tests). One bounded Groq
+live exchange in a scratch repo (artifacts exported here, not a live
+push to this repo).
 
 Not proven: unattended/parallel operation, live models closing cycles
 (no DONE status line observed), multi-day runs, heterogeneous
@@ -79,6 +80,7 @@ autonomy.
 3. Open gaps before any unattended claim: cooperative local leases;
    best-effort relay; models may not close cycles; unsandboxed
    `verify_command` shell; manual prompt-size budgeting. Closed from
-   this list: 429 backoff with Retry-After; supervisor-restart
-   semantics (orphaned lease blocks a new supervisor's seat, no
-   duplicate turn - regression test).
+   this list: 429 backoff with Retry-After. Scoped coverage only:
+   one orphaned-lease fixture proves a new supervisor's seat stops
+   instead of duplicating a turn; full crash/restart cycles and
+   endurance remain untested.
