@@ -8,18 +8,18 @@ from matplotlib.patches import Circle, FancyBboxPatch, Polygon
 INK = "#1a1a2e"; GRAY = "#5a6272"; ARROW = "#8a8fa3"; PURPLE = "#8b7ec8"
 
 def render(here, updated):
-    W, H = 1180, 1080
+    W, H = 1180, 900
     fig = plt.figure(figsize=(W/100, H/100), dpi=100)
     ax = fig.add_axes([0, 0, 1, 1]); ax.set_xlim(0, W); ax.set_ylim(H, 0); ax.axis("off")
     img = lambda n: mpimg.imread(os.path.join(here, "avatars", n + ".png"))
     def text(x, y, s, size=12, color=GRAY, weight="normal", style="normal", ha="center"):
         ax.text(x, y, s, fontsize=size, color=color, fontweight=weight, fontstyle=style, ha=ha, va="top")
-    def node(cx, cy, r, name=None, icon=None, bg=PURPLE):
+    def node(cx, cy, r, name=None, icon=None, bg=PURPLE, fs=22):
         if name:
             ax.imshow(img(name), extent=(cx-r, cx+r, cy+r, cy-r), zorder=3)
         else:
             ax.add_patch(Circle((cx, cy), r, fc=bg, ec="none", zorder=3))
-            ax.text(cx, cy+2, icon, fontsize=22, color="white", fontweight="bold", ha="center", va="center", zorder=4)
+            ax.text(cx, cy+1, icon, fontsize=fs, color="white", fontweight="bold", ha="center", va="center", zorder=4)
         ax.set_xlim(0, W); ax.set_ylim(H, 0)
     def arrow(p1, p2, label=None, lx=0, ly=0, rad=0.0):
         dx, dy = p2[0]-p1[0], p2[1]-p1[1]; d = math.hypot(dx, dy)
@@ -64,18 +64,13 @@ def render(here, updated):
     arrow((REV[0]-52,REV[1]+16),(BLD[0]+46,BLD[1]+16),"verdicts",0,2)
     ax.annotate("", xy=(0,0), xytext=(0,0))
     ax.annotate("", xy=(0,0), xytext=(0,0))
-    # model pool
-    ax.add_patch(FancyBboxPatch((130,705),920,165,boxstyle="round,pad=4,rounding_size=10",fc="#fafafc",ec="#c9ccd4",lw=1.2,ls="--"))
-    text(W/2,716,"Provider pool: standby, not team seats",13,INK,"bold")
-    node(340,785,26,icon="Ce"); node(830,785,26,icon="Rq")
-    text(340,816,"Cerebras (on hold)",12,INK,"bold"); text(340,835,"key and tool calls checked; credit ledger unverified",10)
-    text(830,816,"Requesty (standby)",12,INK,"bold"); text(830,854,"needed manual recovery, skipped Reviewer; not autonomy",10)
-    text(830,835,"zero-price model verified; one bounded run",10)
-    ax.add_patch(FancyBboxPatch((130,895),920,76,boxstyle="round,pad=4,rounding_size=10",fc="white",ec="#c9ccd4",lw=1.2))
-    text(W/2,905,"On demand: Architect, Independent QC, Records",12,INK,"bold")
-    text(W/2,927,"Blueprint roles activated only when a task needs them. None is staffed today.",10)
-    text(W/2,945,"The Coordinator keeps responsibility for accepting reviewed work.",10)
-    text(40,1000,"Sources: docs/developers.md and the team roster chart on the team-launcher branch, plus the current Researcher assignment.",9,"#8a8fa3",ha="left")
-    text(40,1018,"Lines show three levels: owner, Coordinator, others. Arrows show review loops: Alex and Bill on code, Nora and Eva on sources.",9,"#8a8fa3",ha="left")
-    text(40,1036,"Builder commits go through @coolkowkank-bot. Researcher commits: role author, owner @coolkowkank as committer.",9,"#8a8fa3",ha="left")
+    # compact provider line (details live in docs)
+    y0=745
+    text(60,y0-8,"Provider pool:",12,INK,"bold",ha="left")
+    node(222,y0+2,13,icon="Ce",fs=9); text(244,y0-6,"1) Cerebras: on hold, credit ledger unverified",10,ha="left")
+    node(700,y0+2,13,icon="Rq",fs=9); text(722,y0-6,"2) Requesty: free route, used for Nora and Eva trials",10,ha="left")
+    text(60,y0+34,"On demand, not staffed: Architect, Independent QC, Records.  The Coordinator keeps responsibility for accepting reviewed work.",10,ha="left")
+    text(40,830,"Sources: docs/developers.md and the team roster chart on the team-launcher branch, plus the current Researcher assignment.",9,"#8a8fa3",ha="left")
+    text(40,848,"Lines show three levels: owner, Coordinator, others. Arrows show review loops: Alex and Bill on code, Nora and Eva on sources.",9,"#8a8fa3",ha="left")
+    text(40,866,"Builder commits go through @coolkowkank-bot. Researcher commits: role author, owner @coolkowkank as committer.",9,"#8a8fa3",ha="left")
     fig.savefig(os.path.join(here, "team.png")); plt.close(fig)
