@@ -335,13 +335,26 @@ def settle(store, rid, qid, role, model, res, now):
     """Record a result line; returns a dict for failures, None on 'ok'.
     Raises Halt for 429/unknown/auth/nonzero cost (PAUSED)."""
     done = {"phase": "result", "rid": rid, "ts": iso(now), "qid": qid,
-            "role": role, "model": model, "usage": res.get("usage")}
+            "role": role, "model": model}
+    # final persistence boundary: validate here, never trust caller helpers
+    raw_u = res.get("usage")
+    clean_u, u_flag = sanitize_usage(raw_u)
+    done["usage"] = clean_u
     if res.get("diag"):
         done["diag"] = clean_diag(res["diag"])
-    sig = res.get("cost_signal")
-    if sig is None and (res.get("usage") or {}).get("cost"):
+    sigs = [res.get("cost_signal"), cost_signal(raw_u)]
+    if "nonzero" in sigs:
         sig = "nonzero"
-    bad = sig in ("nonzero", "invalid") or res.get("usage_flag") == "invalid"
+    elif "invalid" in sigs or res.get("cost_signal") not in (
+            None, "zero", "nonzero", "invalid"):
+        sig = "invalid"
+    elif "zero" in sigs:
+        sig = "zero"
+    else:
+        sig = None
+    flags = (u_flag, res.get("usage_flag"))
+    bad = sig in ("nonzero", "invalid") or "invalid" in flags or \
+        (res.get("usage_flag") not in (None, "invalid", "extra_keys"))
     if bad:
         # any nonzero/invalid cost or invalid usage halts for EVERY kind,
         # keeping the original outcome and the signal.
@@ -354,7 +367,7 @@ def settle(store, rid, qid, role, model, res, now):
                       "reason": "cost/usage signal %s on %s"
                                 % (done["cost_signal"], rid)})
         raise Halt("nonzero or invalid cost/usage signal")
-    if res.get("usage_flag") == "extra_keys":
+    if "extra_keys" in flags:
         done["usage_extra_keys"] = 1
     if res["kind"] == "unknown":
         done["outcome"] = "unknown"
@@ -813,6 +826,11 @@ def clean_diag(d):
     out = {}
     for k in DIAG_KEYS:
         v = d.get(k)
+        if k == "finish_reason":
+            fe = finish_enum(v)
+            if fe is not None:
+                out[k] = fe
+            continue
         if isinstance(v, (int, float)) and not isinstance(v, bool):
             out[k] = round(v, 2) if isinstance(v, float) else v
         elif isinstance(v, str):

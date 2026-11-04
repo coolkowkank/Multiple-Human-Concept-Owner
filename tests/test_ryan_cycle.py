@@ -722,6 +722,50 @@ class Diag(Base):
             self.assertTrue(r.get("cost_signal"))
             self.assertEqual(led[-1]["phase"], "halt")
 
+    def _direct(self, res):
+        self.setUp()
+        self.seed()
+        try:
+            self.run_step([res])
+            halted = False
+        except rc.Halt:
+            halted = True
+        return halted, self.store.ledger()
+
+    def test_direct_settle_boundary_revalidates(self):
+        for u, sig in (({"cost": 0.25}, "zero"), ({"cost": "0.25"}, "zero"),
+                       ({"cost": False}, "zero"), ({"cost": -1}, None)):
+            for kind in ("http", "ok"):
+                res = {"kind": kind, "usage": u, "content": "x",
+                       "cost_signal": sig}
+                if kind == "http":
+                    res["code"] = 500
+                halted, led = self._direct(res)
+                self.assertTrue(halted, (u, sig, kind))
+        halted, led = self._direct({"kind": "ok", "content": "x",
+                                    "usage": {"completion_tokens": 3},
+                                    "cost_signal": "bogus"})
+        self.assertTrue(halted)
+
+    def test_direct_settle_stores_only_sanitized(self):
+        halted, led = self._direct({
+            "kind": "ok", "content": "x", "cost_signal": "zero",
+            "usage": {"prompt_tokens": 3, "secret-session-123": 9,
+                      "prompt_tokens_details": {"secret-session-123": 1,
+                                                "cached_tokens": 2}},
+            "diag": {"stage": "s", "finish_reason": "secret-session-123"}})
+        self.assertFalse(halted)
+        r = [e for e in led if e["phase"] == "result"][0]
+        self.assertEqual(r["usage"], {"prompt_tokens": 3, "prompt_tokens_details":
+                                      {"cached_tokens": 2}})
+        self.assertEqual(r["diag"]["finish_reason"], "unknown")
+        self.assertNotIn("secret-session-123", json.dumps(led))
+
+    def test_direct_settle_good_zero_cost_ok(self):
+        halted, led = self._direct({"kind": "ok", "content": "x",
+                                    "usage": {"cost": 0}, "cost_signal": "zero"})
+        self.assertFalse(halted)
+
     def test_settle_persists_only_clean_diag_in_ledger(self):
         self.seed()
         post = lambda *a: {"kind": "unknown", "usage": None, "content": "",
