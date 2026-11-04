@@ -416,6 +416,33 @@ class Review2(Base):
         self.assertEqual(self.run_step([])["action"], "wait")
 
 
+class Review3(Base):
+    def test_alloc_rid_minted_inside_reserve_and_unique(self):
+        e1 = {"phase": "reserved", "rid": None, "ts": rc.iso(T0),
+              "qid": "alloc", "role": "allocation", "model": "m"}
+        self.store.reserve(T0, e1, "alloc")
+        self.store.append({"phase": "result", "rid": e1["rid"],
+                           "ts": rc.iso(T0), "outcome": "ok"})
+        e2 = dict(e1, rid=None, ts=rc.iso(T0 + 20))
+        self.store.reserve(T0 + 20, e2, "alloc")
+        self.assertNotEqual(e1["rid"], e2["rid"])
+
+    def test_queue_deleted_midflight_fails_closed(self):
+        self.seed()
+
+        def post(*a):
+            self.store.save_queue({"questions": []})
+            return ok(R_OK)
+        with self.assertRaises(rc.Halt):
+            rc.step(self.d, post, FRESH, T0 + 20, RECORD)
+        self.assertEqual(self.store.ledger()[-1]["phase"], "halt")
+        self.store.save_queue({"questions": [{
+            "id": "q2", "status": "open", "attempts": {}, "question": "?",
+            "packet": PACKET}]})
+        with self.assertRaises(rc.Halt):
+            self.run_step([])
+
+
 class JobDesc(unittest.TestCase):
     def mk(self, extra=""):
         repo = tempfile.mkdtemp()

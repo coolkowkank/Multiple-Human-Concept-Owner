@@ -107,6 +107,9 @@ class Store:
         with self.lock():
             state, why = ledger_gate(self, now, qid)
             if state == "ok":
+                if not entry.get("rid"):  # id minted INSIDE the lock
+                    entry["rid"] = "%s-%d" % (entry["role"],
+                                              len(self.ledger()))
                 self.append(entry)
             return state, why
 
@@ -283,8 +286,8 @@ def load_assignments(root):
 def allocate(root, post, list_models, record, now):
     """Ryan's model-backed allocation decision: ONE request, counted in
     the daily cap like any other. The choice is saved ONLY if it passes
-    validate_assignments; otherwise it is stored as rejected and a human
-    decides. Ryan's choice is a decision, not proof the routes work:
+    validate_assignments; otherwise it is NOT saved (the verbatim reply stays under
+    runs/alloc/) and a human decides. Ryan's choice is a decision, not proof the routes work:
     cycle 1 tests them. The allocation request counts as 1 of the 24
     daily requests AND takes 1 of the 4 daily question/cycle slots
     (qid "alloc"), so it leaves 3 research questions that day."""
@@ -314,12 +317,12 @@ def allocate(root, post, list_models, record, now):
     if len((system + prompt).encode()) > MAX_INPUT_BYTES:
         return {"action": "needs-human", "reason": "allocation input too "
                 "large", "calls": 0}
-    rid = "alloc-%d" % len(store.ledger())
-    state, why = store.reserve(now, {
-        "phase": "reserved", "rid": rid, "ts": iso(now), "qid": "alloc",
-        "role": "allocation", "model": BOOTSTRAP_RYAN}, "alloc")
+    entry = {"phase": "reserved", "rid": None, "ts": iso(now),
+             "qid": "alloc", "role": "allocation", "model": BOOTSTRAP_RYAN}
+    state, why = store.reserve(now, entry, "alloc")
     if state == "wait":
         return {"action": "wait", "reason": why, "calls": 0}
+    rid = entry["rid"]
     res = post(BOOTSTRAP_RYAN, system, prompt, CEILINGS["allocation"])
     out = settle(store, rid, "alloc", "allocation", BOOTSTRAP_RYAN, res, now)
     if out:
@@ -567,7 +570,12 @@ def step(root, post, list_models, now, record):
             return out
         store.write_run(qid, "%s-%d.txt" % (role, n), res["content"])
         queue = store.queue()
-        q = next(x for x in queue["questions"] if x["id"] == qid)
+        q = next((x for x in queue["questions"] if x["id"] == qid), None)
+        if q is None:
+            store.append({"phase": "halt", "ts": iso(now),
+                          "reason": "queue entry %s vanished mid-flight; "
+                          "result kept in runs/, explicit recovery" % qid})
+            raise Halt("queue entry vanished mid-flight")
         try:
             obj = strict_json(res["content"])
             bad = precheck(role, q, obj)
