@@ -202,7 +202,7 @@
                 "type": "function",
                 "function": {
                   "name": "write_file",
-                  "arguments": "{\"content\":\"import os, time, unittest, tempfile, shutil\\nfrom launcher.supervisor import Supervisor\\n\\nclass DummyBus:\\n    def __init__(self):\\n        self.state_data = {\\\"status\\\":\\\"running\\\",\\\"turn\\\":None,\\\"turn_since\\\":None}\\n        self.logs=[]\\n    def state(self):\\n        return self.state_data.copy()\\n    def write_state(self, state):\\n        self.state_data.update(state)\\n    def append_log(self, seat, kind, msg):\\n        self.logs.append((seat, kind, msg))\\n    def commit_all(self, msg):\\n        pass\\n    def roster(self):\\n        return {\\\"seats\\\":{}}\\n    def open_gate(self, *a, **kw):\\n        pass\\n\\nclass TestDeadlockFix(unittest.TestCase):\\n    def setUp(self):\\n        self.bus=DummyBus()\\n        self.sup=Supervisor(repo='.', stall_timeout=1)\\n        self.sup.bus=self.bus\\n        # inject counter\\n        self.sup._routing_failures=0\\n    def test_no_stall_utc(self):\\n        # set turn_since 5 seconds ago UTC\\n        ts=time.time()-5\\n        self.bus.state_data['turn']='coordinator'\\n        self.bus.state_data['turn_since']=time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(ts))\\n        # set TZ offset +2\\n        os.environ['TZ']='Europe/Berlin'\\n        time.tzset()\\n        self.sup._check_stall(self.bus.state())\\n        self.assertNotIn('coordinator', self.sup._stalled_seats)\\n    def test_routing_failure_first(self):\\n        self.bus.state_data['status']='running'\\n        self.bus.state_data['turn']=None\\n        self.sup._check_stall(self.bus.state())\\n        self.assertIn(('supervisor','routing-failure'), [(s,k) for s,k,_ in self.bus.logs])\\n        self.assertEqual(self.bus.state_data['turn'],'coordinator')\\n    def test_routing_failure_escalate(self):\\n        self.bus.state_data['status']='running'\\n        self.bus.state_data['turn']=None\\n        # first call\\n        self.sup._check_stall(self.bus.state())\\n        # second call should trigger escalation\\n        self.sup._check_stall(self.bus.state())\\n        # escalation opens gate -\\u003e no direct check, ensure no second routing-failure log\\n        count=sum(1 for _,k,_ in self.bus.logs if k=='routing-failure')\\n        self.assertEqual(count,1)\\n    def test_done_no_action(self):\\n        self.bus.state_data.update({'status':'done','turn':None})\\n        self.sup._check_stall(self.bus.state())\\n        self.assertEqual(len(self.bus.logs),0)\\n\\nif __name__=='__main__':\\n    unittest.main()\\n\",\"path\":\"tests/test_deadlock_fix.py\"}"
+                  "arguments": "{\"path\": \"tests/test_deadlock_fix.py\", \"content\": \"[written to tests/test_deadlock_fix.py: 2348 bytes; full content in the run transcript]\"}"
                 }
               }
             ]
@@ -240,6 +240,12 @@
     },
     "result": {
       "ok": true,
+      "path": "tests/test_deadlock_fix.py",
+      "bytes": 2348
+    }
+  },
+  {
+    "history_elided": {
       "path": "tests/test_deadlock_fix.py",
       "bytes": 2348
     }
