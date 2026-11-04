@@ -1,0 +1,9 @@
+{
+  "state": "REVIEW_REQUESTED",
+  "cycle": 1,
+  "pinned_sha": "b993bd24411fab6433be9a804b99d1b9c73adc5b",
+  "feedback_sha": null,
+  "api_budget_total": 6,
+  "api_used": 0,
+  "notes": "Cycle 1: independent review of the pinned model commit. Feedback lands as immutable .team/review/FEEDBACK-c1.md on review/groq-dev-3. Budget counts every attempted provider request (failures/probes included), no retries. Protocol: docs/review-loop.md on team-launcher."
+}
