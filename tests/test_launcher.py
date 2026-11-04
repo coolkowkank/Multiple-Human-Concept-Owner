@@ -579,6 +579,7 @@ class LiveAdapterFixtureTests(unittest.TestCase):
                 n = int(self.headers.get("content-length", 0))
                 seen["body"] = json.loads(self.rfile.read(n))
                 seen["auth"] = self.headers.get("authorization")
+                seen["ua"] = self.headers.get("user-agent")
                 payload = {"choices": [{"message": {"content":
                     '{"summary": "http fixture ok", "handoff": null}'}}]}
                 data = json.dumps(payload).encode()
@@ -610,6 +611,10 @@ class LiveAdapterFixtureTests(unittest.TestCase):
         self.assertEqual(seen["auth"], "Bearer fixture-key")
         self.assertEqual(seen["body"]["model"], "fixture-model")
         self.assertEqual(seen["body"]["messages"][0]["role"], "system")
+        # Explicit UA: a bare Python-urllib UA is 403'd by some
+        # provider edge rules (observed against Groq 2026-11-04).
+        self.assertIn("team-launcher-http-adapter",
+                      seen.get("ua") or "")
 
     def test_http_adapter_missing_key_env_fails_clean(self):
         os.environ.pop("TEAM_TEST_ABSENT_KEY", None)

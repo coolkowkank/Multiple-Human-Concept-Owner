@@ -184,6 +184,9 @@ class HttpAdapter(Adapter):
             headers={
                 "content-type": "application/json",
                 "authorization": f"Bearer {key}",
+                # Some providers' edge rules 403 the bare
+                # Python-urllib user agent; send an explicit one.
+                "user-agent": "team-launcher-http-adapter/0.1",
             })
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
             data = json.loads(resp.read())
