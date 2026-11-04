@@ -2,13 +2,17 @@
   "seats": {
     "builder": {
       "role": "builder",
-      "allowed_paths": ["launcher/prompts.py", "launcher/cli.py",
-                        "tests/test_prompt_budget.py"],
+      "allowed_paths": [
+        "launcher/prompts.py",
+        "launcher/cli.py",
+        "tests/test_prompt_budget.py"
+      ],
       "adapter": {
         "type": "http",
         "base_url": "https://api.groq.com/openai/v1",
         "model": "openai/gpt-oss-20b",
-        "api_key_env": "GROQ_API_KEY"
+        "api_key_env": "GROQ_API_KEY",
+        "max_tokens": 8192
       }
     }
   }
