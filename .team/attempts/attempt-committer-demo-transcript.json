@@ -65,5 +65,11 @@
       "path": "docs/model-committer-demo.md",
       "bytes": 400
     }
+  },
+  {
+    "budget_stop": {
+      "used": 1,
+      "budget": 1
+    }
   }
 ]
