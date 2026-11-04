@@ -11,7 +11,7 @@
 
 *Latest update: 2026-11-04 17:30 EET. [Static full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/team/) (GitHub Pages, selectable text, responsive cards; the picture below is the fallback). No role is currently vacant; Ryan has no qualified backup route yet, so replacement proposals go to the Coordinator; "not project-configured" means no documented model or provider.*
 
-![Current Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/c7d1b9bc54b8a173d4a322bc7f9602a03230ad26/docs/progress/team.png)
+![Current Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/973c36ff54f72cdfcdf19513bc7b50d748e999ec/docs/progress/team.png)
 
 ### Coordinator work timeline
 
@@ -31,7 +31,7 @@
 | Researcher | Nora | active | sourced findings on Research_lab | Nemotron-3 Ultra 550B, Requesty free | [researcher](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/researcher.md) | 1* |
 | Evidence verifier | Eva | active | citation and evidence review | Gemma 4 31B, Requesty free | [evidence-verifier](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/evidence-verifier.md) | 1* |
 | Team Resources | Ryan | active | model route checks, replacement proposals (free resources only) | not project-configured | [team-resources](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/team-resources.md) | 1* |
-| Coordinator Assistant | Gemma (status drafts) | active | status drafts only, every draft reviewed, publication separate | google/gemma-4-31b-it, Requesty free | [coordinator-assistant](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/coordinator-assistant.md) | 1* |
+| Coordinator Assistant | Sam (status drafts) | active | status drafts only, every draft reviewed, publication separate | google/gemma-4-31b-it, Requesty free | [coordinator-assistant](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/coordinator-assistant.md) | 1* |
 | Reference-project members (Bill-QC, joe-agent, Claude) | - | unknown | none here | - | leads only, see registry | - |
 
 ### Project progress
