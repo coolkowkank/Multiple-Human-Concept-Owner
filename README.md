@@ -1,5 +1,15 @@
 # Autonomous AI-Human Teamwork - Work in Progress and Intended Operating Model
 
+## Project progress
+
+*As of 2026-11-04 14:40 EET. Verified progress is **38.5%** of weighted scope. No autonomous end-to-end run has passed yet.*
+
+![Gantt chart](docs/progress/gantt.svg)
+
+![Progress S-curve](docs/progress/s-curve.svg)
+
+Only verified outcomes count as progress. The dashed lines are forecasts, not commitments, and no earlier plan existed to compare against. See [how progress is measured](docs/progress/README.md).
+
 *Repository: `coolkowkank/Multiple-Human-Concept-Owner` - a reusable blueprint for human-led AI project teams: roles, coordination, handoffs, independent review, and project setup.*
 
 A reusable setup blueprint for running any project with a concept-led human team and a managed AI delivery team. It is project-, model- and framework-agnostic: copy this into a new project, fill in the placeholders, and the working setup is ready.

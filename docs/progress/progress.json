@@ -1,0 +1,104 @@
+{
+ "as_of": "2026-11-04T14:40:00+02:00",
+ "timezone": "EET (UTC+2), same as commit timestamps",
+ "rules": "Verified = 100% of weight. Partial = 50%. In progress / not started = 0% until verified. A package is Verified only with evidence of passing tests or an independent review, never because commits exist.",
+ "packages": [
+  {
+   "id": "WP1",
+   "name": "Blueprint docs and templates",
+   "weight": 8,
+   "status": "verified",
+   "start": "2026-11-03T15:51",
+   "end": "2026-11-04T00:59",
+   "credit_at": "2026-11-04T00:59",
+   "evidence": "On main: roles, rules, templates, references (commits 2026-11-03 15:51 to 2026-11-04 00:59)"
+  },
+  {
+   "id": "WP2",
+   "name": "Team launcher runtime (bus, turn token, supervisor)",
+   "weight": 15,
+   "status": "verified",
+   "start": "2026-11-04T01:19",
+   "end": "2026-11-04T14:38",
+   "credit_at": "2026-11-04T14:38",
+   "evidence": "team-launcher at 93b3552: 177/177 tests pass. Infrastructure tests only, no autonomous run"
+  },
+  {
+   "id": "WP3",
+   "name": "Groq and reviewer docs loop",
+   "weight": 8,
+   "status": "verified",
+   "start": "2026-11-04T09:03",
+   "end": "2026-11-04T09:52",
+   "credit_at": "2026-11-04T09:52",
+   "evidence": "review/groq-dev-3 4451611: independent review VERIFIED, docs scope only"
+  },
+  {
+   "id": "WP4",
+   "name": "Requesty tiny-library run",
+   "weight": 7,
+   "status": "partial",
+   "start": "2026-11-04T13:12",
+   "end": "2026-11-04T13:21",
+   "credit_at": "2026-11-04T13:21",
+   "evidence": "live/requesty-tinylib-experiment reached DONE, but needed manual recovery and skipped Reviewer",
+   "forecast_end": "2026-11-05T12:00"
+  },
+  {
+   "id": "WP5",
+   "name": "Builder fix: null-handoff deadlock and stall-clock UTC bug",
+   "weight": 15,
+   "status": "in_progress",
+   "start": "2026-11-04T13:24",
+   "forecast_end": "2026-11-04T17:00",
+   "evidence": "live/builder-deadlock-fix: Builder commit 0fa083a pushed, 1 of 4 regression tests fails; repair running. Not fixed until tests are green"
+  },
+  {
+   "id": "WP6",
+   "name": "Push gate, budget ledger and pacing controls",
+   "weight": 8,
+   "status": "partial",
+   "start": "2026-11-04T13:48",
+   "end": "2026-11-04T14:38",
+   "credit_at": "2026-11-04T14:38",
+   "forecast_end": "2026-11-04T19:00",
+   "evidence": "team-launcher 93b3552 implemented and unit tested; no independent review yet"
+  },
+  {
+   "id": "WP7",
+   "name": "Independent review of the Builder fix",
+   "weight": 6,
+   "status": "not_started",
+   "start": "2026-11-04T17:00",
+   "forecast_end": "2026-11-04T19:00",
+   "evidence": "Waits for green tests on WP5"
+  },
+  {
+   "id": "WP8",
+   "name": "Research_lab: literature insights",
+   "weight": 5,
+   "status": "in_progress",
+   "start": "2026-11-04T14:35",
+   "forecast_end": "2026-11-04T20:00",
+   "evidence": "Research_lab scaffold pushed (b8df577); verified findings not yet published"
+  },
+  {
+   "id": "WP9",
+   "name": "Lower-token handoffs",
+   "weight": 5,
+   "status": "in_progress",
+   "start": "2026-11-04T14:33",
+   "forecast_end": "2026-11-04T20:00",
+   "evidence": "Delta-only handoff rule adopted; token savings not yet measured"
+  },
+  {
+   "id": "WP10",
+   "name": "First autonomous run with Reviewer, no manual recovery",
+   "weight": 23,
+   "status": "not_started",
+   "start": "2026-11-04T19:00",
+   "forecast_end": "2026-11-05T12:00",
+   "evidence": "No autonomous PASS yet. Also re-proves WP4 cleanly"
+  }
+ ]
+}
