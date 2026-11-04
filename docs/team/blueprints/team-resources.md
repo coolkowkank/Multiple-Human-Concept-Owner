@@ -8,13 +8,45 @@
   evidence; propose a job-fitting replacement from existing authorized
   free resources when a route fails.
 - **Current model / provider:** not project-configured. The role's
-  checks are deterministic (provider model-listing price check plus
-  bounded probes tied to a real task need) and are coordination-run;
-  no model qualification trial is needed for deterministic checks.
+  resource checks are deterministic and coordination-run; no model is
+  needed for them. The performance-analysis job DOES need a model:
+  assignment is pending a bounded verified-free qualification on the
+  actual analysis task. This role label authorizes no provider calls;
+  caps are approved per task by the coordinator.
+
+## Proposal review chain (owner direction 2026-11-04, Slack 1793807405.061099)
+
+Ryan's proposals route: Coordinator Assistant (Sam) first when an
+assistant is active; if not approved -> Coordinator; if not approved
+-> owner. No auto-adoption, ever. An unresolved review escalates up;
+nobody invents a sign-off. Sam's current qualification is narrow
+(fixed-template status drafts) and does NOT cover workflow-review
+verdicts, so until a reviewer is qualified for this shape proposals
+start at the Coordinator. Money, security/access changes and merges
+stay owner-only regardless of the chain.
+
+## Support (owner direction 2026-11-04, Slack 1793807522.615389)
+
+Dedicated Researcher + Verifier functions work for Ryan, separate from
+Nora/Eva prototype research: the Researcher gathers performance and
+workflow evidence; the Verifier independently checks claims before a
+proposal enters the chain. Staffing status 2026-11-04: research seeded
+by the coordinator's focused performance-analysis work; Verifier to be
+independently assigned once evidence is ready. No models assigned to
+either function yet - a name is recorded only after a verified-free
+qualification on the actual task.
 - **Owns (scope):** docs/team/model-availability.md +
   docs/team/model-availability.json (the living availability record),
   tools/model_resources.py + tests/test_model_resources.py (the
   executable mechanism), and replacement proposals.
+- **Also assigned (owner 2026-11-04, Slack 1793807276.032229):**
+  member-performance analysis - useful output, review failures,
+  turnaround and token use from recorded runs and repair cycles - and
+  proposals for an optimized workflow/protocol (speed, token use).
+  Rules: measured savings only, never guessed numbers (token
+  composition is not a saving); a proposal is never a permission or
+  spending change; inputs are public project evidence (repo records,
+  logs, charts), never private transcripts or runtime internals.
 
 ## Executable mechanism
 
@@ -24,8 +56,10 @@ stay with the task's authorized operator flow):
 
 - `check-price <listing.json> <model-id>`: PASS only when the EXACT id
   is present with all-zero prices; paid prefixed variants never match.
-- `record-event <record.json> <route> ok|cap|error <evidence>`: dated
-  status update to the machine record.
+- `record-event <record.json> <route> ok|cap-ambiguous|cap-org-confirmed|error
+  <evidence>`: dated status update; an ambiguous cap cools only that
+  route, an org-confirmed cap blocks the whole provider pool until a
+  later success, never a date guess.
 - `propose <record.json> <listing.json|-> <job-shape> <failed-route>
   <remaining-attempts>`: prints DECISION (automatic replacement choice,
   authorized under the owner's 2026-11-04 resource-fit grant) ONLY when
@@ -34,7 +68,7 @@ stay with the task's authorized operator flow):
   never expands the task's existing call cap), no new access. Anything
   else prints COORDINATOR with the unresolved qualification/context/
   budget gap. Automatic choice is route selection only - never
-  credentialed execution. tests/test_model_resources.py: 8 tests, all
+  credentialed execution. tests/test_model_resources.py: 15 tests, all
   offline.
 - **Explicitly NOT in scope:** task assignment and model substitution
   decisions (coordinator - one model per task, swaps need coordinator
