@@ -1,68 +1,61 @@
 """Render docs/progress/coordinator-timeline.png: Coordinator work on a time axis (EET, 2026-11-04).
-Every solid marker is a timestamp from git history (commit times) on the main or Research_lab branch; edit EVENTS to refresh.
+Solid markers are commit times from git history (main and Research_lab). Edit the lists below to refresh.
 Checks that found no change are not recorded in the repo, so they are not drawn."""
 import os, sys
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
-INK="#1a1a2e"; GRAY="#5a6272"; GREEN="#2e7d32"; BLUE="#1d5fb8"; ORANGE="#d97800"; RED="#b23b3b"; PURPLE="#6a4fb3"
+from matplotlib.patches import Rectangle, Circle
+INK="#1a1a2e"; GRAY="#5a6272"; GREEN="#2e7d32"; BLUE="#1d5fb8"; PURPLE="#6a4fb3"; RED="#b23b3b"
 here=os.path.dirname(os.path.abspath(__file__))
-asof=sys.argv[1] if len(sys.argv)>1 else "15:40"
+asof=sys.argv[1] if len(sys.argv)>1 else "15:45"
 m=lambda s:int(s[:2])*60+int(s[3:])
 T0,T1=m("14:30"),m("16:00")
-W,H=1400,800; L,R=190,1370
-X=lambda t:L+(m(t) if isinstance(t,str) else t)*0+( (m(t) if isinstance(t,str) else t)-T0)*(R-L)/(T1-T0)
+W,H=800,905; L,R=120,775
+X=lambda t:L+((m(t) if isinstance(t,str) else t)-T0)*(R-L)/(T1-T0)
 fig=plt.figure(figsize=(W/100,H/100),dpi=100)
 ax=fig.add_axes([0,0,1,1]); ax.set_xlim(0,W); ax.set_ylim(H,0); ax.axis("off")
-ax.text(W/2,16,"Coordinator work timeline, 2026-11-04 (EET)",ha="center",va="top",fontsize=18,fontweight="bold",color=INK)
-ax.text(W/2,46,f"As of {asof} EET. Solid markers are recorded events (git commit times). Hatched is planned, not yet happened.",ha="center",va="top",fontsize=10.5,color=GRAY)
-lanes=[("Routine:\nchart updates",95,200,GREEN,"#f4faf4"),("Trigger:\nBuilder and review",205,325,BLUE,"#f3f7fd"),
-       ("Trigger:\nResearch and Eva",330,620,PURPLE,"#f7f4fc"),("Planned",625,695,GRAY,"#f7f7f7")]
+def T(x,y,s,size=10,color=INK,ha="left",va="top",**k): ax.text(x,y,s,fontsize=size,color=color,ha=ha,va=va,**k)
+T(W/2,12,"Coordinator work timeline, 2026-11-04 (EET)",17,INK,"center",fontweight="bold")
+T(W/2,40,f"As of {asof} EET. Solid markers are recorded commit times. Hatched is planned, not yet happened.",10,GRAY,"center")
+lanes=[("Chart\npublications",100,172,GREEN,"#f4faf4"),("Builder and\nreview",178,256,BLUE,"#f3f7fd"),("Research\nand Eva",264,392,PURPLE,"#f7f4fc"),("Planned",400,452,GRAY,"#f7f7f7")]
 for name,y0,y1,c,fc in lanes:
-    ax.add_patch(Rectangle((L-10,y0),R-L+20,y1-y0,fc=fc,ec=c,lw=1))
-    ax.text(L-20,(y0+y1)/2,name,ha="right",va="center",fontsize=11,fontweight="bold",color=c)
-# axis
-AY=720
+    ax.add_patch(Rectangle((L-8,y0),R-L+16,y1-y0,fc=fc,ec=c,lw=1))
+    T(L-14,(y0+y1)/2,name,10,c,"right","center",fontweight="bold")
+AY=462
 ax.plot([L,R],[AY,AY],color=INK,lw=1.2)
 for t in range(T0,T1+1,10):
-    x=X(t); big=(t%30==0)
-    ax.plot([x,x],[AY,AY+(8 if big else 4)],color=INK,lw=1)
-    if big: ax.text(x,AY+12,f"{t//60:02d}:{t%60:02d}",ha="center",va="top",fontsize=10,color=INK)
-    if big: ax.plot([x,x],[95,695],color="#d8d8e0",lw=0.6,zorder=0)
-ax.text((L+R)/2,AY+34,"Time of day, EET",ha="center",va="top",fontsize=10,color=GRAY)
-# frozen baseline and now
-for t,lab,c in [("14:40","baseline frozen 14:40",RED),(asof,"now "+asof,INK)]:
-    ax.plot([X(t),X(t)],[88,695],color=c,lw=1.3,ls="--",zorder=1)
-ax.text(X("14:40")+4,70,"baseline frozen 14:40",fontsize=9,color=RED,va="top")
-ax.text(X(asof)+4,70,"now "+asof,fontsize=9,color=INK,va="top",fontweight="bold")
-def pts(times,y,c,marker="o",s=42):
-    ax.scatter([X(t) for t in times],[y]*len(times),s=s,color=c,marker=marker,zorder=4,edgecolor="white",lw=0.8)
-def lab(t,y,dy,text,c,ha="left"):
-    x=X(t); ax.plot([x,x],[y,y+dy],color=c,lw=0.7,zorder=2)
-    ax.text(x+(3 if ha=="left" else -3),y+dy+(2 if dy>0 else -2),text,fontsize=8.6,color=INK,va="top" if dy>0 else "bottom",ha=ha)
-# lane 1
+    big=t%30==0; x=X(t)
+    ax.plot([x,x],[AY,AY+(7 if big else 4)],color=INK,lw=1)
+    if big:
+        T(x,AY+10,f"{t//60:02d}:{t%60:02d}",10,INK,"center"); ax.plot([x,x],[100,452],color="#d8d8e0",lw=0.6,zorder=0)
+T((L+R)/2,AY+30,"Time of day, EET",9.5,GRAY,"center")
+for t,c in [("14:40",RED),(asof,INK)]: ax.plot([X(t),X(t)],[92,452],color=c,lw=1.3,ls="--",zorder=1)
+T(X("14:40")+3,78,"baseline frozen 14:40",9,RED)
+T(X(asof)-3,78,"now "+asof,9,INK,"right",fontweight="bold")
+def dot(t,y,c): ax.scatter([X(t)],[y],s=34,color=c,zorder=4,edgecolor="white",lw=0.8)
+def num(t,y,n,c,diamond=False):
+    ax.add_patch(Circle((X(t),y),9,fc=c,ec="white",lw=1,zorder=4)); T(X(t),y,str(n),8.5,"white","center","center",fontweight="bold",zorder=5)
 upd=["14:40","14:45","14:50","15:01","15:05","15:06","15:17","15:21","15:23","15:25","15:27","15:29","15:32"]
-y=150; pts(upd,y,GREEN)
-for t,tx,dy in [("14:40","First Gantt and S-curve",-8),("14:50","Research plan evidence",-38),("15:06","WP7 credit reversed\n(changes-required)",-8),
-                ("15:21","Aliases, access label,\nthree-level team chart",-38),("15:32","Groq pool, provider badges",-8)]:
-    lab(t,y,dy,tx,GREEN)
-ax.text(L,185,"13 chart updates published. A check that finds no change is not recorded in the repo, so it is not drawn.",fontsize=8.8,color=GRAY,va="top",fontstyle="italic")
-# lane 2
-y=245
-ev2=[("14:49","Builder pushes fix 45cec13",-8),("15:02","Coordinator assigns next Builder task\n(reviewer-skip guard)",44),("15:04","Reviewer verdict:\nchanges required",-8),("15:06","Coordinator reverses WP7 credit",74)]
-pts([e[0] for e in ev2],y,BLUE)
-for t,tx,dy in ev2: lab(t,y,dy,tx,BLUE)
-# lane 3
-y=425
-ev3=[("14:42","Researcher: literature scan",-8),("14:52","Plan v3 (RW1-RW6)",42),("15:10","RW5 prior-art notes",-8),("15:11","RW4 liveness design",42),
-     ("15:24","Nora seat trial recorded",84),("15:26","Citation gate trial",126),("15:28","Eva role defined",-8)]
-pts([e[0] for e in ev3],y,PURPLE)
-for t,tx,dy in ev3: lab(t,y,dy,tx,PURPLE)
-ev3b=[("15:34","Eva review 1:\n1 unverified, 1 caveat missing",-55),("15:35","Nora correction note",70),("15:37","Researcher corrections",112),("15:37","Eva review 2: C5 and C14 verified,\nfirst loop closed",154)]
-for t,tx,dy in ev3b:
-    pts([t],y,PURPLE,marker="D"); lab(t,y,dy,tx,PURPLE,ha="right" if t=="15:34" else "left")
-ax.text(L,600,"Diamonds: the Eva and Nora review loop, 15:34 to 15:37. It is one closed loop, not a standing pass, and earns no milestone credit.",fontsize=8.8,color=GRAY,va="top",fontstyle="italic")
-# planned
-ax.add_patch(Rectangle((X("15:40"),645),X("15:46")-X("15:40"),22,fc="white",ec=GRAY,hatch="////",lw=1))
-ax.text(X("15:40")-10,656,"Next scheduled check, due about 15:40-15:46 (exact time not fixed).\nChecks then repeat about every 30 minutes while work is active.",fontsize=8.8,color=INK,va="center",ha="right")
-ax.text(L,672,"Trigger work has no schedule. It happens when a draft, review, test result, failure or blocker arrives.",fontsize=8.8,color=GRAY,va="top",fontstyle="italic")
+for t in upd: dot(t,119,GREEN)
+T(L,134,"13 chart publications, 14:40 to 15:32 (recorded commits only).\nThe repo does not show which, if any, came from a scheduled check.",8.6,GRAY,fontstyle="italic",wrap=False)
+B=[("14:49",0,"Builder pushes fix 45cec13"),("15:02",1,"Coordinator assigns next Builder task (reviewer-skip guard)"),
+   ("15:04",0,"Reviewer verdict: changes required"),("15:06",1,"Coordinator reverses WP7 credit (changes-required is not a pass)")]
+C=[("14:42",0,"Researcher: literature scan"),("14:52",0,"Researcher: plan v3 (RW1-RW6)"),("15:10",0,"Researcher: RW5 prior-art notes"),("15:11",1,"Researcher: RW4 liveness design"),
+   ("15:24",0,"Coordinator records Nora seat-model trial"),("15:26",1,"Coordinator records citation-gate trial"),("15:28",2,"Eva role defined (team-launcher branch)"),
+   ("15:34",0,"Eva review 1: one claim unverified, one caveat missing"),("15:35",1,"Nora correction note"),("15:37",2,"Researcher corrections"),
+   ("15:37",0,"Eva review 2: both verified, first loop closed")]
+key=[];n=0
+for t,r,txt in B: n+=1; num(t,200+r*28,n,BLUE); key.append((n,t,txt,BLUE))
+for t,r,txt in C: n+=1; num(t,286+r*28,n,PURPLE); key.append((n,t,txt,PURPLE))
+# planned: next scheduled check window starting at asof
+ax.add_patch(Rectangle((X(asof),414),X(m(asof)+6)-X(asof),22,fc="white",ec=GRAY,hatch="////",lw=1,zorder=3))
+T(X(asof)-8,425,"Next scheduled check: about every 30 minutes\nwhile work is active, exact time not fixed",9,INK,"right","center")
+# key
+KY=506
+T(L-70,KY-4,"Key (numbers on the timeline)",11,INK,fontweight="bold")
+for i,(k,t,txt,c) in enumerate(key):
+    y=KY+22+i*21
+    ax.add_patch(Circle((L-60,y+7),8,fc=c,ec="none")); T(L-60,y+7,str(k),8,"white","center","center",fontweight="bold")
+    T(L-44,y,f"{t}  {txt}",9.6,INK)
+T(L-70,KY+22+len(key)*21+10,"One closed Eva and Nora review loop is process evidence. It is not a standing pass and earns no milestone credit.",9,GRAY,fontstyle="italic")
+T(L-70,KY+22+len(key)*21+30,"Trigger work (lanes 2 and 3) has no schedule: it happens when a draft, review, test result or blocker arrives.",9,GRAY,fontstyle="italic")
 fig.savefig(os.path.join(here,"coordinator-timeline.png"),dpi=100); plt.close(fig)
