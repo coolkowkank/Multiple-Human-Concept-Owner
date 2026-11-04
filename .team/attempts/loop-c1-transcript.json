@@ -170,5 +170,15 @@
       },
       "service_tier": "on_demand"
     }
+  },
+  {
+    "tool_call": "git_commit",
+    "args": {
+      "message": "Fix documentation inaccuracies per independent review:\n- Clarify that the TURN: builder hook lives in local .git/hooks and is not part of the repo tree.\n- State that execution guards are runtime harness features, not repository files.\n- Correct the description of human oversight to occur after push via review loop.\n- Add explicit provenance note in commit messages.\n\nTURN: builder"
+    },
+    "result": {
+      "ok": true,
+      "head": "cc13b0f83bb96a3a2917860ff004d5862470e219"
+    }
   }
 ]
