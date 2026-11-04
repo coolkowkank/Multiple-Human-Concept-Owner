@@ -247,5 +247,25 @@
       "seconds": 46.2,
       "min_interval": 65.0
     }
+  },
+  {
+    "api_error": {
+      "kind": "api",
+      "status": "400",
+      "detail": {
+        "message": "Tool call validation failed: tool call validation failed: parameters for tool edit_file did not match schema: errors: [missing properties: 'old_string', 'new_string']",
+        "type": "invalid_request_error",
+        "code": "tool_use_failed",
+        "failed_generation": "{\"name\": \"edit_file\", \"arguments\": {\"path\":\"launcher/runtime.py\",\"line_start\":1,\"line_end\":200}}"
+      },
+      "rate_headers": {
+        "x-ratelimit-limit-requests": "1000",
+        "x-ratelimit-limit-tokens": "8000",
+        "x-ratelimit-remaining-requests": "999",
+        "x-ratelimit-remaining-tokens": "6163",
+        "x-ratelimit-reset-requests": "1m26.4s",
+        "x-ratelimit-reset-tokens": "13.777s"
+      }
+    }
   }
 ]
