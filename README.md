@@ -2,13 +2,13 @@
 
 ## Project progress
 
-*As of 2026-11-04 14:40 EET. Verified progress is **38.5%** of weighted scope. No autonomous end-to-end run has passed yet.*
+*As of 2026-11-04 14:40 EET. Weighted milestone progress is **38.5%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
 
 ![Gantt chart](docs/progress/gantt.png)
 
 ![Progress S-curve](docs/progress/s-curve.png)
 
-Only verified outcomes count as progress. The dashed lines are forecasts, not commitments, and no earlier plan existed to compare against. See [how progress is measured](docs/progress/README.md).
+Only milestones backed by passing tests or an independent review count. The dashed lines are forecasts, not commitments, and no earlier plan existed to compare against. See [how progress is measured](docs/progress/README.md).
 
 *Repository: `coolkowkank/Multiple-Human-Concept-Owner` - a reusable blueprint for human-led AI project teams: roles, coordination, handoffs, independent review, and project setup.*
 

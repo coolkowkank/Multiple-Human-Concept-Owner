@@ -16,7 +16,7 @@ P = d["packages"]; asof = D.fromisoformat(d["as_of"][:16])
 t = lambda s: D.fromisoformat(s[:16])
 CRED = {"verified": 1.0, "partial": 0.5}
 COL = {"verified": "#2e7d32", "partial": "#f9a825", "in_progress": "#1565c0", "not_started": "#9e9e9e"}
-LAB = {"verified": "Verified", "partial": "Partial (50%)", "in_progress": "In progress", "not_started": "Not started"}
+LAB = {"verified": "Milestone done", "partial": "Partial (50%)", "in_progress": "In progress", "not_started": "Not started"}
 plt.rcParams["svg.fonttype"] = "none"; plt.rcParams["font.family"] = "DejaVu Sans"
 x0, x1 = D(2026,11,3,12), D(2026,11,5,15)
 
@@ -62,7 +62,7 @@ rem.sort(); fx = [asof]; fy = [actual]
 for tm, w in rem:
     fx += [tm, tm]; fy += [c2, c2+w]; c2 += w
 fig, ax = plt.subplots(figsize=(9, 4.6))
-ax.plot(ax_, ay_, color=COL["verified"], lw=2.2, label=f"Actual verified progress: {actual:.1f}%")
+ax.plot(ax_, ay_, color=COL["verified"], lw=2.2, label=f"Actual weighted milestone progress, incl. partial credit: {actual:.1f}%")
 ax.plot(fx, fy, color="#555", lw=1.8, ls="--", label="Forecast baseline set "+asof.strftime("%b %d %H:%M")+" (a guess)")
 ax.axvline(md.date2num(asof), color="#c62828", lw=1.2); ax.scatter([asof],[actual], color="#c62828", zorder=5)
 ax.set_xlim(md.date2num(x0), md.date2num(x1)); ax.set_ylim(0, 105)
