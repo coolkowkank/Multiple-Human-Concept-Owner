@@ -1,9 +1,9 @@
 {
-  "turn": "builder",
-  "turn_seq": 5,
-  "turn_since": "2026-11-04T11:20:54Z",
+  "turn": "coordinator",
+  "turn_seq": 6,
+  "turn_since": "2026-11-04T11:21:25Z",
   "status": "running",
-  "status_line": "QC passed all ACs; requesting builder confirmation",
+  "status_line": "ACs verified; project complete.",
   "leases": {
     "coordinator": {
       "holder": "coordinator-32a14394",
@@ -11,7 +11,7 @@
     },
     "builder": {
       "holder": "builder-d21f29f3",
-      "claimed_at": 1793790784.7963538
+      "claimed_at": 1793791259.1997607
     },
     "qc": {
       "holder": "qc-56fb2c2f",
