@@ -22,7 +22,7 @@ No plan or schedule existed before 2026-11-04 14:40 EET, so there is no planned-
 
 ## Baseline and as-of time
 
- in progress.json is frozen at 2026-11-04 14:40 EET and must never be edited.  is the time of the latest update. The current forecast () can move; the red diamonds on the Gantt chart and the pink S-curve line keep the original dates visible.
+`baseline` in progress.json is frozen at 2026-11-04 14:40 EET and must never be edited. `as_of` is the time of the latest update. The current forecast (`forecast_end`) can move; the red diamonds on the Gantt chart and the pink S-curve line keep the original dates visible.
 
 ## Owners (PIC)
 
