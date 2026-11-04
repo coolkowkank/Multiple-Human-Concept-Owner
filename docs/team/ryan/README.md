@@ -4,6 +4,10 @@ Status: PAUSED after the first live attempt (see incident-1.md): one
 allocation request ended with an unknown outcome. No assignment exists and
 nothing is running. Earlier text below describes the design.
 
+Update 2026-11-04 20:23 EET: the one Verifier retry returned content at the 1536 ceiling
+that was not the required JSON (format pre-check failed). Not qualified, no
+verdicts, PAUSED again. See incident-1.md.
+
 Update 2026-11-04 20:19 EET: budgets are now per LINEAGE, not per queue id. A packet
 version (lineage field) cannot reset role caps, the 5-request question budget
 or the daily cycle count, and ENVELOPE_TOTAL=6 caps ALL reserves ever (3 used:

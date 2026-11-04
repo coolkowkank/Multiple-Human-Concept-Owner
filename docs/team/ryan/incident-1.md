@@ -43,3 +43,15 @@ route is NOT qualified for this job at these settings; the reason beyond
 'ceiling reached with empty content' is not established. Requests consumed in
 total: 3 of the first qualification envelope of 6 (3 remain). No retry,
 review or schedule ran.
+
+## Follow-up 2026-11-04 20:23 EET (Verifier retry, one attempt)
+
+Operator-controlled single retry on queue item research-model-vs-harness-v2
+(same 6-finding draft, packet v2 with Appendix F text), novita/ling-3.1-flash,
+max_tokens 1536, reasoning_effort none. Result: HTTP 200, cost 0, prompt 1915
+/ completion 1536 (the whole ceiling) / total 3451, 13.6 s, content 4763 bytes.
+The content is free-form working-out text and NOT the required JSON, so the
+mechanical format pre-check failed (no verdict JSON exists). The raw text is
+not published here (it reads as unstructured reasoning). It is unverified model
+output, not a verifier verdict. Run halted again. Requests consumed: 4 of the
+lifetime envelope of 6 (2 remain); the Verifier role cap of 2 is reached.

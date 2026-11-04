@@ -199,7 +199,8 @@
       "kind": "research",
       "status": "drafted",
       "attempts": {
-        "researcher": 1
+        "researcher": 1,
+        "verifier": 1
       },
       "question": "How much does model selection change task performance when the harness (prompts, tools, scaffolding) is held fixed, and which model-harness interactions matter? Keep published findings separate from anything tested on this project.",
       "packet": [
@@ -328,7 +329,8 @@
           "status": "SUPPORTED_BY_PACKET"
         }
       ],
-      "lineage": "research-model-vs-harness"
+      "lineage": "research-model-vs-harness",
+      "fb_verifier": "format: Expecting value: line 1 column 1 (char 0)"
     }
   ]
 }
