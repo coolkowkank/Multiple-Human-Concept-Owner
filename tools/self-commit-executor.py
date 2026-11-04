@@ -55,6 +55,7 @@ TASK = open(TASK_FILE).read()
 MODEL = os.environ.get("PROVIDER_MODEL", "openai/gpt-oss-120b")
 API_URL = os.environ.get("PROVIDER_API_URL", "https://api.groq.com/openai/v1/chat/completions")
 MAX_ROUNDS = int(os.environ.get("MAX_ROUNDS", "6"))
+MAX_NUDGES = int(os.environ.get("MAX_NUDGES", "2"))  # prose-only rounds tolerated before halt
 MAX_CALLS = int(os.environ.get("MAX_CALLS", "6"))  # coordinator passes the loop's REMAINING global budget; every attempted provider request counts, including failed/error responses; the executor never retries
 CALLS = {"n": 0}
 # Zero-price routes only (owner rule for the Requesty gemma batch): when
@@ -504,6 +505,7 @@ def main():
         raise SystemExit(f"RECORDS_DIR is not a git worktree: {RECORDS_DIR}")
     record({"system": SYSTEM, "user": TASK})
     messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": TASK}]
+    nudges = 0
     for rnd in range(MAX_ROUNDS):
         if PERSIST["halt"]:
             print("HALT: transcript persistence failed; refusing further API calls (fail-closed)")
@@ -514,8 +516,21 @@ def main():
         messages.append(msg)
         calls = msg.get("tool_calls") or []
         if not calls:
-            print(f"round {rnd+1}: model stopped without tool call: {(msg.get('content') or '')[:200]}")
-            return
+            # A prose-only round is not completion: nudge the model back to
+            # tool use, bounded so a chatty model cannot burn the budget.
+            nudges += 1
+            record({"no_tool_call": {"round": rnd + 1, "nudge": nudges,
+                                     "content": (msg.get("content") or "")[:300]}})
+            if nudges > MAX_NUDGES:
+                print(f"round {rnd+1}: model stopped without tool call after {MAX_NUDGES} nudges; halting")
+                return
+            print(f"round {rnd+1}: no tool call; nudging model to act ({nudges}/{MAX_NUDGES})")
+            messages.append({"role": "user", "content":
+                "You replied with text but no tool call. Take the next concrete "
+                "action NOW with a tool call (edit_file/write_file/git_commit/"
+                "git_push). Do not describe actions in prose."})
+            continue
+        nudges = 0
         for c in calls:
             if PERSIST["halt"]:
                 print("HALT: persistence failed; refusing further tool execution this round (fail-closed)")

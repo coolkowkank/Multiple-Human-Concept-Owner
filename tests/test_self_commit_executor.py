@@ -227,10 +227,31 @@ class ExecutorCase(unittest.TestCase):
         self.assertEqual(len(reqs), 2)
         self.assertTrue(any("budget_stop" in e for e in ns["transcript"] if isinstance(e, dict)))
 
+
+    # prose-only rounds are nudged back to tool use, not treated as done
+    def test_prose_round_nudged_not_fatal(self):
+        ns = self.load()
+        seq = [self.msg(content="let me think"),
+               self.msg(tool_calls=[self.tc("write_file", json.dumps({"path": "docs/x.md", "content": "hi"}))]),
+               self.msg(content="done"), self.msg(content="done"), self.msg(content="done")]
+        calls = []
+        ns["api"] = lambda m: calls.append(1) or seq.pop(0)
+        ns["main"]()
+        self.assertTrue(os.path.exists(os.path.join(self.repo, "docs", "x.md")))
+        self.assertTrue(any(isinstance(e, dict) and "no_tool_call" in e for e in ns["transcript"]))
+
+    def test_repeated_prose_halts_after_nudge_cap(self):
+        ns = self.load()
+        calls = []
+        ns["api"] = lambda m: calls.append(1) or self.msg(content="thinking out loud")
+        ns["main"]()
+        self.assertEqual(len(calls), 1 + ns["MAX_NUDGES"])
+
     # 5. malformed tool arguments: explicit error record, fed back, no crash
     def test_malformed_args_recorded(self):
         ns = self.load()
-        seq = [self.msg(tool_calls=[self.tc("write_file", "{not json")]), self.msg(content="ok")]
+        seq = [self.msg(tool_calls=[self.tc("write_file", "{not json")]),
+               self.msg(content="ok"), self.msg(content="ok"), self.msg(content="ok")]
         ns["api"] = lambda m: seq.pop(0)
         ns["main"]()
         errs = [e for e in ns["transcript"] if isinstance(e, dict) and e.get("args_error")]
@@ -478,7 +499,7 @@ class ExecutorCase(unittest.TestCase):
     def test_checkpoint_per_event_no_dup(self):
         ns = self.load()
         seq = [self.msg(tool_calls=[self.tc("write_file", json.dumps({"path": "docs/x.md", "content": "hi"}))]),
-               self.msg(content="done")]
+               self.msg(content="done"), self.msg(content="done"), self.msg(content="done")]
         ns["api"] = lambda m: seq.pop(0)
         ns["main"]()
         self.assertEqual(self.checkpoint_commits(), len(ns["transcript"]))
@@ -530,7 +551,7 @@ class ExecutorCase(unittest.TestCase):
         ns = self.load()
         big = "x" * 4000
         seq = [self.msg(tool_calls=[self.tc("write_file", json.dumps({"path": "docs/x.md", "content": big}), "c1")]),
-               self.msg(content="done")]
+               self.msg(content="done"), self.msg(content="done"), self.msg(content="done")]
         seen = []
         ns["api"] = lambda m: seen.append(m) or seq.pop(0)
         ns["main"]()
@@ -545,7 +566,7 @@ class ExecutorCase(unittest.TestCase):
     def test_failed_push_does_not_end_run(self):
         ns = self.load()
         seq = [self.msg(tool_calls=[self.tc("git_push", "{}", "c1")]),
-               self.msg(content="gave up")]
+               self.msg(content="gave up"), self.msg(content="gave up"), self.msg(content="gave up")]
         ns["api"] = lambda m: seq.pop(0)
         orig = ns["run_tool"]
         ns["run_tool"] = lambda n, a: ({"ok": False, "error": "push refused"} if n == "git_push" else orig(n, a))
