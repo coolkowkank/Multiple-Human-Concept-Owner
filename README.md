@@ -8,9 +8,24 @@
 
 ### Coordinator work timeline
 
-*As of 2026-11-04 15:44 EET. Time runs left to right. Solid markers are recorded commit times on `main` and `Research_lab`. The hatched box is planned, not yet happened. The chart publications lane lists recorded publications only: the repo does not show which came from a scheduled check, and a check that finds no change leaves no record. Numbered events in the Builder, review, Research and Eva lanes are keyed below the chart. They are trigger work, which has no schedule. See also [how the two kinds of work run](docs/progress/coordinator-work.png).*
+**[Open the interactive timeline](https://files.instinct.com/9ikwv5puwqvj-coordinator-work-timeline)** - time on the X-axis, pick a day, zoom, filter by kind of work, and click an event for its status and evidence links.
 
-![Coordinator work timeline](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/f329630e727ba939c2900084834beb885dbee438/docs/progress/coordinator-timeline.png)
+*Snapshot as of 2026-11-04 15:58 EET, not a live feed. Markers are recorded commit times on `main`, `Research_lab` and project branches. A check that finds no change leaves no record, so it is not drawn. The chart publications lane lists recorded publications only, not proof of scheduled checks. Triggered work has no schedule. Each day's picture is posted at the end of the day and kept in [the archive](docs/progress/archive/README.md). Data: [events.json](docs/progress/timeline/events.json).*
+
+### Legacy Members
+
+*As of 2026-11-04 15:58 EET. Full table with instance IDs, blueprints and rules: [registry](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/registry.md). `*` marks an instance with repo evidence of work. A vacant role has no active member.*
+
+| Role | Member | Status | Assignment | Model / provider | Blueprint | Parallels |
+| --- | --- | --- | --- | --- | --- | --- |
+| Coordinator | Telkomsel | active | coordination, assignments, acceptance | not project-configured | - | 1* |
+| Builder | Alex | active | reviewer-skip guard attempt | gpt-oss-120b, Groq free | [builder](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/builder.md) | 1* |
+| Independent reviewer | Bill | active | pinned-commit review | not project-configured | - | 1* |
+| Researcher | Nora | active | sourced findings on Research_lab | Nemotron-3 Ultra 550B, Requesty free | [researcher](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/researcher.md) | 1* |
+| Evidence verifier | Eva | active | citation and evidence review | Gemma 4 31B, Requesty free | [evidence-verifier](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/evidence-verifier.md) | 1* |
+| Team Resources | Maya | vacant | none until qualified | unassigned | [team-resources](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/team-resources.md) | - |
+| Coordinator Assistant | unassigned | vacant | none until assigned | unassigned | [coordinator-assistant](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/coordinator-assistant.md) | - |
+| Reference-project members (Bill-QC, joe-agent, Claude) | - | unknown | none here | - | leads only, see registry | - |
 
 ### Project progress
 
