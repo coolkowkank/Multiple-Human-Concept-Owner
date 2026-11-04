@@ -92,3 +92,19 @@ Proposed, not started: a real-model rehearsal (routes in
 docs/launcher.md), the staged fault-injection and days-long soak tests
 (method: MAS-FIRE and chaos-engineering sources in docs/references.md).
 No sustained unattended run has happened; nothing here claims one.
+
+## Self-commit executor (added 4 Nov 2026, branch team-launcher + live/groq-dev-3)
+
+- Fixture-tested offline (tests/test_self_commit_executor.py, no provider):
+  fail-closed capture at startup and mid-round, global call budget counted
+  before each request, malformed tool arguments recorded and fed back,
+  non-JSON HTTP error capture, exactly one checkpoint per event.
+- Live-verified once (4 Nov 2026): a model issued write/commit/push tool
+  calls that produced commit b993bd2 on live/groq-dev-3; transcript on the
+  branch. One success is not proof of reliability.
+- Known accounting gap: pre-fix runs (attempts 13-14) lost crashed-run
+  call records to a sandbox reset; only the 3 successful attempt-14 calls
+  are log-verified. Earlier totals are reconstruction, marked as such in
+  .team/ATTEMPTS.md.
+- Peer-reviewed: capture mechanics cleared in scoped static review;
+  MAX_CALLS enforcement not independently reproduced by the reviewer.
