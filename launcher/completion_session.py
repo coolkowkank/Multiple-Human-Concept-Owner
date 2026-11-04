@@ -27,7 +27,8 @@ class CompletionSession:
         return (list(self._evidence), dict(self._instances), self._pending)
 
     def restore(self, snapshot):
-        self._evidence, self._instances, self._pending = snapshot
+        rows, instances, pending = snapshot
+        self._evidence, self._instances, self._pending = list(rows), dict(instances), pending
 
     @staticmethod
     def _digest(data):
