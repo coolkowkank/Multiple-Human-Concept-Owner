@@ -45,6 +45,13 @@ def check_repo(repo):
             notes.append(f"status={state.get('status')} "
                          f"turn={state.get('turn')} "
                          f"seq={state.get('turn_seq')}")
+            # Closing validation: a closed cycle (turn null) must not
+            # still report an active status - no DONE marker otherwise.
+            if state.get("turn") is None and \
+                    state.get("status") not in (None, "forming", "done"):
+                problems.append(
+                    "STATE.json: turn is null but status is "
+                    f"{state.get('status')!r} - cycle not marked done")
         except json.JSONDecodeError as exc:
             problems.append(f"STATE.json is not valid JSON: {exc}")
 

@@ -489,6 +489,51 @@ class MockQueueTests(unittest.TestCase):
             a.consume()
 
 
+class AdapterConsumePlacementTests(unittest.TestCase):
+    def test_only_mock_has_consume(self):
+        from launcher.adapters import Adapter, CliAdapter, HttpAdapter, MockAdapter
+        self.assertNotIn("consume", Adapter.__dict__)
+        self.assertIsNone(getattr(CliAdapter(["true"]), "consume", None))
+        self.assertIsNone(
+            getattr(HttpAdapter("http://x", "m", "K"), "consume", None))
+        self.assertTrue(hasattr(MockAdapter([]), "consume"))
+
+
+class InitGuardTests(unittest.TestCase):
+    def test_init_message_passes_existing_hook(self):
+        # init in a repo whose hook is already installed (re-init path):
+        # the layout commit must carry an operational prefix.
+        repo, bus = make_repo(seats={"builder": seat_spec([], ["src/"])})
+        self.addCleanup(shutil.rmtree, repo, True)
+        from launcher.guards import check_commit
+        self.assertEqual(
+            check_commit(repo, "operator: init coordination layout",
+                         [".team/STATE.json"]), [])
+
+
+class ClosingValidationTests(unittest.TestCase):
+    def _repo_with_state(self, turn, status):
+        repo, bus = make_repo(seats={"builder": seat_spec([], ["src/"])})
+        self.addCleanup(shutil.rmtree, repo, True)
+        state = bus.state()
+        state["turn"] = turn
+        state["status"] = status
+        bus.write_state(state)
+        bus.commit_all("operator: state for close check")
+        return repo
+
+    def test_null_turn_active_status_flagged(self):
+        from launcher.conformance import check_repo
+        problems, _ = check_repo(self._repo_with_state(None, "active"))
+        self.assertTrue(any("cycle not marked done" in p for p in problems))
+
+    def test_null_turn_done_status_clean(self):
+        from launcher.conformance import check_repo
+        problems, _ = check_repo(self._repo_with_state(None, "done"))
+        self.assertFalse(any("cycle not marked done" in p for p in problems),
+                         problems)
+
+
 class FalseGreenTests(unittest.TestCase):
     def test_claimed_green_cannot_override_recorded_exit_code(self):
         # Builder's prose claims green; the runtime records the true

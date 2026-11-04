@@ -76,7 +76,7 @@ class Bus:
             if not os.path.exists(full):
                 with open(full, "w") as fh:
                     fh.write(content)
-        self.commit_all("team: init coordination layout")
+        self.commit_all("operator: init coordination layout")
 
     # -- git transport ---------------------------------------------------
 

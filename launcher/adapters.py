@@ -28,23 +28,6 @@ class AdapterError(Exception):
 
 
 class Adapter:
-    def consume(self):
-        """Remove the peeked line after the turn was applied. Called by
-        the runtime inside the same transact mutation, so a reset after
-        a lost race also restores the queue. Raises if the file changed
-        between peek and consume (record would be incoherent)."""
-        if not self.script_path or self._peeked is None:
-            return
-        with open(self.script_path) as fh:
-            lines = [l for l in fh.read().splitlines() if l.strip()]
-        if not lines or lines[0] != self._peeked:
-            raise AdapterError(
-                f"mock script queue at {self.script_path} changed "
-                "between peek and consume")
-        with open(self.script_path, "w") as fh:
-            fh.write("\n".join(lines[1:]) + ("\n" if len(lines) > 1 else ""))
-        self._peeked = None
-
     def complete(self, system, prompt):
         raise NotImplementedError
 
@@ -61,12 +44,6 @@ class MockAdapter(Adapter):
     double-consumed, and separate `seat --once` processes consume
     successive prepared responses instead of restarting at script[0]."""
 
-    def __init__(self, script, script_path=None):
-        self.script = script
-        self.script_path = script_path
-        self.calls = []
-        self._peeked = None
-
     def consume(self):
         """Remove the peeked line after the turn was applied. Called by
         the runtime inside the same transact mutation, so a reset after
@@ -82,6 +59,13 @@ class MockAdapter(Adapter):
                 "between peek and consume")
         with open(self.script_path, "w") as fh:
             fh.write("\n".join(lines[1:]) + ("\n" if len(lines) > 1 else ""))
+        self._peeked = None
+
+
+    def __init__(self, script, script_path=None):
+        self.script = script
+        self.script_path = script_path
+        self.calls = []
         self._peeked = None
 
     def complete(self, system, prompt):
@@ -113,23 +97,6 @@ class CliAdapter(Adapter):
         self.command = command
         self.timeout = timeout
 
-    def consume(self):
-        """Remove the peeked line after the turn was applied. Called by
-        the runtime inside the same transact mutation, so a reset after
-        a lost race also restores the queue. Raises if the file changed
-        between peek and consume (record would be incoherent)."""
-        if not self.script_path or self._peeked is None:
-            return
-        with open(self.script_path) as fh:
-            lines = [l for l in fh.read().splitlines() if l.strip()]
-        if not lines or lines[0] != self._peeked:
-            raise AdapterError(
-                f"mock script queue at {self.script_path} changed "
-                "between peek and consume")
-        with open(self.script_path, "w") as fh:
-            fh.write("\n".join(lines[1:]) + ("\n" if len(lines) > 1 else ""))
-        self._peeked = None
-
     def complete(self, system, prompt):
         import tempfile
         with tempfile.NamedTemporaryFile(
@@ -157,23 +124,6 @@ class HttpAdapter(Adapter):
         self.model = model
         self.api_key_env = api_key_env
         self.timeout = timeout
-
-    def consume(self):
-        """Remove the peeked line after the turn was applied. Called by
-        the runtime inside the same transact mutation, so a reset after
-        a lost race also restores the queue. Raises if the file changed
-        between peek and consume (record would be incoherent)."""
-        if not self.script_path or self._peeked is None:
-            return
-        with open(self.script_path) as fh:
-            lines = [l for l in fh.read().splitlines() if l.strip()]
-        if not lines or lines[0] != self._peeked:
-            raise AdapterError(
-                f"mock script queue at {self.script_path} changed "
-                "between peek and consume")
-        with open(self.script_path, "w") as fh:
-            fh.write("\n".join(lines[1:]) + ("\n" if len(lines) > 1 else ""))
-        self._peeked = None
 
     def complete(self, system, prompt):
         key = os.environ.get(self.api_key_env)
