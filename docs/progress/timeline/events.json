@@ -1,4 +1,5 @@
 {
+ "asOf": "2026-11-04T16:50",
  "timezone": "Europe/Helsinki",
  "note": "Recorded events use commit times. Planned items are not events. A check that finds no change leaves no record.",
  "events": [
@@ -174,20 +175,6 @@
    ]
   },
   {
-   "id": "pub-70cf09f",
-   "day": "2026-11-04",
-   "time": "14:55",
-   "kind": "publication",
-   "title": "docs/progress: Project Team chart",
-   "status": "Published on main. Recorded commit time.",
-   "evidence": [
-    {
-     "label": "Commit 70cf09f",
-     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/70cf09f"
-    }
-   ]
-  },
-  {
    "id": "pub-e595560",
    "day": "2026-11-04",
    "time": "14:55",
@@ -198,6 +185,20 @@
     {
      "label": "Commit e595560",
      "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/e595560"
+    }
+   ]
+  },
+  {
+   "id": "pub-70cf09f",
+   "day": "2026-11-04",
+   "time": "14:55",
+   "kind": "publication",
+   "title": "docs/progress: Project Team chart",
+   "status": "Published on main. Recorded commit time.",
+   "evidence": [
+    {
+     "label": "Commit 70cf09f",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/70cf09f"
     }
    ]
   },
@@ -245,13 +246,12 @@
    ]
   },
   {
-   "id": "trg-a75ce06",
+   "id": "pub-a75ce06",
    "day": "2026-11-04",
    "time": "15:04",
-   "kind": "trigger",
-   "lane": "Builder and review",
-   "title": "Reviewer verdict: changes required",
-   "status": "Verdict recorded in this update commit. The verdict's own timestamp is not recorded, so this is the commit time.",
+   "kind": "publication",
+   "title": "docs/progress: 15:05 update, review verdict returned (changes-required), WP7 criterion",
+   "status": "Published on main. Recorded commit time.",
    "evidence": [
     {
      "label": "Commit a75ce06",
@@ -260,12 +260,13 @@
    ]
   },
   {
-   "id": "pub-a75ce06",
+   "id": "trg-a75ce06",
    "day": "2026-11-04",
    "time": "15:04",
-   "kind": "publication",
-   "title": "docs/progress: 15:05 update, review verdict returned (changes-required), WP7 criterion",
-   "status": "Published on main. Recorded commit time.",
+   "kind": "trigger",
+   "lane": "Builder and review",
+   "title": "Reviewer verdict: changes required",
+   "status": "Verdict recorded in this update commit. The verdict's own timestamp is not recorded, so this is the commit time.",
    "evidence": [
     {
      "label": "Commit a75ce06",
@@ -288,13 +289,12 @@
    ]
   },
   {
-   "id": "trg-fb34fc9",
+   "id": "pub-fb34fc9",
    "day": "2026-11-04",
    "time": "15:07",
-   "kind": "trigger",
-   "lane": "Builder and review",
-   "title": "Coordinator reverses WP7 credit",
-   "status": "Changes-required is not a pass, so the credit was removed. The Verified criterion was not changed.",
+   "kind": "publication",
+   "title": "README progress: 15:06 update - WP7 credit reversed (changes-required is not a pass), review findings wording,",
+   "status": "Published on main. Recorded commit time.",
    "evidence": [
     {
      "label": "Commit fb34fc9",
@@ -303,12 +303,13 @@
    ]
   },
   {
-   "id": "pub-fb34fc9",
+   "id": "trg-fb34fc9",
    "day": "2026-11-04",
    "time": "15:07",
-   "kind": "publication",
-   "title": "README progress: 15:06 update - WP7 credit reversed (changes-required is not a pass), review findings wording,",
-   "status": "Published on main. Recorded commit time.",
+   "kind": "trigger",
+   "lane": "Builder and review",
+   "title": "Coordinator reverses WP7 credit",
+   "status": "Changes-required is not a pass, so the credit was removed. The Verified criterion was not changed.",
    "evidence": [
     {
      "label": "Commit fb34fc9",
@@ -688,6 +689,20 @@
    ]
   },
   {
+   "id": "pub-b526241",
+   "day": "2026-11-04",
+   "time": "15:59",
+   "kind": "publication",
+   "title": "Timeline: interactive link, events data, Legacy Members table, day-end archive rule",
+   "status": "Published on main. Recorded commit time.",
+   "evidence": [
+    {
+     "label": "Commit b526241",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/b526241"
+    }
+   ]
+  },
+  {
    "id": "trg-f0cb55f",
    "day": "2026-11-04",
    "time": "16:08",
@@ -761,7 +776,81 @@
      "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/09db68b"
     }
    ]
+  },
+  {
+   "id": "trg-4a95bf5",
+   "day": "2026-11-04",
+   "time": "16:30",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Executor hardening v3 pinned for review",
+   "status": "Offline only, not rolled out. The independent recheck found remaining bypasses and ledger gaps: partial remediation, no pass.",
+   "evidence": [
+    {
+     "label": "Commit 4a95bf5",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/4a95bf5"
+    }
+   ]
+  },
+  {
+   "id": "trg-6a0f59a",
+   "day": "2026-11-04",
+   "time": "16:37",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Harness review status recorded",
+   "status": "Project record of the v1, v2 and v3 verdicts. No rollout. Green offline unit counts earn no completion credit.",
+   "evidence": [
+    {
+     "label": "Commit 6a0f59a",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/6a0f59a"
+    }
+   ]
+  },
+  {
+   "id": "trg-2024e2d",
+   "day": "2026-11-04",
+   "time": "16:39",
+   "kind": "trigger",
+   "lane": "Builder and review",
+   "title": "F3 roster finding published",
+   "status": "Supervisor reissue of the coordinator has no roster check, so a custom roster can stall. Finding only, not fixed. F1 and F2 are still undelivered.",
+   "evidence": [
+    {
+     "label": "Commit 2024e2d",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/2024e2d"
+    }
+   ]
+  },
+  {
+   "id": "trg-9115552",
+   "day": "2026-11-04",
+   "time": "16:43",
+   "kind": "trigger",
+   "lane": "Research and Eva",
+   "title": "Researcher: stall-rule replay E4 v2",
+   "status": "Offline replay. Timezone false-stalls confirmed; the two candidate rules are not told apart (N=1). Hypothesis level.",
+   "evidence": [
+    {
+     "label": "Commit 9115552",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/9115552"
+    }
+   ]
+  },
+  {
+   "id": "trg-aacfe44",
+   "day": "2026-11-04",
+   "time": "16:48",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Durable ledger module and tests",
+   "status": "Offline, not integrated into the executor. Not reviewed, no credit.",
+   "evidence": [
+    {
+     "label": "Commit aacfe44",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/aacfe44"
+    }
+   ]
   }
- ],
- "asOf": "2026-11-04T16:23"
+ ]
 }

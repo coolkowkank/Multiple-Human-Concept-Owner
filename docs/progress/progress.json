@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04T15:44:00+02:00",
+ "as_of": "2026-11-04T16:50:00+02:00",
  "timezone": "EET (UTC+2), same as commit timestamps",
  "rules": "Weighted milestone progress, not independently verified completion. Milestone done = 100% of weight (tests pass or an independent review passed). Partial = 50%. In progress / not started = 0%. Weights are judgment calls. Commits alone never count.",
  "packages": [
@@ -73,7 +73,7 @@
    "status": "partial",
    "start": "2026-11-04T13:24",
    "forecast_end": "2026-11-04T21:00",
-   "evidence": "Builder head 45cec13 pushed (base 625de3f). Independent review returned changes-required. F1, F2 and F4 are real test/counter follow-ups (escalation test never exercises escalation, counter reset, dead test injection); F3 (roster invariant) is still to verify. A routing concern was retracted as an ambiguity and the logged supervisor recovery is proposal-specified, so no violation is recorded. Reviewer reproduced 164/164 and 5/5 and verified the UTC fix. Correction queued. Partial: full credit needs an accepting review. Forecast time is a tentative estimate, not a commitment",
+   "evidence": "Builder head 45cec13 pushed (base 625de3f). Independent review returned changes-required. F1, F2 and F4 are real test/counter follow-ups and are not delivered (a correction attempt was discarded). F3 (roster invariant) is now a published finding on live/builder-deadlock-fix (2024e2d, 16:39): a supervisor reissue of the coordinator has no roster check, and custom rosters do not guarantee a coordinator seat, so the run can still stall. Not fixed. Reviewer reproduced 164/164 and 5/5 and verified the UTC fix. Partial: full credit needs an accepting review. Forecast time is a tentative estimate, not a commitment",
    "pic": [
     "coolkowkank-bot"
    ],
@@ -121,7 +121,7 @@
    "end": "2026-11-04T14:44",
    "credit_at": "2026-11-04T14:44",
    "forecast_end": "2026-11-04T20:00",
-   "evidence": "Note b42f670 plus research plan v3 and REFERENCES published (76351f3, per execution report). Spot check: 3 of 3 arXiv links resolve with matching titles; F1 numbers match the paper abstract. The Researcher later labelled the F2 figures as abstract-only. Partial until F2 and F3 are checked. Since then two more docs-only notes on Research_lab: 947a498 (RW5 prior art) and ad93523 (RW4 liveness design), both read from partial sources and labelled hypotheses. Researcher commits now use role author and owner committer. No credit change",
+   "evidence": "Note b42f670 plus research plan v3 and REFERENCES published (76351f3, per execution report). Spot check: 3 of 3 arXiv links resolve with matching titles; F1 numbers match the paper abstract. The Researcher later labelled the F2 figures as abstract-only. Partial until F2 and F3 are checked. Since then two more docs-only notes on Research_lab: 947a498 (RW5 prior art) and ad93523 (RW4 liveness design), both read from partial sources and labelled hypotheses. Researcher commits now use role author and owner committer. No credit change. Latest on Research_lab: 9115552 (16:43) E4 v2 offline stall-rule replay: timezone false-stalls confirmed, the two candidate rules are not told apart (N=1). Hypothesis-level, no credit change",
    "pic": [
     "researcher"
    ],
@@ -148,7 +148,7 @@
    "status": "in_progress",
    "start": "2026-11-04T14:33",
    "forecast_end": "2026-11-04T20:00",
-   "evidence": "Delta-only handoff rule adopted; token savings not yet measured",
+   "evidence": "Delta-only handoff rule adopted. One run (batch 7) logged 11037 prompt + 570 completion = 11607 tokens: composition only, not proof of savings or of redundant context. Savings not yet measured",
    "pic": [
     "instinct-telkomsel"
    ],
@@ -162,7 +162,7 @@
    "status": "not_started",
    "start": "2026-11-04T19:00",
    "forecast_end": "2026-11-05T12:00",
-   "evidence": "No autonomous PASS yet. Reviewer-skip guard still open. Also re-proves WP4 cleanly",
+   "evidence": "No autonomous PASS yet. Reviewer-skip guard still unbuilt: batch 7 closed failed (35b0a3c). Independent review of executor hardening v3 (4a95bf5) found remaining destructive-edit bypasses and ledger durability gaps (status record 6a0f59a); a durable-ledger module (aacfe44, offline, not integrated) is the next step. Also re-proves WP4 cleanly",
    "pic": [
     "instinct-telkomsel"
    ],

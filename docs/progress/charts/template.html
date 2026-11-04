@@ -64,7 +64,7 @@ P.forEach((p,i)=>{const y=40+i*36,gr=el('g',{'class':'row',tabindex:0,role:'butt
  let k=0;(p.pic||[]).forEach(id=>{if(people[id]){const im=el('image',{href:'../'+people[id].icon,x:W-RW+(M?4:8),y:y-1,width:26,height:26});gr.appendChild(im)}});
  (M?[]:(p.contributors||[])).forEach((id,j)=>{if(people[id])gr.appendChild(el('image',{href:'../'+people[id].icon,x:W-RW+40+j*18,y:y+5,width:16,height:16}))});
  gr.onclick=()=>pick(p,gr);gr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick(p,gr)}};g.appendChild(gr)});
-g.appendChild(el('line',{x1:X(asof),x2:X(asof),y1:30,y2:H-24,stroke:'#c62828','stroke-width':1.5}));g.appendChild(el('text',{x:X(asof)+4,y:26,'class':'tick',fill:'#c62828'},'now '+hhmm(D.as_of)));
+g.appendChild(el('line',{x1:X(asof),x2:X(asof),y1:30,y2:H-24,stroke:'#c62828','stroke-width':1.5}));g.appendChild(el('text',{x:X(asof)+4,y:26,'class':'tick',fill:'#c62828'},'as of '+hhmm(D.as_of)));
 g.appendChild(el('text',{x:W-RW+8,y:26,'class':'tick'},M?'Own':'Owner + team'));
 function pick(p,gr){document.querySelectorAll('.row.sel').forEach(r=>r.classList.remove('sel'));gr.classList.add('sel');const d=$('detail');d.textContent='';
  const a=document.createElement('p');a.className='t';a.textContent=p.id+'  '+p.name;d.appendChild(a);

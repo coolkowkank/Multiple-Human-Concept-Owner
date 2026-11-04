@@ -47,6 +47,11 @@ trig("83e33bc","16:15","Registry label correction","Removed an unsupported claim
 trig("4d5453f","16:20","Registry: Builder assignment updated","Builder row now says the guard is unbuilt and held pending review of the tooling.",lane=TD)
 trig("35b0a3c","16:20","Guard batch closed: failed, guard unbuilt","6 of 8 reserved requests, 4 real sends, no commit or push, remote unchanged at 55e7c7e. A destructive placeholder edit was discarded, then an invalid edit request ended the run. No restart. Replaces the earlier running status of the guard attempt (15:53).")
 trig("09db68b","16:21","Fresh-operator dry-run documented","Offline commands only, no provider calls. Support-authored, not an independent takeover and not an autonomy pass.",lane=TD)
+trig("4a95bf5","16:30","Executor hardening v3 pinned for review","Offline only, not rolled out. The independent recheck found remaining bypasses and ledger gaps: partial remediation, no pass.",lane=TD)
+trig("6a0f59a","16:37","Harness review status recorded","Project record of the v1, v2 and v3 verdicts. No rollout. Green offline unit counts earn no completion credit.",lane=TD)
+trig("2024e2d","16:39","F3 roster finding published","Supervisor reissue of the coordinator has no roster check, so a custom roster can stall. Finding only, not fixed. F1 and F2 are still undelivered.")
+trig("9115552","16:43","Researcher: stall-rule replay E4 v2","Offline replay. Timezone false-stalls confirmed; the two candidate rules are not told apart (N=1). Hypothesis level.",lane=R)
+trig("aacfe44","16:48","Durable ledger module and tests","Offline, not integrated into the executor. Not reviewed, no credit.",lane=TD)
 OVERRIDE={"trg-91e928d":"Closed failed (batch closeout 16:20): no commit or push, remote unchanged, guard unbuilt. Earlier status 'running' is superseded."}
 ev=[old.get(e["id"],e) for e in ev]
 for k,v in old.items():
@@ -54,5 +59,5 @@ for k,v in old.items():
 for e in ev:
     if e["id"] in OVERRIDE: e["status"]=OVERRIDE[e["id"]]
 ev.sort(key=lambda e:(e["day"],e["time"]))
-json.dump(dict(timezone="Europe/Helsinki",note="Recorded events use commit times. Planned items are not events. A check that finds no change leaves no record.",events=ev),open(out,"w"),indent=1)
+json.dump(dict(asOf="2026-11-04T16:50",timezone="Europe/Helsinki",note="Recorded events use commit times. Planned items are not events. A check that finds no change leaves no record.",events=ev),open(out,"w"),indent=1)
 print(len(ev),"events")
