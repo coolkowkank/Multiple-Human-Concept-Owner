@@ -146,5 +146,17 @@
       },
       "service_tier": "on_demand"
     }
+  },
+  {
+    "tool_call": "edit_file",
+    "args": {
+      "new_string": "# placeholder",
+      "old_string": "if response.get(\"status_line\", \"\").startswith(\"DONE\"):",
+      "path": "launcher/runtime.py"
+    },
+    "result": {
+      "ok": false,
+      "error": "old_string not found (exact byte match required); no change made"
+    }
   }
 ]
