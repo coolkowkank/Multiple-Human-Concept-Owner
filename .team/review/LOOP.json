@@ -1,9 +1,10 @@
 {
-  "state": "FIX_COMMITTED",
+  "state": "VERIFIED",
   "cycle": 1,
   "pinned_sha": "cc13b0f83bb96a3a2917860ff004d5862470e219",
   "feedback_sha": "d384a1b6307ae22fca3dbbfe1b5207f682d85065",
   "api_budget_total": 6,
   "api_used": 5,
-  "notes": "cycle 1 fix: model addressed F1-F4 in docs/self-commit-protocol.md via own tool calls; 5/6 budget used, 1 remaining"
+  "notes": "TERMINAL: peer VERIFIED cycle-1 fix cc13b0f scoped to F1-F4 documentation findings. Final: 5/6 provider requests used, 1 cycle. Scoped doc verdict, not an overall project/harness pass.",
+  "result_sha": "445161152e037f1819d1eeb80158e0e1c5b1d4b5"
 }
