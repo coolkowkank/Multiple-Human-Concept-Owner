@@ -12,7 +12,7 @@ Charts at the top of the main README come from `progress.json` and `render_progr
 
 ## WP5 and WP7 criteria
 
-WP7 criterion: done when an independent reviewer returns a written verdict on a pinned commit with the tests reproduced. The verdict can be changes-required. Acceptance of the fix is tracked by WP5, which gets full credit only when a review accepts it.
+WP7 criterion: the rule frozen at 14:40 on 2026-11-04 applies unchanged. A package is verified only with passing tests or an independent review that passed. A delivered changes-required review is not a pass, so WP7 earns no credit until a review accepts the corrected fix. (An earlier update on 15:05 counted WP7 under a looser reading. That was reversed in the following update, because criteria are not changed after the outcome is seen.)
 
 ## Research package criteria
 
