@@ -9,9 +9,9 @@
 
 ### Current Project Team
 
-*Latest update: 2026-11-04 16:26 EET. [Static full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/team/) (GitHub Pages, selectable text, responsive cards; the picture below is the fallback). Active members and vacant roles are shown separately; "not project-configured" means no documented model or provider.*
+*Latest update: 2026-11-04 17:30 EET. [Static full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/team/) (GitHub Pages, selectable text, responsive cards; the picture below is the fallback). No role is currently vacant; Ryan has no qualified backup route yet, so replacement proposals go to the Coordinator; "not project-configured" means no documented model or provider.*
 
-![Current Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/543d4ccc8d6895baf920756264aef87e462b6a94/docs/progress/team.png)
+![Current Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/c7d1b9bc54b8a173d4a322bc7f9602a03230ad26/docs/progress/team.png)
 
 ### Coordinator work timeline
 
@@ -21,7 +21,7 @@
 
 ### Legacy Members
 
-*As of 2026-11-04 15:58 EET. [Scrollable full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/legacy-members/) (sideways and down, header and first column stay put). Full table with instance IDs, blueprints and rules: [registry](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/registry.md). `*` marks an instance with repo evidence of work. A vacant role has no active member.*
+*As of 2026-11-04 17:30 EET. [Scrollable full view](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/legacy-members/) (sideways and down, header and first column stay put). Full table with instance IDs, blueprints and rules: [registry](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/registry.md). `*` marks an instance with repo evidence of work. Backup coverage for model failures is a known gap.*
 
 | Role | Member | Status | Assignment | Model / provider | Blueprint | Parallels |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -30,17 +30,17 @@
 | Independent reviewer | Bill | active | pinned-commit review | not project-configured | - | 1* |
 | Researcher | Nora | active | sourced findings on Research_lab | Nemotron-3 Ultra 550B, Requesty free | [researcher](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/researcher.md) | 1* |
 | Evidence verifier | Eva | active | citation and evidence review | Gemma 4 31B, Requesty free | [evidence-verifier](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/evidence-verifier.md) | 1* |
-| Team Resources | Maya | vacant | none until qualified | unassigned | [team-resources](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/team-resources.md) | - |
-| Coordinator Assistant | unassigned | vacant | none until assigned | unassigned | [coordinator-assistant](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/coordinator-assistant.md) | - |
+| Team Resources | Ryan | active | model route checks, replacement proposals (free resources only) | not project-configured | [team-resources](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/team-resources.md) | 1* |
+| Coordinator Assistant | Gemma (status drafts) | active | status drafts only, every draft reviewed, publication separate | google/gemma-4-31b-it, Requesty free | [coordinator-assistant](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/team-launcher/docs/team/blueprints/coordinator-assistant.md) | 1* |
 | Reference-project members (Bill-QC, joe-agent, Claude) | - | unknown | none here | - | leads only, see registry | - |
 
 ### Project progress
 
-*As of 2026-11-04 16:50 EET. Weighted milestone progress is **47.5%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
+*As of 2026-11-04 17:30 EET. Weighted milestone progress is **61.0%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
 
-![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/b26abba5d36b1b72f85489a1fe4f240d0153e2cd/docs/progress/gantt.png)
+![Gantt chart](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/c7d1b9bc54b8a173d4a322bc7f9602a03230ad26/docs/progress/gantt.png)
 
-![Progress S-curve](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/b26abba5d36b1b72f85489a1fe4f240d0153e2cd/docs/progress/s-curve.png)
+![Progress S-curve](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/c7d1b9bc54b8a173d4a322bc7f9602a03230ad26/docs/progress/s-curve.png)
 
 **[Open the Gantt chart and S-curve as a page](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/progress/charts/)** (click a row for status and evidence). The page and these pictures change only when the project evidence changes; a check that finds nothing new leaves them as they are.
 
