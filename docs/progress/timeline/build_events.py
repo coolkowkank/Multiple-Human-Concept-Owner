@@ -62,6 +62,9 @@ trig("76a1554","17:30","Escalation-latch delta: changes required","Operator-auth
 trig("9e55d20","17:33","Team Resources: freshness and cap rules","Offline tooling, 15 stdlib tests. A price listing must be recent and sourced. A dated success is not proof of current quota. An unclear 429 cools down the route only. Status-draft backup qualified (narrow); code and research backup are still gaps.",lane=TD)
 trig("328cec7","17:34","Researcher: RW3 token baseline and RW1 validator spec","Offline analysis, no model instance. Composition of tokens in one recorded run (N=1), no savings claim. RW1 is a design only. Both pending Eva review, no adoption.",lane=R)
 trig("6dd99bd","17:40","Escalation-latch revision: changes required again","Incident-keyed latch from the accepted base, 174 offline tests reported by the author. The independent retest (17:47) asked for changes: a failed gate commit could lose a crashed seat on retry, and a read error in the gate report could crash the run loop. A new revision is being prepared. Not accepted, not merged.")
+trig("bbb310d","18:12","WP8a corrected source publication","Independent full-PDF checks passed; corrected F2/F3 scan and REFERENCES published. Frozen citation/number/class/limits criterion accepted at 18:13. Prior partial and lateness history retained; not Eva-model authorship, no WP8b or autonomy credit.",lane=R)
+trig("63de5d0","18:12","WP4/WP9 execution transferred","Recovery Executor operator role assigned, no project model configured. Historical Coordinator outputs retain attribution; acceptance gaps unchanged.",lane=TD)
+trig("561f2e5","18:10","Latch v5 published; narrow offline review accepted at 18:14","Operator-authored lifecycle delta. Independent 36-case review and adversarial probes accepted. 203-case full suite developer-reported. Not remote delivery, live concurrency or autonomy certification.")
 OVERRIDE={"trg-2024e2d":"Finding published 16:39. Addressed by candidate 26ff4bc (17:19), which an independent review accepted. Earlier text superseded: the stall was an escalation gap, fixed offline.","trg-91e928d":"Closed failed (batch closeout 16:20): no commit or push, remote unchanged, guard unbuilt. Earlier status 'running' is superseded."}
 ev=[old.get(e["id"],e) for e in ev]
 for k,v in old.items():
@@ -69,5 +72,5 @@ for k,v in old.items():
 for e in ev:
     if e["id"] in OVERRIDE: e["status"]=OVERRIDE[e["id"]]
 ev.sort(key=lambda e:(e["day"],e["time"]))
-json.dump(dict(asOf="2026-11-04T17:50",timezone="Europe/Helsinki",note="Recorded events use commit times. Planned items are not events. A check that finds no change leaves no record.",events=ev),open(out,"w"),indent=1)
+json.dump(dict(asOf="2026-11-04T18:16",timezone="Europe/Helsinki",note="Recorded events use commit times. Planned items are not events. A check that finds no change leaves no record.",events=ev),open(out,"w"),indent=1)
 print(len(ev),"events")

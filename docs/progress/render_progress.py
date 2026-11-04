@@ -65,7 +65,7 @@ fig.text(0.02, 0.165, d.get("pic_note",""), fontsize=7, color="#555")
 fig.savefig(os.path.join(here, "gantt.svg")); fig.savefig(os.path.join(here, "gantt.png"), dpi=130); plt.close(fig)
 
 # S-curve
-ev = sorted((t(p["credit_at"]), p["weight"]*CRED[p["status"]]) for p in P if p["status"] in CRED)
+ev = sorted((t(e["at"]), e["credit"]) for p in P if p["status"] in CRED for e in p.get("credit_history", [{"at":p["credit_at"],"credit":p["weight"]*CRED[p["status"]]}]))
 ax_, ay_ = [x0], [0]; c = 0
 for tm, w in ev:
     ax_ += [tm, tm]; ay_ += [c, c+w]; c += w

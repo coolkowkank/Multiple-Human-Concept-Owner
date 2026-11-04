@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04T18:08:00+02:00",
+ "as_of": "2026-11-04T18:16:09+02:00",
  "timezone": "EET (UTC+2), same as commit timestamps",
  "rules": "Weighted milestone progress, not independently verified completion. Milestone done = 100% of weight (tests pass or an independent review passed). Partial = 50%. In progress / not started = 0%. Weights are judgment calls. Commits alone never count.",
  "packages": [
@@ -58,10 +58,10 @@
    "start": "2026-11-04T13:12",
    "end": "2026-11-04T13:21",
    "credit_at": "2026-11-04T13:21",
-   "evidence": "live/requesty-tinylib-experiment reached DONE, but needed manual recovery and skipped Reviewer",
+   "evidence": "live/requesty-tinylib-experiment reached DONE, but needed manual recovery and skipped Reviewer Current execution transferred to Recovery Executor (operator, no project model configured), registry 63de5d0 available at 7c5b753. Earlier Telkomsel work retains its historical attribution. Acceptance gaps unchanged. Fresh proof must include Reviewer and QC on the same application pin, unattended; the 55e7c7e reviewer-skip branch is task-only and latch v5 does not implement that guard.",
    "forecast_end": "2026-11-05T12:00",
    "pic": [
-    "instinct-telkomsel"
+    "recovery-executor"
    ],
    "contributors": [],
    "baseline_end": "2026-11-05T12:00"
@@ -72,7 +72,7 @@
    "weight": 15,
    "status": "verified",
    "start": "2026-11-04T13:24",
-   "evidence": "Candidate live/builder-f3-roster-fix 26ff4bc (on cd7f32c) fixes F1 escalation test, F2 consecutive-null counter reset, F3 no reissue to a missing coordinator seat (escalates instead), F4 dead setUp injection, plus regression tests. An independent review accepted it after static review and 167/167 offline tests in a restricted runner. Counts under the frozen rule (independent review passed). Offline fix on a project branch: not merged, not a live end-to-end run, no autonomy claim. Baseline end 17:00 was missed by about 24 minutes.. 17:50: a separate escalation-latch follow-up (76a1554) got changes-required from an independent review (it could hide distinct incidents); its revision (6dd99bd, author-reported 174 offline tests) also got changes-required at 17:47 (a failed gate commit could lose a crashed seat; a read error could crash the run loop); a third revision is being prepared. It is not part of the accepted fix; no credit change",
+   "evidence": "Candidate live/builder-f3-roster-fix 26ff4bc (on cd7f32c) fixes F1 escalation test, F2 consecutive-null counter reset, F3 no reissue to a missing coordinator seat (escalates instead), F4 dead setUp injection, plus regression tests. An independent review accepted it after static review and 167/167 offline tests in a restricted runner. Counts under the frozen rule (independent review passed). Offline fix on a project branch: not merged, not a live end-to-end run, no autonomy claim. Baseline end 17:00 was missed by about 24 minutes.. 17:50: a separate escalation-latch follow-up (76a1554) got changes-required from an independent review (it could hide distinct incidents); its revision (6dd99bd, author-reported 174 offline tests) also got changes-required at 17:47 (a failed gate commit could lose a crashed seat; a read error could crash the run loop); a third revision is being prepared. It is not part of the accepted fix; no credit change UPDATE: latch v5 561f2e5 independently accepted at 18:14 for the narrow offline lifecycle delta (exact-own-ID durability, rollback on both paths, malformed-read recovery, duplicate suppression and reopen/distinct incidents). Reviewer: 36 cases and adversarial probes. Full suite 203 cases is developer-reported only. Not remote delivery, autonomy or concurrency certification; no extra milestone credit or held-executor release.",
    "pic": [
     "coolkowkank-bot"
    ],
@@ -114,17 +114,26 @@
    "id": "WP8a",
    "name": "Researcher: sourced literature findings",
    "weight": 3,
-   "status": "partial",
+   "status": "verified",
    "start": "2026-11-04T14:35",
-   "end": "2026-11-04T14:44",
-   "credit_at": "2026-11-04T14:44",
-   "forecast_end": "2026-11-04T20:00",
-   "evidence": "Note b42f670 plus research plan v3 and REFERENCES published (76351f3, per execution report). Spot check: 3 of 3 arXiv links resolve with matching titles; F1 numbers match the paper abstract. The Researcher later labelled the F2 figures as abstract-only. Partial until F2 and F3 are checked. Since then two more docs-only notes on Research_lab: 947a498 (RW5 prior art) and ad93523 (RW4 liveness design), both read from partial sources and labelled hypotheses. Researcher commits now use role author and owner committer. No credit change. Latest on Research_lab: 9115552 (16:43) E4 v2 offline stall-rule replay: timezone false-stalls confirmed, the two candidate rules are not told apart (N=1). Hypothesis-level, no credit change. STATE 17:34: role active, but not running continuously. The E4 v2 replay (9115552, 16:43) is published and waits for an Evidence verifier (Eva) review; no review of it yet, so no credit. A related RW3 token-composition note is offline and pending review, not a proven optimization",
+   "end": "2026-11-04T18:12",
+   "credit_at": "2026-11-04T18:12",
+   "evidence": "Corrected publication bbb310d (18:12) applies independent full-PDF checks of F2/R2 sections 3.16 and 4.2 and F3/R3 Table 6. Citations, key numbers, evidence class and limits meet the frozen WP8a criterion; acceptance recorded at 18:13. Independent verifier, not Eva-model authorship. Prior partial status and reported lateness are retained in the timeline; no WP8b experiment data or autonomy credit. E4 replay/RW1/RW3 remain separate, pending review.",
    "pic": [
     "researcher"
    ],
    "contributors": [],
-   "baseline_end": "2026-11-04T20:00"
+   "baseline_end": "2026-11-04T20:00",
+   "credit_history": [
+    {
+     "at": "2026-11-04T14:44",
+     "credit": 1.5
+    },
+    {
+     "at": "2026-11-04T18:12",
+     "credit": 1.5
+    }
+   ]
   },
   {
    "id": "WP8b",
@@ -146,9 +155,9 @@
    "status": "in_progress",
    "start": "2026-11-04T14:33",
    "forecast_end": "2026-11-04T20:00",
-   "evidence": "Delta-only handoff rule adopted. One run (batch 7) logged 11037 prompt + 570 completion = 11607 tokens: composition only, not proof of savings or of redundant context. Savings not yet measured",
+   "evidence": "Delta-only handoff rule adopted. One run (batch 7) logged 11037 prompt + 570 completion = 11607 tokens: composition only, not proof of savings or of redundant context. Savings not yet measured Current execution transferred to Recovery Executor (operator, no project model configured), registry 63de5d0 available at 7c5b753. Earlier Telkomsel work retains its historical attribution. Acceptance gaps unchanged.",
    "pic": [
-    "instinct-telkomsel"
+    "recovery-executor"
    ],
    "contributors": [],
    "baseline_end": "2026-11-04T20:00"
@@ -195,9 +204,15 @@
    "role": "Research agent. Uses @coolkowkank via a dedicated Researcher token. Model: Nemotron-3 Ultra 550B, for verified-source synthesis",
    "icon": "avatars/researcher-role.png",
    "alias": "Nora"
+  },
+  "recovery-executor": {
+   "label": "Recovery Executor",
+   "alias": "Recovery",
+   "role": "Current WP4/WP9 operator execution; no project model configured; historical Telkomsel attribution retained",
+   "icon": "avatars/recovery-executor.png"
   }
  },
- "pic_note": "Large icon = accountable current owner (role assignment, not authorship). Small icons = contributors.",
+ "pic_note": "Large icon = current execution assignment, not authorship or a live model run. Historical work keeps its attribution. Small icons = contributors.",
  "baseline": {
   "set_at": "2026-11-04T14:40",
   "start_pct": 38.5,
@@ -240,9 +255,9 @@
    {
     "member": "Nora - Researcher",
     "assignment": "Researcher role: research notes outside the work packages (E4 replay, RW3, RW1); WP8a source checks are in the Gantt above",
-    "last": "2026-11-04T17:34",
-    "ref": "328cec7",
-    "what": "Offline research support (RW3 token baseline, RW1 handoff validator spec), no model instance. Not evidence that a Researcher model ran",
+    "last": "2026-11-04T18:12",
+    "ref": "bbb310d",
+    "what": "Research-support publication corrected F2/F3 using an independent full-PDF check. No Researcher model instance; WP8a credit is in the Gantt, not this row",
     "state": "Assigned",
     "source": "Research_lab commit",
     "exec": "Unknown, not currently observed"
@@ -260,9 +275,9 @@
    {
     "member": "Alex - Builder",
     "assignment": "Builder role: escalation-latch follow-up to the accepted WP5 fix",
-    "last": "2026-11-04T17:50",
-    "ref": "4459866",
-    "what": "Third latch revision, operator-authored, not a Builder model call. Earlier two got changes-required; the third also has open findings",
+    "last": "2026-11-04T18:10",
+    "ref": "561f2e5",
+    "what": "Operator-authored latch v5; independent narrow offline lifecycle review accepted at 18:14. Not an Alex model call or autonomy pass",
     "state": "Assigned",
     "source": "live/builder-gate-latch-v2 commit",
     "exec": "Unknown, not currently observed"

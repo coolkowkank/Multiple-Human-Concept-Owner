@@ -1,5 +1,5 @@
 {
- "asOf": "2026-11-04T17:50",
+ "asOf": "2026-11-04T18:16",
  "timezone": "Europe/Helsinki",
  "note": "Recorded events use commit times. Planned items are not events. A check that finds no change leaves no record.",
  "events": [
@@ -999,6 +999,51 @@
     {
      "label": "Commit 6dd99bd",
      "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/6dd99bd"
+    }
+   ]
+  },
+  {
+   "id": "trg-561f2e5",
+   "day": "2026-11-04",
+   "time": "18:10",
+   "kind": "trigger",
+   "lane": "Builder and review",
+   "title": "Latch v5 published; narrow offline review accepted at 18:14",
+   "status": "Operator-authored lifecycle delta. Independent 36-case review and adversarial probes accepted. 203-case full suite developer-reported. Not remote delivery, live concurrency or autonomy certification.",
+   "evidence": [
+    {
+     "label": "Commit 561f2e5",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/561f2e5"
+    }
+   ]
+  },
+  {
+   "id": "trg-bbb310d",
+   "day": "2026-11-04",
+   "time": "18:12",
+   "kind": "trigger",
+   "lane": "Research and Eva",
+   "title": "WP8a corrected source publication",
+   "status": "Independent full-PDF checks passed; corrected F2/F3 scan and REFERENCES published. Frozen citation/number/class/limits criterion accepted at 18:13. Prior partial and lateness history retained; not Eva-model authorship, no WP8b or autonomy credit.",
+   "evidence": [
+    {
+     "label": "Commit bbb310d",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/bbb310d"
+    }
+   ]
+  },
+  {
+   "id": "trg-63de5d0",
+   "day": "2026-11-04",
+   "time": "18:12",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "WP4/WP9 execution transferred",
+   "status": "Recovery Executor operator role assigned, no project model configured. Historical Coordinator outputs retain attribution; acceptance gaps unchanged.",
+   "evidence": [
+    {
+     "label": "Commit 63de5d0",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/63de5d0"
     }
    ]
   }
