@@ -73,7 +73,7 @@
    "status": "partial",
    "start": "2026-11-04T13:24",
    "forecast_end": "2026-11-04T21:00",
-   "evidence": "Builder head 45cec13 pushed (base 625de3f). Independent review returned changes-required: hardcoded Coordinator next-turn conflicts with the no-invented-routing rule; the escalation test never exercises escalation; counter-reset and dead test-injection issues. Reviewer reproduced 164/164 and 5/5 and verified the UTC fix. Correction queued. Partial: full credit needs an accepting review of the corrected fix",
+   "evidence": "Builder head 45cec13 pushed (base 625de3f). Independent review returned changes-required. Findings F1-F4 on the tests and the counter stand (escalation test never exercises escalation, counter reset, dead test injection). A routing concern was retracted by the reviewer as an ambiguity, so the Builder is not marked noncompliant. Reviewer reproduced 164/164 and 5/5 and verified the UTC fix. Correction queued. Partial: full credit needs an accepting review of the corrected fix",
    "pic": [
     "coolkowkank-bot"
    ],
@@ -104,7 +104,7 @@
    "weight": 6,
    "status": "verified",
    "start": "2026-11-04T14:58",
-   "evidence": "Christina returned a written verdict on exact head 45cec13: changes-required, tests reproduced. Counted done because WP7 means a delivered independent verdict, not acceptance. Per the coordinator's report of the review. A later re-review of the correction is not a new package",
+   "evidence": "Christina returned a written verdict on exact head 45cec13: changes-required, tests reproduced. Counted done because WP7 means a delivered independent verdict, not acceptance. Per the coordinator's report of the review",
    "pic": [
     "instinct-christina"
    ],
