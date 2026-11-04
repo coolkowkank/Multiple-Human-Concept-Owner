@@ -29,10 +29,20 @@ a separate artifact with its own style.
   (Groq gpt-oss-120b) as a scope line. Never write "no GitHub account". The bot account
   is the Builder's GitHub identity, not a separate team seat; a short footer explains
   what the account does (authenticates model pushes, committer identity).
+- Layout: owner on top; Coordinator, Builder and independent reviewer in one row with the
+  Builder in the middle, so each hand-off is a short straight arrow pair that never crosses
+  a label.
 - Content rules: current occupants only - no unused seats, no adapter details, no
-  historical contributors. The independent reviewer is drawn as a PEER exchange with the
-  Coordinator (review requests one way, verdicts the other), never as a subordinate
+  historical contributors.
+- Link rule (owner decision 2026-11-04, Slack 1793788269.210599): the review/verdict loop
+  is directly between the Builder (@coolkowkank-bot) and the independent reviewer
+  (@instinct-christina): review requests go Builder -> reviewer, verdicts go reviewer ->
+  Builder. The Coordinator (@instinct-telkomsel) is NOT in that loop; it assigns scoped
+  tasks to the Builder and checks the completed review loop. Never draw review arrows
+  to or from the Coordinator, and never read independent review as a subordinate
   reporting line.
+- Arrow check: after rendering, read each arrowhead on the actual image and confirm it
+  matches its label.
 
 ## Update rules
 

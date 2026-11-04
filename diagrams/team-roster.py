@@ -33,7 +33,7 @@ def avatar(login):
     im.putalpha(mask)
     return np.asarray(im)
 
-W, H = 1434, 1394
+W, H = 1434, 1010
 fig = plt.figure(figsize=(W/100, H/100), dpi=100)
 ax = fig.add_axes([0, 0, 1, 1]); ax.set_xlim(0, W); ax.set_ylim(H, 0); ax.axis("off")
 ax.add_patch(plt.Rectangle((0, 0), W, H, color="white"))
@@ -99,8 +99,8 @@ ax.plot([44, 100], [118, 118], color=ARROW, lw=1.6, solid_capstyle="round")
 ax.add_patch(FancyArrowPatch((100, 118), (120, 118), arrowstyle="-|>", mutation_scale=18, lw=1.6, color=ARROW))
 text(140, 106, "labeled hand-off between roles", 13.5, GRAY, ha="left")
 
-# Nodes: owner top-center, coordinator left, reviewer right, builder bottom-center
-OWN, COR, REV, BLD = (717, 282, 74), (310, 715, 74), (1124, 715, 74), (717, 1130, 66)
+# Nodes: owner top-center; coordinator, builder, reviewer in one row (builder in the middle)
+OWN, COR, REV, BLD = (717, 282, 74), (240, 715, 74), (1194, 715, 74), (717, 715, 66)
 node(*OWN, img=avatar("coolkowkank"))
 node(*COR, img=avatar("instinct-telkomsel"))
 node(*REV, img=avatar("instinct-christina"))
@@ -113,29 +113,32 @@ text(OWN[0], OWN[1]+OWN[2]+82, "Decision authority: merges, spend, access", 15)
 # Coordinator labels
 text(COR[0], COR[1]+COR[2]+18, "Coordinator", 21, INK, "bold")
 text(COR[0], COR[1]+COR[2]+50, "@instinct-telkomsel", 16.5, GRAY, style="italic")
-text(COR[0], COR[1]+COR[2]+82, "Coordination + implementation oversight", 15)
+text(COR[0], COR[1]+COR[2]+82, "Assigns work, checks completed loop", 15)
 # Reviewer labels
 text(REV[0], REV[1]+REV[2]+18, "Independent reviewer", 21, INK, "bold")
 text(REV[0], REV[1]+REV[2]+50, "@instinct-christina", 16.5, GRAY, style="italic")
-text(REV[0], REV[1]+REV[2]+82, "Peer-verifies pinned commits", 15)
+text(REV[0], REV[1]+REV[2]+82, "Reviews the Builder's pinned commits", 15)
 # Builder labels
 text(BLD[0], BLD[1]+BLD[2]+18, "Builder", 21, INK, "bold")
 text(BLD[0], BLD[1]+BLD[2]+50, "@coolkowkank-bot", 16.5, GRAY, style="italic")
 text(BLD[0], BLD[1]+BLD[2]+82, "Model: Groq gpt-oss-120b (free plan)", 15)
-text(BLD[0], BLD[1]+BLD[2]+110, "Scoped tasks - edits, commits, pushes via its own tool calls", 15)
+text(BLD[0], BLD[1]+BLD[2]+110, "Edits, commits, pushes via its own tool calls", 15)
 
 # Arrows
 arrow((OWN[0]-60, OWN[1]+40), (COR[0]+30, COR[1]-60), rad=0.25, shrink=78)
-text(230, 600, "direction + GO gates", 14.5, ARROW)
+text(160, 600, "direction + GO gates", 14.5, ARROW)
 arrow((OWN[0]+60, OWN[1]+40), (REV[0]-30, REV[1]-60), rad=-0.25, shrink=78)
-text(1210, 600, "direction + gates", 14.5, ARROW)
-arrow((COR[0]+80, COR[1]-10), (REV[0]-80, REV[1]-10), rad=0.22, shrink=80)
-text(717, 620, "verdicts: verified / new findings", 14.5, ARROW)
-arrow((REV[0]-80, REV[1]+30), (COR[0]+80, COR[1]+30), rad=0.22, shrink=80)
-text(717, 835, "review requests (pinned commit)", 14.5, ARROW)
-arrow((COR[0]+40, COR[1]+66), (BLD[0]-60, BLD[1]-40), rad=0.2, shrink=76)
-text(560, 905, "scoped tasks", 14.5, ARROW)
-text(560, 932, "<-> reviewed output", 14.5, ARROW)
+text(1290, 600, "direction + gates", 14.5, ARROW)
+# Coordinator <-> Builder: assigns work (upper, into Builder), checks the completed loop (lower, into Coordinator)
+arrow((COR[0], BLD[1]-24), (BLD[0], BLD[1]-24), shrink=90)
+text(479, BLD[1]-62, "assigns scoped tasks", 14.5, ARROW)
+arrow((BLD[0], BLD[1]+24), (COR[0], BLD[1]+24), shrink=90)
+text(479, BLD[1]+34, "checks completed review loop", 14.5, ARROW)
+# Review loop is directly between Builder and the independent reviewer
+arrow((BLD[0], BLD[1]-24), (REV[0], BLD[1]-24), shrink=90)
+text(955, BLD[1]-62, "review requests (pinned commit)", 14.5, ARROW)
+arrow((REV[0], BLD[1]+24), (BLD[0], BLD[1]+24), shrink=90)
+text(955, BLD[1]+34, "review verdicts", 14.5, ARROW)
 
 # Footer: shared machine account is infrastructure, not a team member
 text(40, H-64, "@coolkowkank-bot is the shared machine account the Builder acts through:", 13, GRAY, ha="left")
