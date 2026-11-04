@@ -166,5 +166,11 @@
       "path": "launcher/supervisor.py",
       "tool": "edit_file"
     }
+  },
+  {
+    "pacing_wait": {
+      "seconds": 38.1,
+      "min_interval": 65.0
+    }
   }
 ]
