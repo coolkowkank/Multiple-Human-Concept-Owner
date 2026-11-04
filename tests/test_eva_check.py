@@ -59,6 +59,17 @@ class T(unittest.TestCase):
         with self.assertRaises(ValueError):
             ev.intake("# no evidence", PACK, "x")
 
+    def test_intake_rejects_nonstring_rows(self):
+        for bad in ([dict(PACK[0], passage={"a": 1}), PACK[1]],
+                    [dict(PACK[0], passage=None), PACK[1]],
+                    [dict(PACK[0], id=None), PACK[1]],
+                    [PACK[0], dict(PACK[1], id="P1")],
+                    [PACK[0], "P2"], "notalist"):
+            with self.assertRaises(ValueError):
+                ev.intake(PUB, bad, "x")
+        with self.assertRaises(ValueError):
+            ev.intake(PUB, PACK, "x", author_model=5)
+
     def test_report_says_review_false_is_not_a_pass(self):
         self.assertIn("NOT a publication pass",
                       ev.report(PUB, PACK)["review_false_means"])

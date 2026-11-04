@@ -27,6 +27,10 @@ TAG = re.compile(r"^\*\*(M\d+)\.")
 QUOTE = re.compile(r'"([^"\n]{6,})"')
 
 
+def _nes(x):
+    return isinstance(x, str) and bool(x.strip())
+
+
 def norm(t):
     return " ".join(str(t).split()).lower()
 
@@ -119,10 +123,20 @@ def intake(md, packet, queue_id, author_model=None):
     claims = parse_publication(md)
     if not claims or not packet:
         raise ValueError("no claims or no packet: unsupported source")
+    if author_model is not None and not _nes(author_model):
+        raise ValueError("author_model must be a non-empty string")
+    if not isinstance(packet, list):
+        raise ValueError("packet must be a list")
+    seen = set()
     for p in packet:
-        t = str(p.get("passage", ""))
-        if not t.strip() or "[truncated" in t:
-            raise ValueError("partial source passage %s" % p.get("id"))
+        if not isinstance(p, dict) or not _nes(p.get("id")) \
+                or not _nes(p.get("passage")):
+            raise ValueError("packet row needs a string id and passage")
+        if p["id"] in seen:
+            raise ValueError("duplicate packet id %s" % p["id"])
+        seen.add(p["id"])
+        if "[truncated" in p["passage"]:
+            raise ValueError("partial source passage %s" % p["id"])
     findings = []
     for c in claims:
         ids = [p["id"] for p in passages_for(packet, c["tag"])]

@@ -486,6 +486,8 @@ def precheck(role, q, obj):
             return "no verdicts list"
         want = {f["id"] for f in q["findings"]}
         got = [v.get("id") for v in vs if isinstance(v, dict)]
+        if len(got) != len(vs) or any(not isinstance(i, str) for i in got):
+            return "verdict rows need string ids"
         if set(got) != want or len(got) != len(want):
             return "verdict ids do not match finding ids exactly"
         fmap = {f["id"]: f for f in q["findings"]}
@@ -535,27 +537,72 @@ def compute_overall(q, obj):
     return ("PASS" if not bad else "FAIL"), verified, bad
 
 
-def verify_gate(q):
-    """'' or reason: fail closed on unsupported or partial sources."""
-    pk, fs = q.get("packet"), q.get("findings")
-    if not isinstance(pk, list) or not pk or not isinstance(fs, list) \
-            or not fs:
-        return "verify item needs a packet and findings"
-    ids = {p.get("id") for p in pk}
+def _nes(x):
+    """Non-empty STRING only: no coercion of None, dict, list, bool."""
+    return isinstance(x, str) and bool(x.strip())
+
+
+def packet_gate(q):
+    """'' or reason: every packet row is a dict with a unique non-empty
+    string id and a non-empty string passage, none truncated."""
+    pk = q.get("packet")
+    if not isinstance(pk, list) or not pk:
+        return "empty or malformed packet"
+    seen = set()
     for p in pk:
-        t = str(p.get("passage", ""))
-        if not t.strip() or "[truncated" in t:
-            return "packet passage %s empty or truncated" % p.get("id")
+        if not isinstance(p, dict) or not _nes(p.get("id")) \
+                or not _nes(p.get("passage")):
+            return "packet row needs a string id and a string passage"
+        if p["id"] in seen:
+            return "duplicate packet id " + p["id"]
+        seen.add(p["id"])
+        if "[truncated" in p["passage"]:
+            return "packet passage %s truncated" % p["id"]
+    return ""
+
+
+def verify_gate(q):
+    """'' or reason: fail closed on unsupported, partial or malformed
+    sources and findings (strict types, no str() coercion)."""
+    bad = packet_gate(q)
+    if bad:
+        return bad
+    ids = {p["id"] for p in q["packet"]}
+    fs = q.get("findings")
+    if not isinstance(fs, list) or not fs:
+        return "verify item needs findings"
+    seen = set()
     for f in fs:
+        if not isinstance(f, dict) or not _nes(f.get("id")) \
+                or not _nes(f.get("claim")):
+            return "finding needs a string id and a string claim"
+        if f["id"] in seen:
+            return "duplicate finding id " + f["id"]
+        seen.add(f["id"])
         src = f.get("sources")
         if not isinstance(src, list) or not src or any(
-                x not in ids for x in src):
-            return "finding %s has no source or cites outside the packet" \
-                % f.get("id")
-    if not isinstance(q.get("author_model"), str) or \
-            not q["author_model"].strip():
+                not _nes(x) or x not in ids for x in src) or \
+                len(set(src)) != len(src):
+            return "finding %s sources must be unique packet ids" % f["id"]
+    if not _nes(q.get("author_model")):
         return "author_model missing (verifier independence unverifiable)"
     return ""
+
+
+def work_fp(q):
+    """Fingerprint of the claim set (normalised claim texts), so the same
+    work cannot get fresh budgets by renaming its qid, kind or lineage."""
+    fs = q.get("findings")
+    if not isinstance(fs, list) or not fs:
+        return None
+    try:
+        t = sorted(norm(f["claim"]) for f in fs if _nes(f.get("claim")))
+    except (TypeError, KeyError):
+        return None
+    if not t:
+        return None
+    import hashlib
+    return hashlib.sha256("\n".join(t).encode()).hexdigest()
 
 
 def compute_verify(q, obj):
@@ -623,26 +670,54 @@ def lineage_of(q):
 
 
 def lineage_counts(store, queue, q):
-    """Reserved requests per role for q's lineage. The lineage is
-    PERSISTED on each reservation, so deleting or re-parenting a queue
-    item cannot hide past requests. Older reserves without the field
-    fall back to the queue mapping. A qid whose ledger lineage differs
-    from its current lineage raises Halt."""
-    L = lineage_of(q)
-    ids = {x["id"] for x in queue["questions"] if lineage_of(x) == L}
+    """Reserved requests per role for q's work. Counts every reserve that
+    shares the item's persisted lineage, its claim-set fingerprint
+    (work_fp), or a lineage bound to that fingerprint by a lineage-bind
+    ledger line; legacy reserves without fields fall back to the queue
+    alias. Renaming the qid, kind or lineage cannot reset the count, and
+    deleting a queue item cannot hide past requests. A qid whose ledger
+    lineage differs from its current lineage raises Halt."""
+    L, fp = lineage_of(q), work_fp(q)
+    led = store.ledger()
+    related, bound_qids = {L}, set()
+    for e in led:
+        if e["phase"] == "lineage-bind" and fp and e.get("work_fp") == fp:
+            related.add(e["lineage"])
+            bound_qids.update(e.get("qids", []))
+    ids = {x["id"] for x in queue["questions"]
+           if lineage_of(x) in related} | bound_qids
     n = {}
-    for e in store.ledger():
+    for e in led:
         if e["phase"] != "reserved" or "role" not in e:
             continue
         el = e.get("lineage")
         if e.get("qid") == q["id"] and el is not None and el != L:
             raise Halt("lineage of %s changed (%s -> %s)"
                        % (q["id"], el, L))
-        if el == L or (el is None and e.get("qid") in ids):
+        if el in related or (fp and e.get("work_fp") == fp) or (
+                el is None and e.get("qid") in ids):
             n[e["role"]] = n.get(e["role"], 0) + 1
     for k, v in q.get("attempts", {}).items():
         n[k] = max(n.get(k, 0), v)
     return n
+
+
+def bind_lineage(root, queue_id):
+    """Append a lineage-bind ledger line tying an existing item's lineage
+    to its claim-set fingerprint (append-only; no rewrite)."""
+    store = Store(root)
+    with store.lock():
+        q = next(x for x in store.queue()["questions"]
+                 if x["id"] == queue_id)
+        fp = work_fp(q)
+        if not fp:
+            raise ValueError("item has no claim set")
+        L = lineage_of(q)
+        qids = sorted({x["id"] for x in store.queue()["questions"]
+                       if lineage_of(x) == L})
+        store.append({"phase": "lineage-bind", "ts": iso(time.time()),
+                      "lineage": L, "work_fp": fp, "qids": qids})
+    return fp
 
 
 def pick(queue):
@@ -689,6 +764,14 @@ def step(root, post, list_models, now, record):
                         "reason": "assignments.json not made by the "
                         "operator"}
             model = assign["models"][role]
+        if not is_verify:
+            why_not = packet_gate(q)
+            if why_not:
+                q["status"] = "needs-human"
+                q["reason"] = why_not
+                store.save_queue(queue)
+                return {"action": "needs-human", "qid": qid, "calls": 0,
+                        "reason": why_not}
         used = lineage_counts(store, queue, q)
         if sum(used.values()) >= QUESTION_BUDGET:
             q["status"] = "needs-human"
@@ -725,7 +808,7 @@ def step(root, post, list_models, now, record):
         rid = "%s-%s-%d" % (qid, role, len(store.ledger()))
         store.append({"phase": "reserved", "rid": rid, "ts": iso(now),
                       "qid": qid, "role": role, "model": model,
-                      "lineage": lineage_of(q)})
+                      "lineage": lineage_of(q), "work_fp": work_fp(q)})
         q["attempts"][role] = q["attempts"].get(role, 0) + 1
         store.save_queue(queue)
         n = q["attempts"][role]

@@ -13,3 +13,4 @@
 {"phase": "reserved", "rid": "research-model-vs-harness-v2-verifier-12", "ts": "2026-11-04T18:23:30Z", "qid": "research-model-vs-harness-v2", "role": "verifier", "model": "novita/ling-3.1-flash"}
 {"phase": "result", "rid": "research-model-vs-harness-v2-verifier-12", "ts": "2026-11-04T18:23:30Z", "qid": "research-model-vs-harness-v2", "role": "verifier", "model": "novita/ling-3.1-flash", "usage": {"completion_tokens": 1536, "prompt_tokens": 1915, "total_tokens": 3451, "cost": 0}, "outcome": "ok"}
 {"phase": "halt", "ts": "2026-11-04T18:23:44Z", "reason": "operator one-attempt Verifier retry window ended; a new operator decision is required before any further call"}
+{"phase": "lineage-bind", "ts": "2026-11-04T18:37:02Z", "lineage": "research-model-vs-harness", "work_fp": "316ee6d8d08e67303102e8b5b4c9b115a10b31f77248b9614b65238e8d908bd9", "qids": ["research-model-vs-harness", "research-model-vs-harness-v2"]}

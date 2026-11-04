@@ -1000,6 +1000,97 @@ class VerifyKind(Base):
         self.assertEqual(self.run_step([ok(self.V)])["action"], "needs-human")
         self.assertEqual(self.calls, [])
 
+    def test_malformed_source_types_fail_closed_before_any_call(self):
+        bad_packets = [
+            [{"id": "P1", "passage": {"k": "private alpha text"}}],
+            [{"id": "P1", "passage": None}],
+            [{"id": "P1", "passage": ["alpha passage text"]}],
+            [{"id": "P1", "passage": True}],
+            [{"id": None, "passage": "alpha passage text"}],
+            [{"id": ["P1"], "passage": "alpha passage text"}],
+            [{"id": "P1", "passage": "alpha passage text"},
+             {"id": "P1", "passage": "beta passage text"}],
+            ["P1: alpha passage text"],
+        ]
+        for pk in bad_packets:
+            self.setUp()
+            self.seed_v(packet=pk)
+            out = self.run_step([ok(self.V)])
+            self.assertEqual((out["action"], out["calls"]),
+                             ("needs-human", 0), pk)
+            self.assertEqual(self.calls, [])
+        good = [{"id": "P1", "passage": "alpha passage text"}]
+        bad_findings = [
+            [{"id": "M1.1", "claim": None, "sources": ["P1"]}],
+            [{"id": 5, "claim": "a", "sources": ["P1"]}],
+            [{"id": "M1.1", "claim": "a", "sources": [{"x": 1}]}],
+            [{"id": "M1.1", "claim": "a", "sources": ["P1", "P1"]}],
+            [{"id": "M1.1", "claim": "a", "sources": "P1"}],
+            [{"id": "M1.1", "claim": "a", "sources": ["P1"]},
+             {"id": "M1.1", "claim": "b", "sources": ["P1"]}],
+        ]
+        for fs in bad_findings:
+            self.setUp()
+            self.seed_v(packet=good, findings=fs)
+            out = self.run_step([ok(self.V)])
+            self.assertEqual((out["action"], out["calls"]),
+                             ("needs-human", 0), fs)
+
+    def test_dict_passage_quote_cannot_verify_via_repr(self):
+        self.seed_v(packet=[{"id": "P1", "passage": {"s": "private alpha"}}])
+        out = self.run_step([ok({"verdicts": [{
+            "id": "M1.1", "verdict": "SUPPORTED", "source": "P1",
+            "quote": "private alpha", "evidence": "e"}]})])
+        self.assertEqual(out["action"], "needs-human")
+        self.assertEqual(self.calls, [])
+
+    def test_verdict_ids_must_be_strings(self):
+        self.seed_v()
+        self.run_step([ok({"verdicts": [{"id": ["M1.1"], "verdict": "SUPPORTED",
+                                          "source": "P1", "quote": "alpha passage text"}]})])
+        q = self.store.queue()["questions"][0]
+        self.assertEqual(q["status"], "needs-human")
+
+    def test_same_claims_cannot_escape_budget_by_renaming(self):
+        claims = [{"id": "C1", "claim": "Same claim text",
+                   "sources": ["P1"], "status": "UNVERIFIED"}]
+        fp = rc.work_fp({"findings": claims})
+        for i in range(2):      # two Verifier reserves under old lineage
+            self.store.append({"phase": "reserved", "rid": "o%d" % i,
+                               "ts": rc.iso(T0 - 9000 + i), "qid": "old",
+                               "role": "verifier", "model": "m",
+                               "lineage": "oldL", "work_fp": fp})
+            self.store.append({"phase": "result", "rid": "o%d" % i,
+                               "ts": rc.iso(T0 - 9000 + i), "outcome": "ok"})
+        self.seed_v(findings=[dict(claims[0], id="X.1",
+                                   claim="same claim   TEXT")])
+        out = self.run_step([ok(self.V)])
+        self.assertEqual((out["action"], out["calls"]), ("needs-human", 0))
+        self.assertEqual(self.calls, [])
+
+    def test_lineage_bind_survives_item_deletion_and_rename(self):
+        claims = [{"id": "C1", "claim": "Bound claim", "sources": ["P1"],
+                   "status": "UNVERIFIED"}]
+        self.store.save_queue({"questions": [{
+            "id": "legacy", "status": "drafted", "attempts": {},
+            "question": "?", "packet": PACKET, "findings": claims,
+            "lineage": "LL"}]})
+        # legacy reserves carry no lineage or work_fp
+        for i in range(2):
+            self.store.append({"phase": "reserved", "rid": "g%d" % i,
+                               "ts": rc.iso(T0 - 9000 + i), "qid": "legacy",
+                               "role": "verifier", "model": "m"})
+            self.store.append({"phase": "result", "rid": "g%d" % i,
+                               "ts": rc.iso(T0 - 9000 + i), "outcome": "ok"})
+        self.assertEqual(rc.bind_lineage(self.d, "legacy"),
+                         rc.work_fp({"findings": claims}))
+        # delete the item, then re-introduce the same claims as new kind/id
+        self.seed_v(findings=[dict(claims[0], id="E.1")])
+        self.assertEqual(self.store.ledger()[-1]["phase"], "result"
+                         if False else self.store.ledger()[-1]["phase"])
+        out = self.run_step([ok(self.V)])
+        self.assertEqual((out["action"], out["calls"]), ("needs-human", 0))
+
     def test_independence_and_gates_still_apply(self):
         self.seed_v(author="deepinfra/google/gemma-4-31B-it")   # same lab
         with self.assertRaises(rc.Halt):
