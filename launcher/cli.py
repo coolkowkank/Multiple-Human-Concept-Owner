@@ -275,6 +275,16 @@ def _cmd_serve(args):
     serve(args.port, token)
 
 
+def cmd_guarded_offline(args):
+    from .guarded_offline import run_guarded_offline
+    result = run_guarded_offline(args.repo, args.branch,
+        verify_argv=json.loads(args.verify_argv_json), max_turns=args.max_turns,
+        max_seconds=args.max_seconds)
+    print(json.dumps(result))
+    if result['result'] != 'done':
+        raise SystemExit(1)
+
+
 def default_roster():
     """The blueprint's delivery seats as a ready roster (mock adapters;
     swap in cli/http adapters for live models)."""
@@ -338,6 +348,14 @@ def main(argv=None):
     p.add_argument("--poll", type=int, default=5)
     p.add_argument("--max-seconds", type=int)
     p.set_defaults(fn=cmd_launch)
+
+    p = sub.add_parser('guarded-offline', help='opt-in single-process MOCK ONLY guarded cycle')
+    base(p)
+    p.add_argument('--max-turns', type=int, default=8)
+    p.add_argument('--max-seconds', type=int, default=60)
+    p.add_argument('--verify-argv-json', required=True,
+                   help='host-owned fixed verification argv JSON; side-effect-free except pycache')
+    p.set_defaults(fn=cmd_guarded_offline)
 
     p = sub.add_parser("status", help="print turn, log tail, open gates")
     base(p)
