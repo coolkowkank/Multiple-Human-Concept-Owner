@@ -4,3 +4,4 @@
 {"ts": "2026-11-04T11:13:04Z", "seat": "supervisor", "kind": "restart", "body": "seat builder exited -15; restart 1"}
 {"ts": "2026-11-04T11:13:18Z", "seat": "builder", "kind": "handoff", "body": "Implement tinylib.add and corresponding test case | verify: `python3 -m unittest discover -s tests -v` exit=0 | tail:  / ---------------------------------------------------------------------- / Ran 1 test in 0.000s /  / OK", "turn_seq": 2}
 {"ts": "2026-11-04T11:19:29Z", "seat": "operator", "kind": "intervention", "body": "builder returned handoff:null; turn=None deadlocked the bus (supervisor _check_stall ignores falsy turn; seed only fires while forming). Operator re-issued the turn to the coordinator - supervisor's missing function done by hand, NOT model content repair. Launcher gap recorded as experiment finding."}
+{"ts": "2026-11-04T11:19:30Z", "seat": "supervisor", "kind": "stall", "body": "turn stalled on coordinator; restarting seat"}
