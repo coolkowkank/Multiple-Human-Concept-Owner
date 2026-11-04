@@ -129,6 +129,13 @@ def cmd_prompt(args):
     print(system)
     print("=== TASK ===")
     print(task)
+    if getattr(args, "measure", False):
+        from launcher.token_est import measure_prompt
+        m = measure_prompt(system, task)
+        print(f"measure: system={m['system_chars']}c "
+              f"task={m['task_chars']}c total={m['total_chars']}c "
+              f"est_tokens={m['est_tokens']} "
+              "(estimate: total_chars/4)")
 
 
 def cmd_respond(args):
@@ -329,6 +336,9 @@ def main(argv=None):
     p = sub.add_parser("prompt", help="render the seat's exact prompt this turn")
     base(p)
     p.add_argument("name")
+    p.add_argument("--measure", action="store_true",
+                   help="also print char counts and a chars/4 token "
+                        "estimate for the rendered prompt")
     p.set_defaults(fn=cmd_prompt)
 
     p = sub.add_parser("respond", help="queue an externally-reasoned response")

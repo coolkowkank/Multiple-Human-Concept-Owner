@@ -100,7 +100,7 @@ autonomy.
    itself - without weakening the head binding.
 3. Open gaps before any unattended claim: cooperative local leases;
    best-effort relay; models may not close cycles; unsandboxed
-   `verify_command` shell; manual prompt-size budgeting. Closed from
+   `verify_command` shell; manual prompt-size budgeting (now estimated: `launcher prompt --measure`, chars/4 heuristic - an estimate, never an exact tokenizer count). Closed from
    this list: 429 backoff with Retry-After. Scoped coverage only:
    one orphaned-lease fixture proves a new supervisor's seat stops
    instead of duplicating a turn; full crash/restart cycles and

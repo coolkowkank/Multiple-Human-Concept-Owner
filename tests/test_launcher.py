@@ -192,6 +192,33 @@ class SeatTests(unittest.TestCase):
         finally:
             shutil.rmtree(repo, ignore_errors=True)
 
+    def test_prompt_measure_prints_token_estimate(self):
+        import io, contextlib
+        from launcher.cli import main as cli_main
+        seats = {"builder": seat_spec([], ["src/"])}
+        repo, bus = make_repo(seats=seats)
+        try:
+            state = bus.state()
+            state["turn"] = "builder"
+            bus.write_state(state)
+            bus.commit_all("human: go")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                cli_main(["prompt", "builder", "--repo", repo,
+                          "--branch", "team-work", "--measure"])
+            text = out.getvalue()
+            self.assertIn("=== SYSTEM ===", text)
+            self.assertRegex(text, r"measure: system=\d+c task=\d+c "
+                                   r"total=\d+c est_tokens=\d+")
+            # estimate is the documented chars/4 heuristic on the
+            # rendered prompt, computed from the printed totals
+            import re
+            m = re.search(r"total=(\d+)c est_tokens=(\d+)", text)
+            total, est = int(m.group(1)), int(m.group(2))
+            self.assertEqual(est, -(-total // 4))
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)
+
     def test_unknown_handoff_rejected(self):
         seats = {"builder": seat_spec(
             [{"summary": "x", "writes": {"src/a": "b"},
