@@ -37,7 +37,10 @@ MAX_BYTES = 20000
 # owner-approved shared project machine account (coolkowkank-bot), per-model credit
 # in the author NAME. The noreply email is account-linked, so work that lands on the
 # default branch can be credited to the bot account per GitHub's email grouping.
-# Committer stays the operator account (transport identity, separate and honest).
+# Three identities stay SEPARATE and honest: author (per-model name + bot noreply),
+# committer (git identity configured at commit time, operator), and pusher
+# (whichever credential authenticates the push) - committer metadata is
+# configured independently of push authentication.
 MODEL_AUTHOR = "Groq (gpt-oss-120b model) <350571665+coolkowkank-bot@users.noreply.github.com>"
 CRED = re.compile(r"(gsk_[A-Za-z0-9]|ghp_[A-Za-z0-9]|github_pat_|gho_[A-Za-z0-9]|AKIA[0-9A-Z]{16}|xox[baprs]-|Bearer\s+[A-Za-z0-9._-]{20,}|-----BEGIN)")
 transcript = []
