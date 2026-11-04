@@ -1,0 +1,21 @@
+{
+  "batch": 6,
+  "attempt": "routing-fix-b12",
+  "closed_utc": "2026-11-04T13:46:00Z",
+  "purpose": "routing counter/consecutive fix v2 (reconciled Christina scope)",
+  "budget": {
+    "cap": 8,
+    "used": 8,
+    "reset": false,
+    "note": "separate ledger /tmp/budget-ledger-batch6.json; sends 13:38:45-13:45:23Z; durable hard-stop ended the run at the 9th reserve attempt"
+  },
+  "result": {
+    "built": false,
+    "pushed": null,
+    "remote": "live/builder-deadlock-fix unchanged at 964581c52b46be262011858056fcd570aed0bfdc",
+    "cause": "budget burned on prose-only rounds (nudged at rounds 4, 5, 8); edits never committed",
+    "evidence": "uncommitted model diff sha256 9aefc89d98b168efaed570a63e199c363bba1d7735ab68445d92a582e1c92380 (preserved in /tmp/builder-wt, not operator-committed); transcript sha256 116fc01dfd555d3a541869c070e7dd20c803c2c6c6db7a2d7c6c67b3770abb2a",
+    "followup": "v2 routing fix NOT delivered; Christina re-review has nothing new"
+  },
+  "api_calls": 8
+}

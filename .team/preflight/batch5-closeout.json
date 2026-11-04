@@ -1,0 +1,23 @@
+{
+  "batch": 5,
+  "attempts": [
+    "reviewer-guard-b11",
+    "reviewer-guard-b11b"
+  ],
+  "closed_utc": "2026-11-04T13:39:00Z",
+  "purpose": "reviewer-skip guard implementation (task file 55e7c7e, anchors verified)",
+  "budget": {
+    "cap": 8,
+    "used": 5,
+    "reset": false,
+    "note": "b11: 3 sends, fail-closed halt on transient records-push error; b11b: 2 sends, model hallucinated tool 'exec' -> provider 400 -> unhandled RuntimeError. 3 remaining reservations frozen, never reused."
+  },
+  "result": {
+    "built": false,
+    "pushed": null,
+    "guard_status": "UNBUILT - reported as unbuilt in project status, not completion",
+    "evidence": "transcripts .team/attempts/reviewer-guard-b11{,b}-transcript.json; b11 destructive placeholder edit discarded uncommitted",
+    "followup": "hardening 321257b696389d1e72a804cb92bed894275cc6ba (live/executor-hardening) addresses both failure modes; guard retry only as new batch 7"
+  },
+  "api_calls": 5
+}
