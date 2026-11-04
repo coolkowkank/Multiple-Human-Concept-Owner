@@ -1,13 +1,14 @@
-# Blueprint: Recovery Executor
+# Blueprint: Recovery Executor (now Builder 2)
 
 - **Status:** active (owner assignment 2026-11-04, Slack
   1793807666.323859 and 1793807753.116989: WP4 and WP9 transfer off
   the Coordinator, who executes zero WP jobs while any job is late).
 - **Instance:** recovery-1, alias unassigned.
-- **Reports to:** Coordinator Assistant assistant-2 (priorities, blockers;
-  role defined 2026-11-04, currently vacant, so escalations go to the
-  Coordinator until it is held). Technical acceptance stays with
-  independent review, not the assistant.
+- **Renamed 2026-11-04:** this role is now Builder 2 (instance builder-2),
+  on owner direction (Slack 1793812104.985419). Same instance, work and
+  history. Review requests go to reviewer-1 Bill and his verdicts return
+  to Builder 2; technical acceptance stays with independent review. No
+  separate manager layer. This file is kept as the history of the name.
 - **Purpose:** finish the two late work packages the Coordinator was
   carrying, with measured evidence, not status prose.
 - **Current model / provider:** NONE. Operator execution only. No

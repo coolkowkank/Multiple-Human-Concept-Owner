@@ -1,6 +1,11 @@
 # Blueprint: Builder
 
 - **Status:** active (instance builder-1 "Alex")
+- **Instances:** builder-1 "Alex" (Groq gpt-oss-120b). builder-2 (model
+  none, operator execution; carries the WP4/WP9 work, formerly
+  recovery-1, see recovery-executor.md). builder-2 asks reviewer-1 Bill
+  for review of each pinned change and receives his verdicts. It shares no
+  provider quota with builder-1 because it holds no model.
 - **Purpose:** implements scoped code tasks on live/* branches through
   the self-commit executor: receives a coordinator task file with
   verified anchors, edits, commits and pushes its own work with honest

@@ -1,10 +1,16 @@
 # Blueprint: Coordinator Assistant (Recovery Executor management)
 
+> CANCELLED 2026-11-04 on owner direction (Slack 1793812104.985419):
+> no second Coordinator Assistant; the Recovery Executor became Builder 2
+> and its reviews go to Bill. This role was defined for a few minutes,
+> never held and never did work. Kept as history, not deleted. Everything
+> below is historical.
+
 - **Instance:** assistant-2, role "Coordinator Assistant". Same level as
   assistant-1 (Sam). It is not under Sam, and Sam is not under it.
 - **Member name:** none given. The owner has not named this member; the
   registry shows it as unassigned until the owner chooses a name.
-- **Status:** vacant. The role is defined (owner direction 2026-11-04,
+- **Status:** CANCELLED (was vacant). The role is defined (owner direction 2026-11-04,
   Slack 1793811994.355409) but nothing holds it yet, so it does no work
   and is not shown as a working member.
 - **Current model / provider:** none configured, none qualified. This
