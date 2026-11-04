@@ -6,6 +6,12 @@
 
 ![Project Team](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/021b98b47074ea494b1aca1165292ee55f8f5516/docs/progress/team.png)
 
+### Coordinator work
+
+*The Coordinator does routine checks on a 30-minute schedule while work is active, and handles arrivals (drafts, reviews, test results, failures, blockers) as they come. Trigger handling is Coordinator judgment; there is no automatic gate in the repo.*
+
+![Coordinator work](https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/main/docs/progress/coordinator-work.png)
+
 ### Project progress
 
 *As of 2026-11-04 15:32 EET. Weighted milestone progress is **47.5%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
