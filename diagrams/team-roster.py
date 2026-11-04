@@ -125,13 +125,13 @@ text(BLD[0], BLD[1]+BLD[2]+110, "via its own tool calls - NOT a GitHub account",
 
 # Arrows
 arrow((OWN[0]-60, OWN[1]+40), (COR[0]+30, COR[1]-60), rad=0.25, shrink=78)
-text(330, 556, "direction + GO gates", 14.5, ARROW)
+text(230, 600, "direction + GO gates", 14.5, ARROW)
 arrow((OWN[0]+60, OWN[1]+40), (REV[0]-30, REV[1]-60), rad=-0.25, shrink=78)
-text(1090, 556, "direction + gates", 14.5, ARROW)
+text(1210, 600, "direction + gates", 14.5, ARROW)
 arrow((COR[0]+80, COR[1]-10), (REV[0]-80, REV[1]-10), rad=0.22, shrink=80)
-text(717, 620, "review requests (pinned commit)", 14.5, ARROW)
+text(717, 620, "verdicts: verified / new findings", 14.5, ARROW)
 arrow((REV[0]-80, REV[1]+30), (COR[0]+80, COR[1]+30), rad=0.22, shrink=80)
-text(717, 835, "verdicts: verified / new findings", 14.5, ARROW)
+text(717, 835, "review requests (pinned commit)", 14.5, ARROW)
 arrow((COR[0]+40, COR[1]+66), (BLD[0]-60, BLD[1]-40), rad=0.2, shrink=76)
 text(560, 905, "scoped tasks", 14.5, ARROW)
 text(560, 932, "<-> reviewed output", 14.5, ARROW)
