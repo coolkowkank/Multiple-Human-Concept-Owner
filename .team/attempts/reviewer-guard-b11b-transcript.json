@@ -76,5 +76,11 @@
       "ok": false,
       "error": "old_string must be non-empty"
     }
+  },
+  {
+    "pacing_wait": {
+      "seconds": 60.7,
+      "min_interval": 65.0
+    }
   }
 ]
