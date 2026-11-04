@@ -369,6 +369,10 @@ class Seat:
         summary = response.get("summary", "(no summary)")
         corrected = response.pop("_corrected", None)
         body = summary
+        if response.pop("_nonstrict", None):
+            body = ("[model output needed tolerant JSON extraction; "
+                    "prose outside the single response object was "
+                    "dropped] " + body)
         if corrected:
             body = (f"[path-guard correction round used; first reply "
                     f" wrote outside allowed paths: {corrected}] "

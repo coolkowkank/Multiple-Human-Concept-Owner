@@ -219,6 +219,50 @@ class SeatTests(unittest.TestCase):
         finally:
             shutil.rmtree(repo, ignore_errors=True)
 
+    def test_parse_salvage_single_object_with_prose(self):
+        out = parse_response('Sure! {"summary": "x", "handoff": null} done.')
+        self.assertEqual(out["summary"], "x")
+        self.assertTrue(out["_nonstrict"])
+
+    def test_parse_salvage_braces_and_escapes_inside_strings(self):
+        out = parse_response(
+            'pre {"summary": "use } and {\\"q\\"} here", "handoff": null} post')
+        self.assertEqual(out["summary"], 'use } and {"q"} here')
+        self.assertTrue(out["_nonstrict"])
+
+    def test_parse_fails_closed_on_two_objects(self):
+        with self.assertRaises(AdapterError):
+            parse_response('{"summary": "a", "handoff": null} '
+                           '{"summary": "b", "handoff": null}')
+
+    def test_parse_fails_closed_on_unbalanced_trailing_brace(self):
+        with self.assertRaises(AdapterError):
+            parse_response('{"summary": "a", "handoff": null} and {"x"')
+
+    def test_parse_fails_closed_on_trailing_command_block(self):
+        with self.assertRaises(AdapterError):
+            parse_response('{"summary": "a", "handoff": null}\n'
+                           '{"writes": {"etc/passwd": "x"}}')
+
+    def test_strict_output_carries_no_salvage_marker(self):
+        self.assertNotIn("_nonstrict", parse_response('{"a": 1}'))
+
+    def test_nonstrict_salvage_is_recorded_in_turn_log(self):
+        resp = {"summary": "salvaged", "writes": {"src/a": "b"},
+                "verify_command": None, "handoff": None,
+                "_nonstrict": True, "status_line": "ok"}
+        seats = {"builder": seat_spec([resp], ["src/"])}
+        repo, bus = make_repo(seats=seats)
+        try:
+            state = bus.state()
+            state["turn"] = "builder"
+            bus.write_state(state)
+            bus.commit_all("human: go")
+            self.assertTrue(Seat(bus, "builder").act_once())
+            self.assertIn("tolerant JSON extraction", bus.log()[-1]["body"])
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)
+
     def test_unknown_handoff_rejected(self):
         seats = {"builder": seat_spec(
             [{"summary": "x", "writes": {"src/a": "b"},
