@@ -27,3 +27,10 @@ STRICT: the "writes" object in your reply must contain ONLY the keys
 (including launcher/prompts.py or launcher/cli.py) is rejected by the
 runtime and wastes the turn. The --measure CLI wiring is explicitly
 OUT of this batch.
+
+UPDATE (attempt 10): launcher/prompts.py is now an allowed path. You
+MAY place the helper there instead of launcher/token_est.py if you
+judge it belongs with the prompt utilities - write the file's FULL
+new content and keep every existing prompt string intact. If you use
+prompts.py, omit launcher/token_est.py. launcher/cli.py remains
+FORBIDDEN - the runtime rejects it and wastes the turn.
