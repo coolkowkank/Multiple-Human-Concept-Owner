@@ -39,14 +39,14 @@ overall PASS.
 | P2 | Head binding incomplete: only turn/seq compared | verified (`dbeb842`) |
 | P3 | `commit_paths` committed the whole pre-staged index | verified (`dbeb842`); residual R3 |
 | P4 | `init` and gate-answer routes used `git add -A` | init verified (`dbeb842`); answer broken (R2) |
-| R1 | `respond` stale scan checks only turn/seq, not head: a head-stale line (non-queue commit, same token) is refused by the seat, but `--discard-stale` does not drop it and appends behind it; manual edit only | open |
-| R2 | Gate-answer commit message lacks the required prefix; the installed pre-commit guard rejects it, leaving ANSWERS staged and blocking later `respond` (P3). Test fixture had no hook installed | open |
-| R3 | Pre-staged refusal runs after the queue line is appended: uncommitted line left behind; unstage + retry duplicates it | open |
-| R4 | Seat-turn `commit_all` sweeps in-domain dirt; outside-domain dirt fails the guard only after mutation, leaving advanced uncommitted state | open |
+| R1 | `respond` stale scan checked only turn/seq, not head; `--discard-stale` could not drop a head-stale line | fixed-unverified (`37eb735`: one shared staleness definition for seat and respond; refuse -> discard -> fresh-apply regression) |
+| R2 | Gate-answer message lacked the required prefix; the installed hook rejected it, leaving ANSWERS staged | fixed-unverified (`37eb735`: operator: prefix, hook-installed regression, index unstaged on commit failure) |
+| R3 | Pre-staged refusal ran after the queue append: uncommitted residue, duplicate on retry | fixed-unverified (`37eb735`: check before append, rollback on commit failure) |
+| R4 | Outside-domain dirt failed the guard only after mutation, leaving advanced uncommitted state | fixed-unverified (`37eb735`: pre-mutation refusal; in-domain dirt remains the seat's own business) |
 
-R1-R4 fixes in progress on the working branch; each gets a regression
-test, including hook-installed and failure-atomicity cases. States
-move only on independent review.
+R1-R4 fixes landed at `37eb735` (76/76 tests, including
+hook-installed, head-stale recovery, and failure-atomicity cases).
+States move to `verified` only on independent review of `37eb735`.
 
 ## Provider routes (credential-level validation only)
 
@@ -72,7 +72,7 @@ autonomy.
 
 ## Next actions
 
-1. Fix R1-R4 (in progress), then independent review.
+1. Independent read-only review of the R1-R4 fixes (`37eb735`).
 2. Independent review of the R1-R4 fixes (this section).
 3. Then, under a fresh explicit go-ahead: bounded live cycle on the
    fixed head, live-1 protocol, hard stop.
