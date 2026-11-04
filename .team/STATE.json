@@ -1,8 +1,13 @@
 {
-  "turn": "coordinator",
-  "turn_seq": 0,
-  "turn_since": null,
+  "turn": "builder",
+  "turn_seq": 1,
+  "turn_since": "2026-11-04T00:20:07Z",
   "status": "active",
   "status_line": "i2i-2 configured; awaiting peer read-only check + joint GO",
-  "leases": {}
+  "leases": {
+    "coordinator": {
+      "holder": "coordinator-973cb2de",
+      "claimed_at": 1793751607.039593
+    }
+  }
 }
