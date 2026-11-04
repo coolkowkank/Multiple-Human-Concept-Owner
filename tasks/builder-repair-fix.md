@@ -305,3 +305,16 @@ Required repair (preserves test intent, not a weakening):
 - Optionally add the complementary case: same setup but turn_since 3 hours
   old MUST stall under UTC parsing (proves real stalls still detected).
 - Leave launcher/supervisor.py unchanged unless the suite shows otherwise.
+
+## v9 addendum - TZ control must be explicit, not host-dependent
+
+The repair must make the timezone regression reproducible by construction:
+- Save os.environ['TZ'] before the test, restore it in a finally/addCleanup,
+  and call time.tzset() after each change. Never leak TZ to other tests.
+- test_no_stall_utc: TZ=Europe/Berlin, stall_timeout=3600, turn_since 5s old
+  (UTC 'Z' string) -> 'coordinator' NOT stalled.
+- Add the complementary case in the same TZ: turn_since 3 hours old ->
+  'coordinator' MUST be stalled (proves real stalls still fire, so the green
+  is not just a widened timeout).
+- With a local-time (buggy) parse, the first case would inflate elapsed by
+  ~7200s and fail loudly even at timeout=3600 - that is the regression guard.
