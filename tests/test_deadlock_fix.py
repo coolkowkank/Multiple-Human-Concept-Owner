@@ -20,11 +20,18 @@ class DummyBus:
 
 class TestDeadlockFix(unittest.TestCase):
     def setUp(self):
+        self.original_tz = os.environ.get('TZ')
         self.bus=DummyBus()
-        self.sup=Supervisor(repo='.', stall_timeout=1)
+        self.sup=Supervisor(repo='.', stall_timeout=3600)
         self.sup.bus=self.bus
         # inject counter
         self.sup._routing_failures=0
+    def tearDown(self):
+        if self.original_tz is None:
+            os.environ.pop('TZ', None)
+        else:
+            os.environ['TZ'] = self.original_tz
+        time.tzset()
     def test_no_stall_utc(self):
         # set turn_since 5 seconds ago UTC
         ts=time.time()-5
@@ -35,6 +42,15 @@ class TestDeadlockFix(unittest.TestCase):
         time.tzset()
         self.sup._check_stall(self.bus.state())
         self.assertNotIn('coordinator', self.sup._stalled_seats)
+    def test_stall_detected_after_timeout(self):
+        # set turn_since 3 hours ago UTC, exceeds stall_timeout of 1 hour
+        ts=time.time()-3*60*60
+        self.bus.state_data['turn']='coordinator'
+        self.bus.state_data['turn_since']=time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(ts))
+        os.environ['TZ']='Europe/Berlin'
+        time.tzset()
+        self.sup._check_stall(self.bus.state())
+        self.assertIn('coordinator', self.sup._stalled_seats)
     def test_routing_failure_first(self):
         self.bus.state_data['status']='running'
         self.bus.state_data['turn']=None
