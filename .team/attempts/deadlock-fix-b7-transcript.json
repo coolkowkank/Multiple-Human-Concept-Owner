@@ -116,5 +116,15 @@
       },
       "service_tier": "on_demand"
     }
+  },
+  {
+    "tool_call": "git_commit",
+    "args": {
+      "message": "Fix UTC parsing and routing failure handling\n\nAdded tests for stall parsing and routing failure logic.\n\nTURN: builder"
+    },
+    "result": {
+      "ok": true,
+      "head": "651c5c4505ad641d5b0efcd9eabe7c63795f09df"
+    }
   }
 ]
