@@ -1,0 +1,15 @@
+{
+  "batch": 4,
+  "attempt": "deadlock-fix-b10",
+  "closed_utc": "2026-11-04T12:58:30Z",
+  "purpose": "push-only follow-on: publish the already-tested model commit",
+  "budget": {"cap": 2, "used": 1, "reset": false, "note": "separate ledger; batch 3 stays closed at 6/6"},
+  "result": {
+    "pushed": "45cec13eaf9dc0477f55b545042ffa453a00f20e",
+    "remote_verified": "ls-remote origin live/builder-deadlock-fix == 45cec13eaf9dc0477f55b545042ffa453a00f20e",
+    "gate": "whole-tree push-surface binding; approved 2026-11-04T12:57:41Z; push by the model's own git_push call",
+    "api_calls": 1
+  },
+  "credentials": "Groq key + GitHub token vault copies deleted after run",
+  "cumulative": {"batch1": "16/12 (closed, reconciled)", "batch2": "5/6 (closed, 1 unused)", "batch3": "6/6 (closed)", "batch4": "1/2 (closed)"}
+}
