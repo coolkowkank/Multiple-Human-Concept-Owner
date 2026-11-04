@@ -1,1 +1,70 @@
-{"questions": []}
+{
+  "questions": [
+    {
+      "id": "jobdesc-46cb0655",
+      "status": "open",
+      "attempts": {},
+      "question": "Which of these job-description passages (largest blocks or repeated wording) can be shortened or merged without removing a duty or a safety check? Each finding names the passage id, what can be cut, and a shorter wording. Cite packet ids only.",
+      "packet": [
+        {
+          "id": "P1",
+          "title": "block in docs/team/blueprints/coordinator-assistant.md (2523 chars)",
+          "locations": [
+            "docs/team/blueprints/coordinator-assistant.md:7"
+          ],
+          "passage": "- **Status:** active (dedicated assignment from the owner, 2026-11-04:\n  keep the GitHub Pages project status current - Gantt chart, S-curve,\n  team, timeline)\n- **Purpose:** owns status-evidence collection and status publication\n  for the project Pages site, so the coordinator can focus on\n  assignments, priorities and acceptance.\n- **Current model / provider:** google/gemma-4-31b-it via the\n  Requesty price-0 route, for the narrow fixed-template STATUS-DRAFT\n  job only: one bounded attempt, one coordinator-reviewed usable\n  sample (2026-11-04, cost 0). This is NOT a general qualification:\n   [truncated: 600 of 2523 chars shown]"
+        },
+        {
+          "id": "P2",
+          "title": "block in docs/team/blueprints/builder.md (2306 chars)",
+          "locations": [
+            "docs/team/blueprints/builder.md:3"
+          ],
+          "passage": "- **Status:** active (instance builder-1 \"Alex\")\n- **Instances:** builder-1 \"Alex\" (Groq gpt-oss-120b). builder-2 (model\n  none, operator execution; carries the WP4/WP9 work, formerly\n  recovery-1, see recovery-executor.md). builder-2 asks reviewer-1 Bill\n  for review of each pinned change and receives his verdicts (route\n  accepted by Bill 2026-11-04: bounded, read-only, per-request scope;\n  no standing or unbounded work). It shares no\n  provider quota with builder-1 because it holds no model.\n- **Purpose:** implements scoped code tasks on live/* branches through\n  the self-commit executor: r [truncated: 600 of 2306 chars shown]"
+        },
+        {
+          "id": "P3",
+          "title": "block in docs/team/blueprints/researcher.md (1640 chars)",
+          "locations": [
+            "docs/team/blueprints/researcher.md:3"
+          ],
+          "passage": "- **Status:** active (instance researcher-1 \"Nora\")\n- **Purpose:** produces sourced literature findings for the project and\n  publishes them on the Research_lab branch; synthesis of verified\n  sources only, under the citation gate (research/CITATION-GATE.md).\n- **Current model / provider:** nvidia/nemotron-3-ultra-550b-a55b via\n  the Requesty free route (200 requests/day account-wide, cost=0\n  verified). Trial record: research/findings/2026-11-04-nora-model-trial.md.\n  Publishes via the dedicated owner Researcher token (owner-granted).\n- **Owns (scope):** research/** on Research_lab. Never cod [truncated: 600 of 1640 chars shown]"
+        },
+        {
+          "id": "P4",
+          "title": "block in docs/team/blueprints/evidence-verifier.md (1594 chars)",
+          "locations": [
+            "docs/team/blueprints/evidence-verifier.md:3"
+          ],
+          "passage": "- **Status:** active (instance verifier-1 \"Eva\")\n- **Purpose:** independently verifies that Researcher output faithfully\n  reflects its cited sources before publication; separate model family\n  from the Researcher so verification is not the same weights grading\n  their own phrasing. Full workflow: ../../eva-evidence-verifier.md\n  (repo docs/eva-evidence-verifier.md).\n- **Current model / provider:** google/gemma-4-31b-it via the Requesty\n  free route (cost=0 trial-verified, 7/7 verdicts). Publishes reviews on\n  Research_lab via the owner token (owner-granted 2026-11-04).\n- **Owns (scope):** res [truncated: 600 of 1594 chars shown]"
+        },
+        {
+          "id": "P5",
+          "title": "block in docs/team/blueprints/team-resources.md (1591 chars)",
+          "locations": [
+            "docs/team/blueprints/team-resources.md:32"
+          ],
+          "passage": "Dedicated Researcher + Verifier functions work for Ryan, separate from\nNora/Eva prototype research: the Researcher gathers performance and\nworkflow evidence; the Verifier independently checks claims before a\nproposal enters the chain. Staffing status 2026-11-04: dedicated support is requested and its\nmodel assignments are unresolved. One loop is complete: the performance\nanalysis was done by operator research, independently verified against\nthe full sources by operator support (not a model seat), and checked once\nwith a Groq gpt-oss-120b second-opinion sample (3076 tokens, cost 0 as\nprovider-r [truncated: 600 of 1591 chars shown]"
+        },
+        {
+          "id": "P6",
+          "title": "block in docs/team/blueprints/team-resources.md (1508 chars)",
+          "locations": [
+            "docs/team/blueprints/team-resources.md:63"
+          ],
+          "passage": "- `check-price <listing.json> <model-id>`: PASS only when the EXACT id\n  is present with all-zero prices; paid prefixed variants never match.\n- `record-event <record.json> <route> ok|cap-ambiguous|cap-org-confirmed|error\n  <evidence>`: dated status update; an ambiguous cap cools only that\n  route, an org-confirmed cap blocks the whole provider pool until a\n  later success, never a date guess.\n- `propose <record.json> <listing.json|-> <job-shape> <failed-route>\n  <remaining-attempts>`: prints DECISION (automatic replacement choice,\n  authorized under the owner's 2026-11-04 resource-fit grant) O [truncated: 600 of 1508 chars shown]"
+        }
+      ],
+      "kind": "jobdesc-efficiency"
+    },
+    {
+      "id": "research-model-vs-harness",
+      "kind": "research",
+      "status": "awaiting-packet",
+      "attempts": {},
+      "question": "How much does model selection change task performance when the harness (prompts, tools, scaffolding) is held fixed, and which model-harness interactions matter? Keep published findings separate from anything tested on this project.",
+      "packet": [],
+      "note": "Owner request 2026-11-04 19:43 EET. Not runnable: needs a source packet (published findings with URLs) from the research lane, then a free verified route. Adding it does not clear the PAUSE and authorizes no call."
+    }
+  ]
+}

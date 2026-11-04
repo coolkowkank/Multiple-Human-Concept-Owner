@@ -1,0 +1,3 @@
+{"phase": "reserved", "rid": "allocation-0", "ts": "2026-11-04T17:41:11Z", "qid": "alloc", "role": "allocation", "model": "nvidia/nemotron-3-ultra-550b-a55b"}
+{"phase": "result", "rid": "allocation-0", "ts": "2026-11-04T17:41:11Z", "qid": "alloc", "role": "allocation", "model": "nvidia/nemotron-3-ultra-550b-a55b", "usage": null, "outcome": "unknown"}
+{"phase": "halt", "ts": "2026-11-04T17:41:11Z", "reason": "unknown transport outcome allocation-0"}

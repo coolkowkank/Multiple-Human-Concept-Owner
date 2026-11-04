@@ -1,6 +1,10 @@
 # Ryan continuous pipeline (offline build, not running)
 
-Status: runner built and mock-tested only. No live call has been made. Live
+Status: PAUSED after the first live attempt (see incident-1.md): one
+allocation request ended with an unknown outcome. No assignment exists and
+nothing is running. Earlier text below describes the design.
+
+Original status: runner built and mock-tested only. Live
 use waits for independent review, a fresh price-0 check on exact model ids,
 and reconciliation of the shared free-request pool. Nothing here shows a
 model is assigned or running.
