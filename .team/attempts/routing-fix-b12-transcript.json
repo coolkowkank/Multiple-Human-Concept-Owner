@@ -459,5 +459,53 @@
       "x-ratelimit-reset-tokens": "13.44s"
     },
     "call": 7
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-bd7bd773-b0fe-4388-9760-f075e8daacc2",
+      "object": "chat.completion",
+      "created": 1793799917,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "Maybe the path different. Let's list tree? Not possible. Might be tests file. Open test.",
+            "tool_calls": [
+              {
+                "id": "fc_04c10b08-5be4-42da-aec9-5e7f54eb1189",
+                "type": "function",
+                "function": {
+                  "name": "write_file",
+                  "arguments": "{\"content\":\"# placeholder\",\"path\":\"tests/test_deadlock_fix.py\"}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.11359938,
+        "prompt_tokens": 1657,
+        "prompt_time": 0.094772235,
+        "completion_tokens": 56,
+        "completion_time": 0.118305578,
+        "total_tokens": 1713,
+        "total_time": 0.213077813,
+        "completion_tokens_details": {
+          "reasoning_tokens": 22
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_bb691ea66b",
+      "x_groq": {
+        "id": "req_01m6kcx3wbeb6ra76y5z9f7emb",
+        "seed": 1876685729
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
