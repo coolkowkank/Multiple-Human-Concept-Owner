@@ -84,6 +84,20 @@ class CompletionPolicyTests(unittest.TestCase):
         for field in ('source_commit', 'evidence_digest'):
             self.assertFalse(self.check(evidence=[replace(self.rows[0], **{field: ''}), self.rows[1]]).eligible)
 
+    def test_unhashable_or_invalid_builder_refuses(self):
+        for builder in ([], {}, None, '', '   ', 1):
+            self.assertFalse(self.check(builder=builder).eligible)
+
+    def test_required_seat_wrong_role_never_hides_later_fail(self):
+        bad = replace(self.rows[0], role='qc', verdict='FAIL', turn_seq=6)
+        self.assertFalse(self.check(evidence=self.rows + [bad]).eligible)
+        self.assertFalse(self.check(evidence=[bad] + self.rows).eligible)
+
+    def test_commit_and_digest_require_nonempty_strings(self):
+        for field in ('source_commit', 'evidence_digest'):
+            for value in (True, 42, object(), [], {}, '   '):
+                self.assertFalse(self.check(evidence=[replace(self.rows[0], **{field: value}), self.rows[1]]).eligible)
+
     def test_pure_idempotent_no_input_mutation(self):
         before = repr((self.rows, self.roster, self.binding, self.policy))
         self.assertEqual(self.check(), self.check())
