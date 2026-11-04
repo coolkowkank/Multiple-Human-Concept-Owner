@@ -382,5 +382,53 @@
       "x-ratelimit-reset-tokens": "12.607s"
     },
     "call": 6
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-3941674e-ffbf-4d85-bb66-e544e6ce7e29",
+      "object": "chat.completion",
+      "created": 1793799853,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "We need to read file. Use edit_file with old_string that likely exists. Let's try to search for \"_routing_failure_count\" via edit with dummy replace to get error showing line.",
+            "tool_calls": [
+              {
+                "id": "fc_d009308c-e664-49ff-a7bb-eadac471a1d7",
+                "type": "function",
+                "function": {
+                  "name": "edit_file",
+                  "arguments": "{\"new_string\":\"_routing_failure_count\",\"old_string\":\"_routing_failure_count\",\"path\":\"launcher/supervisor.py\"}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.190656664,
+        "prompt_tokens": 1546,
+        "prompt_time": 0.302998114,
+        "completion_tokens": 78,
+        "completion_time": 0.167078414,
+        "total_tokens": 1624,
+        "total_time": 0.470076528,
+        "completion_tokens_details": {
+          "reasoning_tokens": 38
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_8655ddce88",
+      "x_groq": {
+        "id": "req_01m6kcv4are3q9mxzta9d2dkvq",
+        "seed": 618430156
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
