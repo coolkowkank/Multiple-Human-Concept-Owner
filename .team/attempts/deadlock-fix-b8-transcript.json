@@ -266,5 +266,53 @@
       "x-ratelimit-reset-tokens": "28.485s"
     },
     "call": 4
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-73c97d14-0021-4ba3-88e1-c7508f8bc698",
+      "object": "chat.completion",
+      "created": 1793795364,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "Now commit.",
+            "tool_calls": [
+              {
+                "id": "fc_7efe4213-abe2-4572-b349-7984b58a1757",
+                "type": "function",
+                "function": {
+                  "name": "git_commit",
+                  "arguments": "{\"message\":\"Fix UTC parsing and add routing-failure handling in supervisor.\\n\\n- Imported calendar for UTC timestamp parsing.\\n- Updated _check_stall to use calendar.timegm and handle unparsable timestamps.\\n- Added detection of falsy turn with running status, logging routing-failure and re\u2011issuing turn to coordinator.\\n- Implemented consecutive occurrence tracking and escalation.\\n\\nTURN: builder\"}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 1.058125033,
+        "prompt_tokens": 3031,
+        "prompt_time": 0.156592163,
+        "completion_tokens": 104,
+        "completion_time": 0.223386173,
+        "total_tokens": 3135,
+        "total_time": 0.379978336,
+        "completion_tokens_details": {
+          "reasoning_tokens": 4
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_f73454f048",
+      "x_groq": {
+        "id": "req_01m6k8j488ev1vveb7vfxhnxny",
+        "seed": 1088050564
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
