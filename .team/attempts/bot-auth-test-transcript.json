@@ -110,5 +110,15 @@
       },
       "service_tier": "on_demand"
     }
+  },
+  {
+    "tool_call": "git_commit",
+    "args": {
+      "message": "Update docs/proposed-vs-tested.md with new LIVE-VERIFIED capability entry\n\nTURN: builder"
+    },
+    "result": {
+      "ok": true,
+      "head": "e056ae95ee103c8f1a5b9b619c989543b7d54c24"
+    }
   }
 ]
