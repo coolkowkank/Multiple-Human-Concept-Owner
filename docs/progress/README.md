@@ -10,6 +10,10 @@ Charts at the top of the main README come from `progress.json` and `render_progr
 - Credit is dated when the evidence was observed, so the curve does not claim earlier progress than the repo shows.
 - Weights are a judgment call by the maintainers of this chart. They are not effort estimates.
 
+## WP5 and WP7 criteria
+
+WP7 criterion: done when an independent reviewer returns a written verdict on a pinned commit with the tests reproduced. The verdict can be changes-required. Acceptance of the fix is tracked by WP5, which gets full credit only when a review accepts it.
+
 ## Research package criteria
 
 The Researcher role's deliverable is sourced literature insight, so WP8a does not require product adoption.

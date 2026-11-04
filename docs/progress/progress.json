@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04T15:01:00+02:00",
+ "as_of": "2026-11-04T15:05:00+02:00",
  "timezone": "EET (UTC+2), same as commit timestamps",
  "rules": "Weighted milestone progress, not independently verified completion. Milestone done = 100% of weight (tests pass or an independent review passed). Partial = 50%. In progress / not started = 0%. Weights are judgment calls. Commits alone never count.",
  "packages": [
@@ -72,8 +72,8 @@
    "weight": 15,
    "status": "partial",
    "start": "2026-11-04T13:24",
-   "forecast_end": "2026-11-04T19:00",
-   "evidence": "Builder head 45cec13 pushed to live/builder-deadlock-fix (base 625de3f; implementation 0fa083a plus test repair). Coordinator reports full suite 164/164. Checked by us in a clean checkout: tests/test_deadlock_fix.py 5/5 pass, also under TZ=America/Los_Angeles. Partial: full credit needs the independent review verdict (WP7). Unit tests only, not a live multi-seat run",
+   "forecast_end": "2026-11-04T21:00",
+   "evidence": "Builder head 45cec13 pushed (base 625de3f). Independent review returned changes-required: hardcoded Coordinator next-turn conflicts with the no-invented-routing rule; the escalation test never exercises escalation; counter-reset and dead test-injection issues. Reviewer reproduced 164/164 and 5/5 and verified the UTC fix. Correction queued. Partial: full credit needs an accepting review of the corrected fix",
    "pic": [
     "coolkowkank-bot"
    ],
@@ -102,15 +102,16 @@
    "id": "WP7",
    "name": "Independent review of the Builder fix",
    "weight": 6,
-   "status": "in_progress",
+   "status": "verified",
    "start": "2026-11-04T14:58",
-   "forecast_end": "2026-11-04T19:00",
-   "evidence": "Christina accepted the review request for base 625de3f to head 45cec13. No verdict yet. Not a review PASS",
+   "evidence": "Christina returned a written verdict on exact head 45cec13: changes-required, tests reproduced. Counted done because WP7 means a delivered independent verdict, not acceptance. Per the coordinator's report of the review. A later re-review of the correction is not a new package",
    "pic": [
     "instinct-christina"
    ],
    "contributors": [],
-   "baseline_end": "2026-11-04T19:00"
+   "baseline_end": "2026-11-04T19:00",
+   "end": "2026-11-04T15:03",
+   "credit_at": "2026-11-04T15:03"
   },
   {
    "id": "WP8a",

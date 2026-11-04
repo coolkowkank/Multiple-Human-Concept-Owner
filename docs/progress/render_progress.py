@@ -28,7 +28,7 @@ fig, ax = plt.subplots(figsize=(11, 7.4))
 for i, p in enumerate(P):
     y = len(P) - 1 - i; s = t(p["start"])
     if p["status"] in ("verified", "partial"):
-        e = t(p["end"]); ax.barh(y, md.date2num(e)-md.date2num(s), left=md.date2num(s), color=COL[p["status"]], height=.55)
+        e = t(p["end"]); ax.barh(y, max(md.date2num(e)-md.date2num(s), 0.012), left=md.date2num(s), color=COL[p["status"]], height=.55)
     elif p["status"] == "in_progress":
         ax.barh(y, md.date2num(asof)-md.date2num(s), left=md.date2num(s), color=COL["in_progress"], height=.55)
     if "forecast_end" in p:
