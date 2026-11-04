@@ -4,9 +4,9 @@
 
 *As of 2026-11-04 14:40 EET. Verified progress is **38.5%** of weighted scope. No autonomous end-to-end run has passed yet.*
 
-![Gantt chart](docs/progress/gantt.svg)
+![Gantt chart](docs/progress/gantt.png)
 
-![Progress S-curve](docs/progress/s-curve.svg)
+![Progress S-curve](docs/progress/s-curve.png)
 
 Only verified outcomes count as progress. The dashed lines are forecasts, not commitments, and no earlier plan existed to compare against. See [how progress is measured](docs/progress/README.md).
 
