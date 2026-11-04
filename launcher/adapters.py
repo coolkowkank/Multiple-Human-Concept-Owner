@@ -53,7 +53,12 @@ def _consume_queue(path, peeked):
 
 
 class AdapterError(Exception):
-    pass
+    """Adapter failure. `raw` optionally carries the unmodified model
+    output that caused a format failure, for evidence preservation."""
+
+    def __init__(self, message, raw=None):
+        super().__init__(message)
+        self.raw = raw
 
 
 class Adapter:
@@ -271,11 +276,13 @@ def parse_response(text):
                 return json.loads(block)
             except json.JSONDecodeError:
                 continue
-        raise AdapterError("no parseable JSON fence in model output")
+        raise AdapterError("no parseable JSON fence in model output",
+                           raw=text)
     try:
         return json.loads(text)
     except json.JSONDecodeError as exc:
-        raise AdapterError(f"model output is not JSON: {exc}") from exc
+        raise AdapterError(f"model output is not JSON: {exc}",
+                           raw=text) from exc
 
 
 def build_adapter(spec):

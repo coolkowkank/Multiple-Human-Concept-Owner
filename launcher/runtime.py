@@ -253,6 +253,20 @@ class Seat:
     _FORMAT_ERROR_PREFIXES = ("model output is not JSON",
                               "no parseable JSON fence")
 
+    # Adapter-call budget per turn: at most 3 - the initial call, ONE
+    # format-correction round (contract-format failures only), and ONE
+    # path-guard correction round (forbidden write paths). The two
+    # correction rounds can compose: a format-corrected reply can still
+    # fail the path guard and use the path round.
+    def _preserve_raw(self, state, exc, attempt):
+        raw = getattr(exc, "raw", None)
+        if raw is None:
+            return None
+        path = (f".team/raw/{self.name}-seq{state['turn_seq']}"
+                f"-attempt-{attempt}.txt")
+        self._write(self.bus.repo, path, raw)
+        return path
+
     def _call_adapter(self, state):
         system, task = self.build_prompt(state)
         corrections = []
@@ -262,6 +276,7 @@ class Seat:
             if not str(exc).startswith(self._FORMAT_ERROR_PREFIXES):
                 raise SeatError(
                     f"adapter failed for {self.name}: {exc}") from exc
+            first_raw = self._preserve_raw(state, exc, 1)
             # One bounded format-correction round (observed live:
             # gpt-oss-120b appended prose after a valid object,
             # live/groq-dev-2 2026-11-04). The model re-answers and the
@@ -277,12 +292,18 @@ class Seat:
             try:
                 response = self.adapter.complete(system, correction)
             except AdapterError as exc2:
+                second_raw = self._preserve_raw(state, exc2, 2)
+                saved = [p for p in (first_raw, second_raw) if p]
                 raise SeatError(
                     f"adapter failed for {self.name} on the "
-                    f"format-correction round: {exc2}") from exc2
+                    f"format-correction round: {exc2}"
+                    + (f" (raw model output preserved: {saved})"
+                       if saved else "")) from exc2
             corrections.append(
                 "format-correction round used; first reply was not "
-                f"contract JSON ({exc})")
+                f"contract JSON ({exc})"
+                + (f" (raw preserved: {first_raw})"
+                   if first_raw else ""))
         if not isinstance(response, dict):
             raise SeatError(f"{self.name} returned a non-object response")
         if response.get("_queue") is not None:

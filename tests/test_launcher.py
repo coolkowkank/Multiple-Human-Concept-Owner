@@ -309,6 +309,78 @@ class SeatTests(unittest.TestCase):
         finally:
             shutil.rmtree(repo, ignore_errors=True)
 
+    def test_format_and_path_corrections_compose_budget_three(self):
+        calls = []
+
+        def fn(system, prompt, i):
+            calls.append(prompt)
+            if i == 0:
+                raise AdapterError("model output is not JSON: Extra data")
+            if i == 1:
+                return {"summary": "wrong", "writes": {"etc/x": "y"},
+                        "verify_command": None, "handoff": None}
+            return {"summary": "fixed", "writes": {"src/a": "b"},
+                    "verify_command": None, "handoff": None,
+                    "status_line": "ok"}
+
+        seats = {"builder": seat_spec([], ["src/"])}
+        repo, bus = make_repo(seats=seats)
+        try:
+            seat = self._seat_with_callable(repo, bus, fn)
+            self.assertTrue(seat.act_once())
+            # budget: 1 initial + 1 format correction + 1 path correction
+            self.assertEqual(len(calls), 3)
+            body = bus.log()[-1]["body"]
+            self.assertIn("format-correction round used", body)
+            self.assertIn("path-guard correction round used", body)
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)
+
+    def test_raw_output_preserved_on_successful_format_correction(self):
+        raw_text = '{"summary": "x"} trailing junk that broke parsing'
+
+        def fn(system, prompt, i):
+            if i == 0:
+                raise AdapterError("model output is not JSON: Extra data",
+                                   raw=raw_text)
+            return {"summary": "fixed", "writes": {"src/a": "b"},
+                    "verify_command": None, "handoff": None,
+                    "status_line": "ok"}
+
+        seats = {"builder": seat_spec([], ["src/"])}
+        repo, bus = make_repo(seats=seats)
+        try:
+            seat = self._seat_with_callable(repo, bus, fn)
+            self.assertTrue(seat.act_once())
+            path = os.path.join(
+                repo, ".team", "raw", "builder-seq0-attempt-1.txt")
+            self.assertTrue(os.path.exists(path))
+            self.assertEqual(open(path).read(), raw_text)
+            self.assertIn("raw preserved", bus.log()[-1]["body"])
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)
+
+    def test_raw_output_preserved_on_terminal_format_failure(self):
+        def fn(system, prompt, i):
+            raise AdapterError("model output is not JSON: nope",
+                               raw=f"garbage attempt {i + 1}")
+
+        seats = {"builder": seat_spec([], ["src/"])}
+        repo, bus = make_repo(seats=seats)
+        try:
+            seat = self._seat_with_callable(repo, bus, fn)
+            with self.assertRaises(SeatError) as ctx:
+                seat.act_once()
+            self.assertIn("raw model output preserved",
+                          str(ctx.exception))
+            for n in (1, 2):
+                path = os.path.join(
+                    repo, ".team", "raw", f"builder-seq0-attempt-{n}.txt")
+                self.assertTrue(os.path.exists(path))
+                self.assertEqual(open(path).read(), f"garbage attempt {n}")
+        finally:
+            shutil.rmtree(repo, ignore_errors=True)
+
     def test_unknown_handoff_rejected(self):
         seats = {"builder": seat_spec(
             [{"summary": "x", "writes": {"src/a": "b"},
