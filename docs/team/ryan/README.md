@@ -21,4 +21,18 @@ checks go back for one correction round before Ryan sees anything.
   call; it measures bytes only (chars/4 is a heuristic, not tokens).
 - Policy drafts by Ryan follow the existing approval chain. No automatic
   adoption; no override of owner, spending or security holds.
+- Route record gate: a role model (and Ryan's bootstrap model) must be
+  recorded under its exact id with status working or untested (untested =
+  human-recorded, first cycle tests it); unrecorded ids are unknown, not
+  working. Blocked statuses and blocked providers refuse.
+- Price gate: input and output price must be present, numeric and 0.
+  Missing pricing is unknown, not free.
+- Verifier SUPPORTED verdicts must give a source id from the finding and a
+  quote that is a verbatim substring of that passage (mechanical check;
+  whether it supports the claim stays model judgment).
+- Gate + reserve + queue/assignment writes run under a flock transaction
+  lock (never held across a request). Rejected verifier/Ryan replies are
+  retried once with the rejection reason.
+- Ryan's allocation request counts 1 of the 24 requests and 1 of the 4
+  daily question slots, leaving 3 research questions that day.
 - Outputs end at `ready-for-chain`.

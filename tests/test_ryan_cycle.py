@@ -9,8 +9,13 @@ FRESH = lambda: {"fetched_at": rc.iso(T0 - 60), "source": "mock /v1/models",
      "output_price": 0},
     {"id": "google/gemma-4-31b-it", "input_price": 0, "output_price": 0},
     {"id": "paid/model", "input_price": 1, "output_price": 1}]}
-PACKET = [{"id": "P1", "title": "t", "passage": "alpha"},
-          {"id": "P2", "title": "t", "passage": "beta"}]
+PACKET = [{"id": "P1", "title": "t", "passage": "alpha passage text here"},
+          {"id": "P2", "title": "t", "passage": "beta passage text here"}]
+RECORD = {"provider_blocks": {}, "routes": [
+    {"id": "nvidia/nemotron-3-ultra-550b-a55b", "provider": "requesty",
+     "status": "working"},
+    {"id": "google/gemma-4-31b-it", "provider": "requesty",
+     "status": "working"}]}
 ASSIGN = {"models": {"researcher": "nvidia/nemotron-3-ultra-550b-a55b",
                      "verifier": "google/gemma-4-31b-it",
                      "ryan": "nvidia/nemotron-3-ultra-550b-a55b"},
@@ -24,7 +29,8 @@ def ok(obj, usage=None):
 
 R_OK = {"findings": [{"id": "C1", "claim": "a", "sources": ["P1"],
                       "status": "SUPPORTED_BY_PACKET"}], "summary": "s"}
-V_OK = {"verdicts": [{"id": "C1", "verdict": "SUPPORTED", "evidence": "e"}],
+V_OK = {"verdicts": [{"id": "C1", "verdict": "SUPPORTED", "source": "P1",
+                      "quote": "alpha passage text", "evidence": "e"}],
         "overall": "PASS"}
 Y_OK = {"usefulness": [{"id": "C1", "useful": "HIGH", "why": "w",
                         "proposed_action": "p"}], "note": "n"}
@@ -45,14 +51,14 @@ class Base(unittest.TestCase):
             with open(os.path.join(self.d, "assignments.json"), "w") as f:
                 json.dump(assign, f)
 
-    def run_step(self, replies, listing=FRESH):
+    def run_step(self, replies, listing=FRESH, record=None):
         it = iter(replies)
 
         def post(model, system, prompt, mt):
             self.calls.append((model, prompt))
             return next(it)
         self.t += 20
-        return rc.step(self.d, post, listing, self.t)
+        return rc.step(self.d, post, listing, self.t, record or RECORD)
 
 
 class Pipeline(Base):
@@ -74,7 +80,7 @@ class Pipeline(Base):
         self.store.save_queue({"questions": []})
         fetched = []
         out = rc.step(self.d, lambda *a: 1 / 0,
-                      lambda: fetched.append(1), T0)
+                      lambda: fetched.append(1), T0, RECORD)
         self.assertEqual((out["action"], out["calls"], fetched),
                          ("idle", 0, []))
 
@@ -125,6 +131,7 @@ class Pipeline(Base):
             {"id": "C2", "claim": "unknownbit", "sources": [],
              "status": "UNVERIFIED"}]}
         v = {"verdicts": [{"id": "C1", "verdict": "SUPPORTED",
+                           "source": "P1", "quote": "alpha passage text",
                            "evidence": "e"},
                           {"id": "C2", "verdict": "UNVERIFIED",
                            "evidence": "e"}]}
@@ -159,8 +166,10 @@ class Safety(Base):
         paid = json.loads(json.dumps(ASSIGN))
         paid["models"]["researcher"] = "paid/model"
         self.seed(assign=paid)
+        rec = dict(RECORD, routes=RECORD["routes"] + [
+            {"id": "paid/model", "provider": "x", "status": "working"}])
         with self.assertRaises(rc.Halt):
-            self.run_step([])
+            self.run_step([], record=rec)
         self.assertEqual(self.calls, [])
         self.assertEqual(self.store.ledger(), [])
 
@@ -236,7 +245,7 @@ class Safety(Base):
     def test_spacing(self):
         self.seed()
         self.run_step([ok(R_OK)])
-        out = rc.step(self.d, lambda *a: 1 / 0, FRESH, self.t + 2)
+        out = rc.step(self.d, lambda *a: 1 / 0, FRESH, self.t + 2, RECORD)
         self.assertEqual(out["action"], "wait")
 
     def test_oversize_input_refused(self):
@@ -255,7 +264,7 @@ class Allocation(Base):
     ALLOC = ASSIGN
 
     def test_valid_choice_saved_and_counts_in_cap(self):
-        rec = {"routes": [], "provider_blocks": {}}
+        rec = RECORD
         out = rc.allocate(self.d, lambda *a: ok(self.ALLOC), FRESH, rec,
                           T0 + 20)
         self.assertEqual(out["action"], "assigned")
@@ -265,25 +274,146 @@ class Allocation(Base):
                               if e["phase"] == "reserved"]), 1)
 
     def test_invalid_choices_rejected_not_saved(self):
-        rec = {"routes": [{"id": "google/gemma-4-31b-it",
-                           "provider": "requesty", "status": "cooldown"}],
-               "provider_blocks": {}}
+        rec = {"routes": [RECORD["routes"][0], {
+            "id": "google/gemma-4-31b-it", "provider": "requesty",
+            "status": "cooldown"}], "provider_blocks": {}}
         cases = []
         same = json.loads(json.dumps(ASSIGN))
         same["models"]["verifier"] = "nvidia/nemotron-3-ultra-550b-a55b"
-        cases.append((same, {"routes": [], "provider_blocks": {}}))
+        cases.append((same, RECORD))
         cases.append((ASSIGN, rec))                     # verifier cooldown
         paid = json.loads(json.dumps(ASSIGN))
         paid["models"]["ryan"] = "paid/model"
-        cases.append((paid, {"routes": [], "provider_blocks": {}}))
+        cases.append((paid, RECORD))
         nojust = json.loads(json.dumps(ASSIGN)); nojust["why"]["ryan"] = ""
-        cases.append((nojust, {"routes": [], "provider_blocks": {}}))
+        cases.append((nojust, RECORD))
         for i, (a, r) in enumerate(cases):
             out = rc.allocate(self.d, lambda *x, a=a: ok(a), FRESH, r,
                               T0 + 20 + 30 * i)
             self.assertEqual(out["action"], "rejected", i)
         self.assertFalse(os.path.exists(os.path.join(
             self.d, "assignments.json")))
+
+
+class Review2(Base):
+    def test_missing_or_partial_prices_are_unknown_not_free(self):
+        for item in ({"id": "m", "output_price": 0},
+                     {"id": "m"},
+                     {"id": "m", "input_price": None, "output_price": 0},
+                     {"id": "m", "input_price": "0", "output_price": 0},
+                     {"id": "m", "input_price": 0, "output_price": 0,
+                      "cached_price": None}):
+            self.assertFalse(rc.mr.price_zero({"data": [item]}, "m"), item)
+        self.assertTrue(rc.mr.price_zero({"data": [
+            {"id": "m", "input_price": 0, "output_price": 0}]}, "m"))
+
+    def test_unrecorded_route_is_unknown_for_assignment(self):
+        rec = {"provider_blocks": {}, "routes": [
+            {"id": "nvidia/nemotron-3-ultra-550b", "provider": "requesty",
+             "status": "working"}] + RECORD["routes"][1:]}
+        bad = rc.validate_assignments(ASSIGN, rec, FRESH(), T0)
+        self.assertIn("no route record", bad)
+
+    def test_bootstrap_uses_same_availability_gate(self):
+        for rec in ({"routes": [], "provider_blocks": {}},
+                    {"routes": [dict(RECORD["routes"][0], status="capped")],
+                     "provider_blocks": {}},
+                    {"routes": RECORD["routes"],
+                     "provider_blocks": {"requesty": {}}}):
+            out = rc.allocate(self.d, lambda *a: 1 / 0, FRESH, rec, T0 + 20)
+            self.assertEqual((out["action"], out["calls"]),
+                             ("needs-human", 0))
+        self.assertEqual(self.store.ledger(), [])
+
+    def test_step_refuses_blocked_route_record(self):
+        self.seed()
+        rec = {"routes": [dict(RECORD["routes"][0], status="cooldown")],
+               "provider_blocks": {}}
+        out = self.run_step([], record=rec)
+        self.assertEqual((out["action"], out["calls"]), ("needs-human", 0))
+
+    def test_concurrent_steps_never_exceed_cap(self):
+        import threading
+        self.seed()
+        for i in range(rc.DAILY_CAP - 1):
+            self.store.append({"phase": "reserved", "rid": "x%d" % i,
+                               "ts": rc.iso(T0 - 100), "qid": "q%d" % (i % 3),
+                               "role": "researcher", "model": "m"})
+            self.store.append({"phase": "result", "rid": "x%d" % i,
+                               "ts": rc.iso(T0 - 100), "outcome": "ok"})
+        outs, errs = [], []
+
+        def go():
+            try:
+                outs.append(rc.step(self.d, lambda *a: ok(R_OK), FRESH,
+                                    T0 + 20, RECORD)["action"])
+            except rc.Halt as e:
+                errs.append(str(e))
+        ts = [threading.Thread(target=go) for _ in range(4)]
+        [t.start() for t in ts]
+        [t.join() for t in ts]
+        n = len([e for e in self.store.ledger() if e["phase"] == "reserved"])
+        self.assertLessEqual(n, rc.DAILY_CAP)
+
+    def test_reserve_is_atomic_gate_plus_append(self):
+        for i in range(rc.DAILY_CAP - 1):
+            self.store.append({"phase": "reserved", "rid": "x%d" % i,
+                               "ts": rc.iso(T0 - 100), "qid": "q%d" % (i % 3),
+                               "role": "researcher", "model": "m"})
+            self.store.append({"phase": "result", "rid": "x%d" % i,
+                               "ts": rc.iso(T0 - 100), "outcome": "ok"})
+        a = rc.Store(self.d).reserve(T0, {"phase": "reserved", "rid": "a",
+            "ts": rc.iso(T0), "qid": "q0", "role": "r", "model": "m"}, "q0")
+        self.assertEqual(a[0], "ok")
+        self.store.append({"phase": "result", "rid": "a", "ts": rc.iso(T0),
+                           "outcome": "ok"})
+        b = rc.Store(self.d).reserve(T0 + 20, {"phase": "reserved",
+            "rid": "b", "ts": rc.iso(T0 + 20), "qid": "q1", "role": "r",
+            "model": "m"}, "q1")
+        self.assertEqual(b[0], "wait")
+
+    def test_fabricated_or_wrong_source_quote_is_not_verified(self):
+        for v in ({"source": "P1", "quote": "this never appears anywhere"},
+                  {"source": "P2", "quote": "beta passage text"},
+                  {"source": "P1", "quote": ""}):
+            self.setUp()
+            self.seed()
+            self.run_step([ok(R_OK)])
+            row = dict({"id": "C1", "verdict": "SUPPORTED",
+                        "evidence": "e"}, **v)
+            out = self.run_step([ok({"verdicts": [row]})])
+            self.assertEqual(out["action"], "precheck-failed", v)
+            self.assertEqual(self.store.queue()["questions"][0]["status"],
+                             "drafted")
+
+    def test_verifier_and_ryan_retry_carry_feedback(self):
+        self.seed()
+        self.run_step([ok(R_OK)])
+        self.run_step([ok({"verdicts": "bad"})])
+        self.run_step([ok(V_OK)])
+        self.assertIn("rejected", self.calls[2][1])
+        self.run_step([ok({"usefulness": [{"id": "ZZ", "useful": "HIGH"}]})])
+        self.run_step([ok(Y_OK)])
+        self.assertIn("rejected", self.calls[-1][1])
+
+    def test_same_second_halt_after_clear_pauses(self):
+        s = self.store
+        s.append({"phase": "halt", "ts": rc.iso(T0), "reason": "x"})
+        s.append({"phase": "cleared", "ts": rc.iso(T0), "note": "console ok x"})
+        self.assertEqual(rc.ledger_gate(s, T0 + 20)[0], "ok")
+        s.append({"phase": "halt", "ts": rc.iso(T0), "reason": "y"})
+        with self.assertRaises(rc.Halt):
+            rc.ledger_gate(s, T0 + 20)
+
+    def test_allocation_takes_one_of_four_slots(self):
+        self.seed(qid="qNEW")
+        for i, qid in enumerate(["alloc", "o1", "o2", "o3"]):
+            self.store.append({"phase": "reserved", "rid": "r%d" % i,
+                               "ts": rc.iso(T0 - 100), "qid": qid,
+                               "role": "researcher", "model": "m"})
+            self.store.append({"phase": "result", "rid": "r%d" % i,
+                               "ts": rc.iso(T0 - 100), "outcome": "ok"})
+        self.assertEqual(self.run_step([])["action"], "wait")
 
 
 class JobDesc(unittest.TestCase):

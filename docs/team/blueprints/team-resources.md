@@ -118,8 +118,9 @@ stay with the task's authorized operator flow):
 
 ## Continuous pipeline (offline build, not running)
 
-Owner direction (relayed through the delegation chain) asks for Ryan,
-Ryan's Researcher and Ryan's Verifier to run continuously with AI models.
+Plan: Ryan, Ryan's Researcher and Ryan's Verifier run continuously with
+AI models (authority sits with the project owner's own channel, not this
+file).
 Status: runner `tools/ryan_cycle.py` is built and mock-tested only; no
 model is assigned or running. Details and caps: `docs/team/ryan/README.md`.
 Ryan allocates models for the other roles inside the validation gates; paid

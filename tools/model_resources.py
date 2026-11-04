@@ -48,15 +48,22 @@ def listing_age_ok(listing):
     except (KeyError, ValueError, TypeError):
         return False
 
+def _num(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
 def price_zero(listing, model_id):
-    """True only if the EXACT id exists in the listing with all-zero
-    prices. A prefixed variant (deepinfra/...) never matches the bare
-    id; a listed price-0 id is still only a listing fact."""
+    """True only if the EXACT id exists in the listing with input_price
+    AND output_price present, numeric and 0 (cached_price, if present,
+    also numeric 0). Missing or non-numeric pricing is UNKNOWN, never
+    free. A prefixed variant never matches the bare id; a listed price-0
+    id is still only a listing fact."""
     for m in listing.get("data", []):
         if m.get("id") == model_id:
-            vals = [m.get("input_price"), m.get("output_price"),
-                    m.get("cached_price", 0)]
-            return all(v == 0 for v in vals if v is not None)
+            vals = [m.get("input_price"), m.get("output_price")]
+            if "cached_price" in m:
+                vals.append(m["cached_price"])
+            return all(_num(v) and v == 0 for v in vals)
     return False
 
 def get_route(record, route_id):

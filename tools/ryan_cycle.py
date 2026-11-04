@@ -28,15 +28,20 @@ Hard rules (all enforced in code, all tested with a mock transport):
     UNKNOWN: this cap bounds OUR use only.
   - empty queue -> zero requests, zero listing fetches
   - adoption is never done here: finished questions stop at
-    'ready-for-chain' (Sam -> Coordinator -> owner decides).
+    'ready-for-chain' (Coordinator -> owner decides).
 """
 import json, os, sys, datetime, time, urllib.request, urllib.error
+import contextlib
+try:
+    import fcntl
+except ImportError:  # non-POSIX: refuse to run unlocked
+    fcntl = None
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import model_resources as mr
 
 BASE_URL = "https://router.requesty.ai/v1"
-# CANDIDATES only (owner 2026-11-04: Ryan chooses the role models).
+# CANDIDATES only (Ryan chooses the role models).
 # Nothing here is an assignment. BOOTSTRAP_RYAN is the one default: the
 # route Ryan uses to make the allocation decision itself, because Ryan
 # cannot choose his own model before he has one. It is gated like any
@@ -56,7 +61,6 @@ DAILY_CAP = 24      # 4 cycles x 6 requests, all three roles combined
 CYCLES_PER_DAY = 4
 SPACING_S = 10
 MAX_INPUT_BYTES = 12288
-FIRST_PASS = ("SUPPORTED",)
 
 
 class Halt(Exception):
@@ -81,6 +85,30 @@ class Store:
         self.root = root
         self.qpath = os.path.join(root, "queue.json")
         self.lpath = os.path.join(root, "ledger.jsonl")
+
+    @contextlib.contextmanager
+    def lock(self):
+        """Single-writer transaction lock (flock on root/.lock). All
+        gate-check + reserve + queue/assignment writes happen inside it;
+        it is never held across a provider request."""
+        if fcntl is None:
+            raise Halt("no flock on this platform; refusing to run")
+        os.makedirs(self.root, exist_ok=True)
+        with open(os.path.join(self.root, ".lock"), "a") as lf:
+            fcntl.flock(lf, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lf, fcntl.LOCK_UN)
+
+    def reserve(self, now, entry, qid):
+        """Atomic: ledger_gate then append the reserve under the lock.
+        Returns ('ok','') or ('wait',reason); raises Halt if paused."""
+        with self.lock():
+            state, why = ledger_gate(self, now, qid)
+            if state == "ok":
+                self.append(entry)
+            return state, why
 
     def queue(self):
         if not os.path.exists(self.qpath):
@@ -196,29 +224,47 @@ def family(model_id):
     return model_id.split("/")[0]
 
 
+OK_STATUS = ("working", "untested")  # untested = human-recorded, first
+#                                       cycle tests it; absent = UNKNOWN
+
+
+def route_gate(record, model):
+    """'' or reason. The route must be RECORDED under this exact id, with
+    a non-blocked status, and its provider must not be blocked. An
+    unrecorded id is unknown, not working."""
+    rec = mr.get_route(record, model) if isinstance(record, dict) else None
+    if rec is None:
+        return "%s has no route record (unknown, not working)" % model
+    if rec.get("status") not in OK_STATUS:
+        return "%s recorded %s" % (model, rec.get("status"))
+    if rec.get("provider") in (record.get("provider_blocks") or {}):
+        return "provider of %s is blocked" % model
+    return ""
+
+
 def validate_assignments(assign, record, listing, now):
     """Mechanical gate on Ryan's choice. Returns '' or the reason.
-    Ryan may not waive: exact price-0 in the fresh listing, verifier
-    different execution AND different model family from the researcher,
-    routes recorded not-qualified/uncallable/capped/cooldown, provider
+    Ryan may not waive: exact price-0 (all fields numeric 0) in the
+    fresh listing, a recorded non-blocked route for the exact id,
+    verifier different model AND family from the researcher, provider
     blocks, or the per-role justification."""
     if not isinstance(assign, dict) or set(assign.get("models", {})) != \
             set(ROLES):
         return "assignments must name exactly researcher, verifier, ryan"
     m = assign["models"]
     why = assign.get("why", {})
+    if not listing_fresh(listing, now):
+        return "no fresh named-source listing"
     for r in ROLES:
+        if not isinstance(m[r], str):
+            return "role %s model must be an id string" % r
         if not isinstance(why.get(r), str) or len(why[r].strip()) < 10:
             return "role %s needs a justification" % r
-        if not listing_fresh(listing, now):
-            return "no fresh named-source listing"
         if not mr.price_zero(listing, m[r]):
             return "%s not price-0 in the fresh listing" % m[r]
-        rec = mr.get_route(record, m[r]) if record else None
-        if rec and rec.get("status") in BLOCKED_STATUS:
-            return "%s recorded %s" % (m[r], rec["status"])
-        if rec and rec.get("provider") in record.get("provider_blocks", {}):
-            return "provider of %s is blocked" % m[r]
+        bad = route_gate(record, m[r])
+        if bad:
+            return bad
     if m["verifier"] == m["researcher"]:
         return "verifier must be a different model than the researcher"
     if family(m["verifier"]) == family(m["researcher"]):
@@ -239,11 +285,18 @@ def allocate(root, post, list_models, record, now):
     the daily cap like any other. The choice is saved ONLY if it passes
     validate_assignments; otherwise it is stored as rejected and a human
     decides. Ryan's choice is a decision, not proof the routes work:
-    cycle 1 tests them."""
+    cycle 1 tests them. The allocation request counts as 1 of the 24
+    daily requests AND takes 1 of the 4 daily question/cycle slots
+    (qid "alloc"), so it leaves 3 research questions that day."""
     store = Store(root)
-    state, why = ledger_gate(store, now, None)
+    with store.lock():
+        state, why = ledger_gate(store, now, "alloc")
     if state == "wait":
         return {"action": "wait", "reason": why, "calls": 0}
+    bad = route_gate(record, BOOTSTRAP_RYAN)
+    if bad:
+        return {"action": "needs-human", "reason": "bootstrap route: " +
+                bad, "calls": 0}
     listing = list_models()
     free_gate(listing, BOOTSTRAP_RYAN, now)
     pool = sorted(m["id"] for m in listing.get("data", [])
@@ -262,9 +315,11 @@ def allocate(root, post, list_models, record, now):
         return {"action": "needs-human", "reason": "allocation input too "
                 "large", "calls": 0}
     rid = "alloc-%d" % len(store.ledger())
-    store.append({"phase": "reserved", "rid": rid, "ts": iso(now),
-                  "qid": "alloc", "role": "allocation",
-                  "model": BOOTSTRAP_RYAN})
+    state, why = store.reserve(now, {
+        "phase": "reserved", "rid": rid, "ts": iso(now), "qid": "alloc",
+        "role": "allocation", "model": BOOTSTRAP_RYAN}, "alloc")
+    if state == "wait":
+        return {"action": "wait", "reason": why, "calls": 0}
     res = post(BOOTSTRAP_RYAN, system, prompt, CEILINGS["allocation"])
     out = settle(store, rid, "alloc", "allocation", BOOTSTRAP_RYAN, res, now)
     if out:
@@ -281,8 +336,11 @@ def allocate(root, post, list_models, record, now):
         return {"action": "rejected", "reason": bad, "calls": 1}
     obj["decided_by"] = "ryan"
     obj["decided_at"] = iso(now)
-    with open(os.path.join(root, "assignments.json"), "w") as f:
-        json.dump(obj, f, indent=2)
+    with store.lock():
+        ap = os.path.join(root, "assignments.json")
+        with open(ap + ".tmp", "w") as f:
+            json.dump(obj, f, indent=2)
+        os.replace(ap + ".tmp", ap)
     return {"action": "assigned", "calls": 1, "models": obj["models"]}
 
 
@@ -322,7 +380,7 @@ def build_prompt(role, q):
     if role == "researcher":
         fb = ""
         if q.get("feedback"):
-            fb = "\nCorrection feedback from the verifier:\n" + q["feedback"]
+            fb = "\nCorrection feedback:\n" + q["feedback"]
         return ("Question: %s\nSource packet (cite ONLY these ids; never "
                 "add sources from memory):\n%s\n%s\nReply with ONE JSON "
                 'object: {"findings":[{"id":"C1","claim":"...",'
@@ -330,22 +388,32 @@ def build_prompt(role, q):
                 'UNVERIFIED|MISSING_SOURCE"}],"summary":"..."}. A claim '
                 "with status SUPPORTED_BY_PACKET needs >=1 source id.") % (
                     q["question"], packet, fb)
+    fb = ""
+    if q.get("fb_" + role):
+        fb = "\nYour previous reply was rejected: " + q["fb_" + role] + "\n"
     if role == "verifier":
         return ("Check each finding against the packet passages only. For "
                 "every finding id give SUPPORTED, NOT_SUPPORTED or "
-                "UNVERIFIED and quote the passage evidence.\nPacket:\n%s\n"
-                "Findings:\n%s\nReply with ONE JSON object: "
+                "UNVERIFIED. SUPPORTED needs a source id from that "
+                "finding and a quote copied EXACTLY (verbatim substring) "
+                "from that packet passage.\nPacket:\n%s\n"
+                "Findings:\n%s\n%sReply with ONE JSON object: "
                 '{"verdicts":[{"id":"C1","verdict":"SUPPORTED|'
-                'NOT_SUPPORTED|UNVERIFIED","evidence":"..."}]}') % (
-                    packet, json.dumps(q["findings"], indent=1))
+                'NOT_SUPPORTED|UNVERIFIED","source":"P1","quote":"exact '
+                'text","evidence":"..."}]}') % (
+                    packet, json.dumps(q["findings"], indent=1), fb)
     ok = [f for f in q["findings"] if f["id"] in q["verified_ids"]]
     return ("Question: %s\nVerified findings only:\n%s\nFor each, rate "
             "usefulness to the team's speed and token use and propose an "
             "action for the Coordinator. Proposals are not adopted by you. "
-            'Reply with ONE JSON object: {"usefulness":[{"id":"C1",'
+            '%sReply with ONE JSON object: {"usefulness":[{"id":"C1",'
             '"useful":"HIGH|MEDIUM|LOW|NONE","why":"...",'
             '"proposed_action":"..."}],"note":"..."}') % (
-                q["question"], json.dumps(ok, indent=1))
+                q["question"], json.dumps(ok, indent=1), fb)
+
+
+def norm(t):
+    return " ".join(str(t).split()).lower()
 
 
 def precheck(role, q, obj):
@@ -379,10 +447,23 @@ def precheck(role, q, obj):
         got = [v.get("id") for v in vs if isinstance(v, dict)]
         if set(got) != want or len(got) != len(want):
             return "verdict ids do not match finding ids exactly"
+        fmap = {f["id"]: f for f in q["findings"]}
+        pmap = {p["id"]: norm(p.get("passage", "")) for p in q["packet"]}
         for v in vs:
             if v.get("verdict") not in ("SUPPORTED", "NOT_SUPPORTED",
                                         "UNVERIFIED"):
                 return "bad verdict value"
+            if v["verdict"] == "SUPPORTED":
+                src, quote = v.get("source"), v.get("quote")
+                if src not in fmap[v["id"]].get("sources", []) or \
+                        src not in pmap:
+                    return "verdict %s source not among the finding's " \
+                        "packet sources" % v["id"]
+                if not isinstance(quote, str) or len(norm(quote)) < 8 \
+                        or norm(quote) not in pmap[src]:
+                    return "verdict %s quote is not a verbatim passage " \
+                        "substring (mechanical check; whether it " \
+                        "supports the claim stays model judgment)" % v["id"]
         return ""
     us = obj.get("usefulness")
     if not isinstance(us, list):
@@ -431,95 +512,104 @@ def pick(queue):
     return None
 
 
-def step(root, post, list_models, now):
+def step(root, post, list_models, now, record):
     """One step. post(model, system, prompt, max_tokens) ->
     {'kind': 'ok'|'http'|'unknown', 'code': int, 'content': str,
-     'usage': dict}. Returns a dict describing what happened."""
+     'usage': dict}. RECORD is the route record (model-availability).
+    Gate+reserve+queue write are one locked transaction; the lock is not
+    held across the request. Returns a dict describing what happened."""
     store = Store(root)
-    queue = store.queue()
-    q = pick(queue)
-    if q is None:
-        return {"action": "idle", "calls": 0}
-    role = next_action(q)
-    assign = load_assignments(root)
-    if assign is None:
-        return {"action": "needs-allocation", "calls": 0}
-    model = assign["models"][role]
-    if role == "verifier" and (model == assign["models"]["researcher"]
-                               or family(model) == family(
-                                   assign["models"]["researcher"])):
-        raise Halt("verifier not independent of researcher")
-    if q["attempts"].get(role, 0) >= ROLE_CAP[role]:
-        q["status"] = "needs-human"
-        q["reason"] = role + " attempts exhausted"
-        store.save_queue(queue)
-        return {"action": "needs-human", "qid": q["id"], "calls": 0}
-    try:
-        state, why = ledger_gate(store, now, q["id"])
-    except Halt as e:
-        raise
-    if state == "wait":
-        return {"action": "wait", "reason": why, "calls": 0}
-    prompt = build_prompt(role, q)
-    system = "You are the %s in a source-bound review pipeline." % role
-    if len((system + prompt).encode()) > MAX_INPUT_BYTES:
-        q["status"] = "needs-human"
-        q["reason"] = "input over %d bytes" % MAX_INPUT_BYTES
-        store.save_queue(queue)
-        return {"action": "needs-human", "qid": q["id"], "calls": 0}
-    free_gate(list_models(), model, now)
-    rid = "%s-%s-%d" % (q["id"], role, len(store.ledger()))
-    store.append({"phase": "reserved", "rid": rid, "ts": iso(now),
-                  "qid": q["id"], "role": role, "model": model})
-    q["attempts"][role] = q["attempts"].get(role, 0) + 1
-    store.save_queue(queue)
-    res = post(model, system, prompt, CEILINGS[role])
-    out = settle(store, rid, q["id"], role, model, res, now)
-    if out:
-        return out
-    n = q["attempts"][role]
-    store.write_run(q["id"], "%s-%d.txt" % (role, n), res["content"])
-    try:
-        obj = strict_json(res["content"])
-        bad = precheck(role, q, obj)
-    except ValueError as e:
-        obj, bad = None, "format: %s" % e
-    if bad:
-        q["feedback"] = "format/consistency problem: " + bad
-        if role == "researcher" and q["attempts"][role] < ROLE_CAP[role]:
-            pass  # stays 'open' for one correction
-        elif role == "researcher":
-            q["status"] = "needs-human"; q["reason"] = bad
-        elif q["attempts"][role] >= ROLE_CAP[role]:
-            q["status"] = "needs-human"; q["reason"] = bad
-        store.save_queue(queue)
-        return {"action": "precheck-failed", "qid": q["id"], "role": role,
-                "reason": bad, "calls": 1}
-    if role == "researcher":
-        q["findings"] = obj["findings"]
-        q["status"] = "drafted"
-        q.pop("feedback", None)
-    elif role == "verifier":
-        overall, verified, bad_ids = compute_overall(q, obj)
-        q["verifier_verdict"] = {"overall": overall, "bad": bad_ids}
-        q["verified_ids"] = verified
-        if overall == "PASS":
-            q["status"] = "verified"
-        elif q["attempts"].get("researcher", 0) < ROLE_CAP["researcher"]:
-            q["status"] = "open"
-            q["feedback"] = "claims not supported: %s. Evidence: %s" % (
-                ",".join(bad_ids),
-                json.dumps([v for v in obj["verdicts"]
-                            if v["id"] in bad_ids]))
-        else:
+    with store.lock():
+        queue = store.queue()
+        q = pick(queue)
+        if q is None:
+            return {"action": "idle", "calls": 0}
+        qid = q["id"]
+        role = next_action(q)
+        assign = load_assignments(root)
+        if assign is None:
+            return {"action": "needs-allocation", "calls": 0}
+        model = assign["models"][role]
+        if role == "verifier" and (model == assign["models"]["researcher"]
+                                   or family(model) == family(
+                                       assign["models"]["researcher"])):
+            raise Halt("verifier not independent of researcher")
+        if q["attempts"].get(role, 0) >= ROLE_CAP[role]:
             q["status"] = "needs-human"
-            q["reason"] = "verification failed, no correction attempt left"
-    else:
-        q["ryan_review"] = obj
-        q["status"] = "ready-for-chain"
-    store.save_queue(queue)
-    return {"action": "done-" + role, "qid": q["id"], "status": q["status"],
-            "calls": 1}
+            q["reason"] = role + " attempts exhausted"
+            store.save_queue(queue)
+            return {"action": "needs-human", "qid": qid, "calls": 0}
+        state, why = ledger_gate(store, now, qid)
+        if state == "wait":
+            return {"action": "wait", "reason": why, "calls": 0}
+        bad = route_gate(record, model)
+        if bad:
+            return {"action": "needs-human", "qid": qid, "calls": 0,
+                    "reason": bad}
+        prompt = build_prompt(role, q)
+        system = "You are the %s in a source-bound review pipeline." % role
+        if len((system + prompt).encode()) > MAX_INPUT_BYTES:
+            q["status"] = "needs-human"
+            q["reason"] = "input over %d bytes" % MAX_INPUT_BYTES
+            store.save_queue(queue)
+            return {"action": "needs-human", "qid": qid, "calls": 0}
+        free_gate(list_models(), model, now)
+        rid = "%s-%s-%d" % (qid, role, len(store.ledger()))
+        store.append({"phase": "reserved", "rid": rid, "ts": iso(now),
+                      "qid": qid, "role": role, "model": model})
+        q["attempts"][role] = q["attempts"].get(role, 0) + 1
+        store.save_queue(queue)
+        n = q["attempts"][role]
+    res = post(model, system, prompt, CEILINGS[role])
+    with store.lock():
+        out = settle(store, rid, qid, role, model, res, now)
+        if out:
+            return out
+        store.write_run(qid, "%s-%d.txt" % (role, n), res["content"])
+        queue = store.queue()
+        q = next(x for x in queue["questions"] if x["id"] == qid)
+        try:
+            obj = strict_json(res["content"])
+            bad = precheck(role, q, obj)
+        except ValueError as e:
+            obj, bad = None, "format: %s" % e
+        if bad:
+            if role == "researcher":
+                q["feedback"] = "format/consistency problem: " + bad
+            else:
+                q["fb_" + role] = bad
+            if q["attempts"][role] >= ROLE_CAP[role]:
+                q["status"] = "needs-human"
+                q["reason"] = bad
+            store.save_queue(queue)
+            return {"action": "precheck-failed", "qid": qid, "role": role,
+                    "reason": bad, "calls": 1}
+        q.pop("fb_" + role, None)
+        if role == "researcher":
+            q["findings"] = obj["findings"]
+            q["status"] = "drafted"
+            q.pop("feedback", None)
+        elif role == "verifier":
+            overall, verified, bad_ids = compute_overall(q, obj)
+            q["verifier_verdict"] = {"overall": overall, "bad": bad_ids}
+            q["verified_ids"] = verified
+            if overall == "PASS":
+                q["status"] = "verified"
+            elif q["attempts"].get("researcher", 0) < ROLE_CAP["researcher"]:
+                q["status"] = "open"
+                q["feedback"] = "claims not supported: %s. Evidence: %s" % (
+                    ",".join(bad_ids),
+                    json.dumps([v for v in obj["verdicts"]
+                                if v["id"] in bad_ids]))
+            else:
+                q["status"] = "needs-human"
+                q["reason"] = "verification failed, no correction left"
+        else:
+            q["ryan_review"] = obj
+            q["status"] = "ready-for-chain"
+        store.save_queue(queue)
+        return {"action": "done-" + role, "qid": qid, "status": q["status"],
+                "calls": 1}
 
 
 def jobdesc_scan(repo, root, now, max_packet=8, passage_chars=360):
