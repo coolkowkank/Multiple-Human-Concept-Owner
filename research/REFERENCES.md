@@ -33,3 +33,8 @@ Rules: each claim in findings/experiments carries [R#]/[S#] plus section or comm
 
 ## Work package map
 RW1 handoffs: R3. RW2 review: R1, R2, R6, R7. RW3 tokens: R1, R3, R8. RW4 stall: none applicable (R4 excluded). RW5 prior art: S1-S6. RW6 routing: none.
+
+## Public system detail (added 15:10)
+- S1 LangGraph: docs https://docs.langchain.com/oss/python/langgraph/interrupts and /checkpointers read 2026-11-04 (level 1, code not read).
+- S2 OpenHands: https://github.com/OpenHands/software-agent-sdk (stuck_detector.py read 2026-11-04, commit SHA not captured; level 2 partial). Docs https://docs.openhands.dev/sdk/guides/agent-stuck-detector .
+Notes: findings/2026-11-04-rw5-prior-art-stall-and-gates.md
