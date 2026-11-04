@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04T14:44:00+02:00",
+ "as_of": "2026-11-04T14:47:00+02:00",
  "timezone": "EET (UTC+2), same as commit timestamps",
  "rules": "Weighted milestone progress, not independently verified completion. Milestone done = 100% of weight (tests pass or an independent review passed). Partial = 50%. In progress / not started = 0%. Weights are judgment calls. Commits alone never count.",
  "packages": [
@@ -11,7 +11,10 @@
    "start": "2026-11-03T15:51",
    "end": "2026-11-04T00:59",
    "credit_at": "2026-11-04T00:59",
-   "evidence": "On main: roles, rules, templates, references (commits 2026-11-03 15:51 to 2026-11-04 00:59)"
+   "evidence": "On main: roles, rules, templates, references (commits 2026-11-03 15:51 to 2026-11-04 00:59)",
+   "pic": [
+    "instinct-christina"
+   ]
   },
   {
    "id": "WP2",
@@ -21,7 +24,10 @@
    "start": "2026-11-04T01:19",
    "end": "2026-11-04T14:38",
    "credit_at": "2026-11-04T14:38",
-   "evidence": "team-launcher at d02927f: 178/178 offline tests pass. Not proof the runtime works end to end: runtime defects (WP5) are unresolved"
+   "evidence": "team-launcher at d02927f: 178/178 offline tests pass. Not proof the runtime works end to end: runtime defects (WP5) are unresolved",
+   "pic": [
+    "instinct-telkomsel"
+   ]
   },
   {
    "id": "WP3",
@@ -31,7 +37,11 @@
    "start": "2026-11-04T09:03",
    "end": "2026-11-04T09:52",
    "credit_at": "2026-11-04T09:52",
-   "evidence": "review/groq-dev-3 4451611: independent review VERIFIED, docs scope only"
+   "evidence": "review/groq-dev-3 4451611: independent review VERIFIED, docs scope only",
+   "pic": [
+    "coolkowkank-bot",
+    "instinct-christina"
+   ]
   },
   {
    "id": "WP4",
@@ -42,7 +52,10 @@
    "end": "2026-11-04T13:21",
    "credit_at": "2026-11-04T13:21",
    "evidence": "live/requesty-tinylib-experiment reached DONE, but needed manual recovery and skipped Reviewer",
-   "forecast_end": "2026-11-05T12:00"
+   "forecast_end": "2026-11-05T12:00",
+   "pic": [
+    "instinct-telkomsel"
+   ]
   },
   {
    "id": "WP5",
@@ -51,7 +64,10 @@
    "status": "in_progress",
    "start": "2026-11-04T13:24",
    "forecast_end": "2026-11-04T17:00",
-   "evidence": "live/builder-deadlock-fix: Builder commit 0fa083a pushed with 1 of 4 regression tests failing. Repair batch 3 running (2 of 6 calls used). No green pin or review yet. Not fixed"
+   "evidence": "live/builder-deadlock-fix: Builder commit 0fa083a pushed with 1 of 4 regression tests failing. Repair batch 3 running (2 of 6 calls used). No green pin or review yet. Not fixed",
+   "pic": [
+    "coolkowkank-bot"
+   ]
   },
   {
    "id": "WP6",
@@ -62,7 +78,10 @@
    "end": "2026-11-04T14:38",
    "credit_at": "2026-11-04T14:38",
    "forecast_end": "2026-11-04T19:00",
-   "evidence": "Gate 93b3552 shipped a stale executor that dropped edit_file and the ledger; fixed forward in d02927f (178/178 offline tests). No independent review yet, so credit stays partial"
+   "evidence": "Gate 93b3552 shipped a stale executor that dropped edit_file and the ledger; fixed forward in d02927f (178/178 offline tests). No independent review yet, so credit stays partial",
+   "pic": [
+    "instinct-telkomsel"
+   ]
   },
   {
    "id": "WP7",
@@ -71,7 +90,10 @@
    "status": "not_started",
    "start": "2026-11-04T17:00",
    "forecast_end": "2026-11-04T19:00",
-   "evidence": "Waits for green tests on WP5"
+   "evidence": "Waits for green tests on WP5",
+   "pic": [
+    "instinct-christina"
+   ]
   },
   {
    "id": "WP8a",
@@ -82,7 +104,10 @@
    "end": "2026-11-04T14:44",
    "credit_at": "2026-11-04T14:44",
    "forecast_end": "2026-11-04T20:00",
-   "evidence": "Note b42f670 published with citations, evidence classes, limits and proposed experiments. Independent spot check at 14:44: 3 of 3 arXiv links resolve with matching titles; F1 numbers match the paper abstract. F2 and F3 numbers not yet checked, so partial"
+   "evidence": "Note b42f670 published with citations, evidence classes, limits and proposed experiments. Independent spot check at 14:44: 3 of 3 arXiv links resolve with matching titles; F1 numbers match the paper abstract. F2 and F3 numbers not yet checked, so partial",
+   "pic": [
+    "researcher"
+   ]
   },
   {
    "id": "WP8b",
@@ -91,7 +116,10 @@
    "status": "not_started",
    "start": "2026-11-04T20:00",
    "forecast_end": "2026-11-05T06:00",
-   "evidence": "No experiment run yet. Adoption is a separate decision and is not required for WP8a"
+   "evidence": "No experiment run yet. Adoption is a separate decision and is not required for WP8a",
+   "pic": [
+    "researcher"
+   ]
   },
   {
    "id": "WP9",
@@ -100,7 +128,10 @@
    "status": "in_progress",
    "start": "2026-11-04T14:33",
    "forecast_end": "2026-11-04T20:00",
-   "evidence": "Delta-only handoff rule adopted; token savings not yet measured"
+   "evidence": "Delta-only handoff rule adopted; token savings not yet measured",
+   "pic": [
+    "instinct-telkomsel"
+   ]
   },
   {
    "id": "WP10",
@@ -109,7 +140,35 @@
    "status": "not_started",
    "start": "2026-11-04T19:00",
    "forecast_end": "2026-11-05T12:00",
-   "evidence": "No autonomous PASS yet. Also re-proves WP4 cleanly"
+   "evidence": "No autonomous PASS yet. Also re-proves WP4 cleanly",
+   "pic": [
+    "instinct-telkomsel",
+    "coolkowkank-bot",
+    "instinct-christina"
+   ]
   }
- ]
+ ],
+ "people": {
+  "instinct-telkomsel": {
+   "label": "instinct-telkomsel",
+   "role": "Coordinator and project support (Habibil's Telkomsel Instinct)",
+   "icon": "avatars/instinct-telkomsel.png"
+  },
+  "instinct-christina": {
+   "label": "instinct-christina",
+   "role": "Independent reviewer and blueprint author (Christina's Instinct)",
+   "icon": "avatars/instinct-christina.png"
+  },
+  "coolkowkank-bot": {
+   "label": "coolkowkank-bot",
+   "role": "Builder: Groq gpt-oss-120b model acting through the shared project bot account",
+   "icon": "avatars/coolkowkank-bot.png"
+  },
+  "researcher": {
+   "label": "Researcher role",
+   "role": "Literature research agent. No GitHub account of its own; role icon, not an avatar",
+   "icon": "avatars/researcher-role.png"
+  }
+ },
+ "pic_note": "PIC = person or agent in charge, by who authored or reviewed the evidence. A shared bot account is not a unique model identity."
 }

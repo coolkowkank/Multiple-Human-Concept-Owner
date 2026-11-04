@@ -7,6 +7,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.dates as md
+import matplotlib.image as mpimg
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 
@@ -21,7 +23,7 @@ plt.rcParams["svg.fonttype"] = "none"; plt.rcParams["font.family"] = "DejaVu San
 x0, x1 = D(2026,11,3,12), D(2026,11,5,15)
 
 # Gantt
-fig, ax = plt.subplots(figsize=(11, 6.1))
+fig, ax = plt.subplots(figsize=(11, 7.4))
 for i, p in enumerate(P):
     y = len(P) - 1 - i; s = t(p["start"])
     if p["status"] in ("verified", "partial"):
@@ -34,6 +36,14 @@ for i, p in enumerate(P):
         if p["status"] in ("verified","partial"): fs = t(p["end"])
         ax.barh(y, md.date2num(fe)-md.date2num(fs), left=md.date2num(fs), height=.55, facecolor="none", edgecolor="#555", hatch="////", linewidth=.8, linestyle="--")
 ax.axvline(md.date2num(asof), color="#c62828", lw=1.4); ax.text(md.date2num(asof), len(P)-.35, " now", color="#c62828", fontsize=8, va="bottom")
+ppl = d.get("people", {})
+icons = {k: mpimg.imread(os.path.join(here, v["icon"])) for k, v in ppl.items()}
+ax.text(1.045, len(P)-.05, "PIC", transform=ax.get_yaxis_transform(), fontsize=8, ha="center", va="bottom", fontweight="bold")
+for i, p in enumerate(P):
+    y = len(P) - 1 - i
+    for j, k in enumerate(p.get("pic", [])):
+        ab = AnnotationBbox(OffsetImage(icons[k], zoom=0.17), (1.02 + j*0.05, y), xycoords=ax.get_yaxis_transform(), frameon=False, annotation_clip=False)
+        ax.add_artist(ab)
 ax.set_yticks(range(len(P))); ax.set_yticklabels([f'{p["id"]}  {p["name"]}  ({p["weight"]}%)' for p in reversed(P)], fontsize=8)
 ax.set_xlim(md.date2num(x0), md.date2num(x1)); ax.set_ylim(-.6, len(P)-.1)
 ax.xaxis.set_major_locator(md.HourLocator(byhour=[0,6,12,18])); ax.xaxis.set_major_formatter(md.DateFormatter("%b %d\n%H:%M"))
@@ -42,7 +52,13 @@ for s_ in ("top","right"): ax.spines[s_].set_visible(False)
 h = [Patch(color=COL[k], label=LAB[k]) for k in COL] + [Patch(facecolor="none", edgecolor="#555", hatch="////", label="Forecast (not a commitment)")]
 ax.legend(handles=h, fontsize=7, loc="lower center", bbox_to_anchor=(.5, 1.0), ncol=5, frameon=False)
 ax.set_title("Gantt chart (times in EET). Solid = observed in repo evidence. Hatched = forecast.", fontsize=9, loc="left", pad=22)
-fig.tight_layout(); fig.savefig(os.path.join(here, "gantt.svg")); fig.savefig(os.path.join(here, "gantt.png"), dpi=130); plt.close(fig)
+fig.tight_layout(rect=(0, 0.17, 0.92, 1))
+for n, (k, v) in enumerate(ppl.items()):
+    yy = 0.135 - n*0.032
+    fig.add_artist(AnnotationBbox(OffsetImage(icons[k], zoom=0.17), (0.035, yy), xycoords="figure fraction", frameon=False))
+    fig.text(0.06, yy, v["label"] + ": " + v["role"], fontsize=8, va="center")
+fig.text(0.02, 0.165, "PIC = person or agent in charge, by who authored or reviewed the evidence. A shared bot account is not a unique model identity.", fontsize=7, color="#555")
+fig.savefig(os.path.join(here, "gantt.svg")); fig.savefig(os.path.join(here, "gantt.png"), dpi=130); plt.close(fig)
 
 # S-curve
 ev = sorted((t(p["credit_at"]), p["weight"]*CRED[p["status"]]) for p in P if p["status"] in CRED)
