@@ -1,13 +1,13 @@
 {
-  "turn": "coordinator",
-  "turn_seq": 3,
-  "turn_since": "2026-11-04T05:31:22Z",
-  "status": "running",
-  "status_line": "live-1: qc verdict PASS on batch 1 review (3 findings verified, limits accepted, must-fix recorded); coordinator close next",
+  "turn": null,
+  "turn_seq": 4,
+  "turn_since": "2026-11-04T05:32:46Z",
+  "status": "done",
+  "status_line": "DONE live-1: bounded review cycle complete - QC PASS with 4 must-fix items recorded; no parallel/unattended readiness claimed",
   "leases": {
     "coordinator": {
       "holder": "coordinator-645dc117",
-      "claimed_at": 1793769651.7364166
+      "claimed_at": 1793770366.784005
     },
     "reviewer": {
       "holder": "reviewer-44ffafd1",
