@@ -65,6 +65,73 @@ class ExecutorCase(unittest.TestCase):
         return {"id": i, "type": "function",
                 "function": {"name": name, "arguments": args}}
 
+
+    # -- bounded small-edit interface (deadlock-fix batch, attempts b3/b5) --
+
+    def test_edit_file_exact_single_replacement_byte_exact(self):
+        ns = self.load()
+        target = os.path.join(self.repo, "launcher", "mod.py")
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        before = "alpha\nKEEP-ONE\nold call()\nKEEP-TWO\nomega\n"
+        open(target, "w").write(before)
+        r = ns["run_tool"]("edit_file", {"path": "launcher/mod.py",
+                                         "old_string": "old call()",
+                                         "new_string": "new call()"})
+        self.assertTrue(r["ok"], r)
+        self.assertEqual(open(target).read(),
+                         "alpha\nKEEP-ONE\nnew call()\nKEEP-TWO\nomega\n")
+
+    def test_edit_file_no_match_fails_loudly_and_changes_nothing(self):
+        ns = self.load()
+        target = os.path.join(self.repo, "launcher", "mod.py")
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        open(target, "w").write("untouched\n")
+        r = ns["run_tool"]("edit_file", {"path": "launcher/mod.py",
+                                         "old_string": "absent", "new_string": "x"})
+        self.assertFalse(r["ok"])
+        self.assertIn("not found", r["error"])
+        self.assertEqual(open(target).read(), "untouched\n")
+
+    def test_edit_file_ambiguous_anchor_refused(self):
+        ns = self.load()
+        target = os.path.join(self.repo, "launcher", "mod.py")
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        open(target, "w").write("dup\ndup\n")
+        r = ns["run_tool"]("edit_file", {"path": "launcher/mod.py",
+                                         "old_string": "dup", "new_string": "x"})
+        self.assertFalse(r["ok"])
+        self.assertIn("2 locations", r["error"])
+        self.assertEqual(open(target).read(), "dup\ndup\n")
+
+    def test_edit_file_missing_file_points_to_write_file(self):
+        ns = self.load()
+        r = ns["run_tool"]("edit_file", {"path": "launcher/nope.py",
+                                         "old_string": "a", "new_string": "b"})
+        self.assertFalse(r["ok"])
+        self.assertIn("write_file", r["error"])
+
+    def test_edit_file_size_cap_and_empty_anchor_refused(self):
+        ns = self.load()
+        target = os.path.join(self.repo, "launcher", "mod.py")
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        open(target, "w").write("body\n")
+        r = ns["run_tool"]("edit_file", {"path": "launcher/mod.py",
+                                         "old_string": "", "new_string": "b"})
+        self.assertFalse(r["ok"])
+        big = "y" * (ns["EDIT_MAX_BYTES"] + 1)
+        r = ns["run_tool"]("edit_file", {"path": "launcher/mod.py",
+                                         "old_string": "body", "new_string": big})
+        self.assertFalse(r["ok"])
+        self.assertIn("cap", r["error"])
+
+    def test_write_file_over_cap_refused_points_to_edit_file(self):
+        ns = self.load()
+        big = "y" * (ns["MAX_BYTES"] + 1)
+        r = ns["run_tool"]("write_file", {"path": "tests/big.py", "content": big})
+        self.assertFalse(r["ok"])
+        self.assertIn("edit_file", r["error"])
+        self.assertFalse(os.path.exists(os.path.join(self.repo, "tests", "big.py")))
+
     def test_committer_derived_from_github_token(self):
         del os.environ["MODEL_COMMITTER"]
         os.environ["GITHUB_TOKEN"] = "fake-token"

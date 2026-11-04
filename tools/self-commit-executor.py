@@ -9,9 +9,15 @@ on branch live/groq-dev-3, not this file.
 
 The MODEL issues every tool call; this harness only executes them
 mechanically with guards. No content authoring, no substantive pre-review.
-Tools offered: write_file (docs/*.md only), git_commit (verbatim message
-+ provenance trailer, local commit-msg hook enforced), git_push (fixed
-branch only).
+Tools offered: write_file (small/new files only, byte-capped),
+edit_file (exact-match anchored replacement in an existing file; the
+bounded interface for model-authored edits to files too large for a
+reliable whole-file rewrite), git_commit (verbatim message + provenance
+trailer, local commit-msg hook enforced), git_push (fixed branch only).
+The harness never repairs, normalizes or completes model-supplied
+content: every payload is written byte-exact, and malformed arguments,
+ambiguous anchors and mismatches fail loudly back to the model (or halt
+the run when the provider rejects the call).
 
 Token discipline (owner request 2026-11-04, "optimize the communication
 with groq"): the run ENDS automatically on a successful git_push - no
@@ -41,7 +47,7 @@ KEY = open(os.environ.get("PROVIDER_KEY_FILE", os.environ.get("GROQ_KEY_FILE", "
 TASK = open(TASK_FILE).read()
 MODEL = os.environ.get("PROVIDER_MODEL", "openai/gpt-oss-120b")
 API_URL = os.environ.get("PROVIDER_API_URL", "https://api.groq.com/openai/v1/chat/completions")
-MAX_ROUNDS = 6
+MAX_ROUNDS = int(os.environ.get("MAX_ROUNDS", "6"))
 MAX_CALLS = int(os.environ.get("MAX_CALLS", "6"))  # coordinator passes the loop's REMAINING global budget; every attempted provider request counts, including failed/error responses; the executor never retries
 CALLS = {"n": 0}
 # Zero-price routes only (owner rule for the Requesty gemma batch): when
@@ -51,7 +57,12 @@ CALLS = {"n": 0}
 # zero-price listing is verified separately before GO). Same semantics as the
 # launcher HttpAdapter require_zero_cost guard (launcher/adapters.py).
 REQUIRE_ZERO_COST = os.environ.get("REQUIRE_ZERO_COST", "").lower() in ("1", "true", "yes")
-MAX_BYTES = 20000
+# Payload bounds (deadlock-fix batch lesson, attempts b3/b5: whole-file
+# rewrite payloads from the model repeatedly failed provider-side JSON
+# validation). write_file is capped small; larger existing files change
+# through edit_file's anchored exact-match replacement.
+MAX_BYTES = int(os.environ.get("MAX_WRITE_BYTES", "6000"))
+EDIT_MAX_BYTES = int(os.environ.get("MAX_EDIT_BYTES", "6000"))
 # Fixed HARNESS-controlled author identity for every model-issued commit: the
 # owner-approved shared project machine account (coolkowkank-bot), per-model credit
 # in the author NAME. The noreply email is account-linked, so work that lands on the
@@ -141,7 +152,8 @@ def _atexit():
 atexit.register(_atexit)
 
 SYSTEM = (f"You are the builder on repo Multiple-Human-Concept-Owner, branch {BRANCH}. "
-          "You commit your own work with the provided tools: write_file (docs/ only), "
+          "You commit your own work with the provided tools: write_file (new or "
+          "small files only), edit_file (exact-match edits to existing files), "
           "git_commit, git_push. Be honest in commit messages: say you are Groq "
           "gpt-oss-120b committing via your own tool calls. The repo's local "
           "commit-msg hook REQUIRES your message to contain a line exactly like "
@@ -151,6 +163,7 @@ SYSTEM = (f"You are the builder on repo Multiple-Human-Concept-Owner, branch {BR
 
 TOOLS = [
  {"type":"function","function":{"name":"write_file","description":"Write a markdown file under docs/.","parameters":{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"]}}},
+ {"type":"function","function":{"name":"edit_file","description":"Replace ONE exact occurrence of old_string with new_string in an existing file (anchored small edit). Fails loudly when old_string is absent or occurs more than once - then retry with more surrounding context.","parameters":{"type":"object","properties":{"path":{"type":"string"},"old_string":{"type":"string"},"new_string":{"type":"string"}},"required":["path","old_string","new_string"]}}},
  {"type":"function","function":{"name":"git_commit","description":"Stage your docs/ file and commit with your exact message (must contain a 'TURN: builder' line).","parameters":{"type":"object","properties":{"message":{"type":"string"}},"required":["message"]}}},
  {"type":"function","function":{"name":"git_push","description":"Push the current branch to GitHub.","parameters":{"type":"object","properties":{}}}},
 ]
@@ -216,11 +229,31 @@ def run_tool(name, args):
             err = safe_path(path)
             if err: return {"ok": False, "error": err}
             if CRED.search(content): return {"ok": False, "error": "credential-pattern content refused"}
-            if len(content.encode()) > MAX_BYTES: return {"ok": False, "error": "file too large"}
+            if len(content.encode()) > MAX_BYTES: return {"ok": False, "error": f"content exceeds {MAX_BYTES}-byte write cap; use edit_file anchored edits for existing files or split the work"}
             full = os.path.join(REPO, path)
             os.makedirs(os.path.dirname(full), exist_ok=True)
             open(full, "w").write(content)
             return {"ok": True, "path": path, "bytes": len(content.encode())}
+        if name == "edit_file":
+            path = args.get("path", "")
+            old, new = args.get("old_string", ""), args.get("new_string", "")
+            err = safe_path(path)
+            if err: return {"ok": False, "error": err}
+            if not old: return {"ok": False, "error": "old_string must be non-empty"}
+            if CRED.search(new): return {"ok": False, "error": "credential-pattern content refused"}
+            if len(old.encode()) > EDIT_MAX_BYTES or len(new.encode()) > EDIT_MAX_BYTES:
+                return {"ok": False, "error": f"edit strings exceed {EDIT_MAX_BYTES}-byte cap; split into smaller anchored edits"}
+            full = os.path.join(REPO, path)
+            if not os.path.isfile(full):
+                return {"ok": False, "error": "file does not exist; use write_file for new files"}
+            text = open(full, encoding="utf-8").read()
+            n = text.count(old)
+            if n == 0:
+                return {"ok": False, "error": "old_string not found (exact byte match required); no change made"}
+            if n > 1:
+                return {"ok": False, "error": f"old_string matches {n} locations; add surrounding context until it is unique; no change made"}
+            open(full, "w", encoding="utf-8").write(text.replace(old, new, 1))
+            return {"ok": True, "path": path, "replacements": 1, "bytes": os.path.getsize(full)}
         if name == "git_commit":
             msg = args.get("message", "")
             if CRED.search(msg): return {"ok": False, "error": "credential-pattern message refused"}
@@ -278,6 +311,11 @@ def main():
             result = run_tool(name, args)
             record({"tool_call": name, "args": args, "result": result})
             messages.append({"role": "tool", "tool_call_id": c["id"], "content": json.dumps(result)})
+            if name == "edit_file" and result.get("ok"):
+                c["function"]["arguments"] = json.dumps(
+                    {"path": args.get("path", ""),
+                     "edit": f"[1 anchored replacement applied to {args.get('path','')}; full payloads in the run transcript]"})
+                record({"history_elided": {"path": args.get("path", ""), "tool": "edit_file"}})
             if name == "write_file" and result.get("ok"):
                 # Elide the just-written content from the history sent to later
                 # rounds; the full bytes remain in the recorded transcript.
