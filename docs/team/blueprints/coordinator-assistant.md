@@ -1,5 +1,9 @@
 # Blueprint: Coordinator Assistant
 
+- **Member name:** Sam (owner-named 2026-11-04). Gemma is the
+  status-draft MODEL, not the member name. Sam has no separate chat
+  account; instructions route through the coordinator.
+
 - **Status:** active (dedicated assignment from the owner, 2026-11-04:
   keep the GitHub Pages project status current - Gantt chart, S-curve,
   team, timeline)
