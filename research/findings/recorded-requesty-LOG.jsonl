@@ -1,0 +1,15 @@
+{"ts": "2026-11-04T11:12:44Z", "seat": "supervisor", "kind": "seed", "body": "brief present; first turn issued to coordinator"}
+{"ts": "2026-11-04T11:12:55Z", "seat": "coordinator", "kind": "handoff", "body": "Assigning initial implementation of tinylib and tests to Builder", "turn_seq": 1}
+{"ts": "2026-11-04T11:12:59Z", "seat": "supervisor", "kind": "stall", "body": "turn stalled on builder; restarting seat"}
+{"ts": "2026-11-04T11:13:04Z", "seat": "supervisor", "kind": "restart", "body": "seat builder exited -15; restart 1"}
+{"ts": "2026-11-04T11:13:18Z", "seat": "builder", "kind": "handoff", "body": "Implement tinylib.add and corresponding test case | verify: `python3 -m unittest discover -s tests -v` exit=0 | tail:  / ---------------------------------------------------------------------- / Ran 1 test in 0.000s /  / OK", "turn_seq": 2}
+{"ts": "2026-11-04T11:19:29Z", "seat": "operator", "kind": "intervention", "body": "builder returned handoff:null; turn=None deadlocked the bus (supervisor _check_stall ignores falsy turn; seed only fires while forming). Operator re-issued the turn to the coordinator - supervisor's missing function done by hand, NOT model content repair. Launcher gap recorded as experiment finding."}
+{"ts": "2026-11-04T11:19:30Z", "seat": "supervisor", "kind": "stall", "body": "turn stalled on coordinator; restarting seat"}
+{"ts": "2026-11-04T11:19:35Z", "seat": "supervisor", "kind": "restart", "body": "seat coordinator exited -15; restart 1"}
+{"ts": "2026-11-04T11:19:52Z", "seat": "coordinator", "kind": "handoff", "body": "Assigning implementation verification to QC", "turn_seq": 3}
+{"ts": "2026-11-04T11:19:55Z", "seat": "supervisor", "kind": "stall", "body": "turn stalled on qc; restarting seat"}
+{"ts": "2026-11-04T11:20:00Z", "seat": "supervisor", "kind": "restart", "body": "seat qc exited -15; restart 1"}
+{"ts": "2026-11-04T11:20:16Z", "seat": "qc", "kind": "handoff", "body": "Verifying implementation of tinylib.add and tests. | verify: `ls -R && cat tinylib/__init__.py && cat tests/test_tinylib.py && python3 -m unittest discover -s tests -v` exit=0 | tail:  / ---------------------------------------------------------------------- / Ran 1 test in 0.000s /  / OK", "turn_seq": 4}
+{"ts": "2026-11-04T11:20:54Z", "seat": "coordinator", "kind": "handoff", "body": "Relaying QC verification pass to Builder for final confirmation.", "turn_seq": 5}
+{"ts": "2026-11-04T11:21:25Z", "seat": "builder", "kind": "handoff", "body": "Final verification of tinylib implementation and tests to confirm all ACs are met. | verify: `python3 -m unittest discover -s tests -v` exit=0 | tail:  / ---------------------------------------------------------------------- / Ran 1 test in 0.000s /  / OK", "turn_seq": 6}
+{"ts": "2026-11-04T11:21:41Z", "seat": "coordinator", "kind": "handoff", "body": "Project complete; all ACs verified by QC and confirmed by Builder.", "turn_seq": 7}
