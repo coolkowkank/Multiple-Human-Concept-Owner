@@ -54,17 +54,26 @@ acts at a time), so expected request rate is well under 5 RPM.
    or restart limit hit (failure artifact preserved as-is).
 3. Wall kill: supervisor --max-seconds 1800; stall-timeout 300s.
 
-## Cost verification (no paid fallback)
-- Vendor docs (inference-docs.cerebras.ai/support/rate-limits): the
-  Free Trial tier is hard rate-limited (5 RPM / 30K TPM / 1M TPD per
-  model); pay-as-you-go is a separate Developer tier.
-- The proposal uses ONLY the existing free account/key already in the
-  vault - no new account, no access changes, no payment method added.
-  If the account were on a paid tier, the same 20-request cap still
-  bounds requests; expected token volume (<20 responses x ~1-2K
-  tokens) is far inside free-tier limits. Residual check at GO time:
-  confirm in the Cerebras console that no payment method is attached
-  (cannot be debited). Requesty standby routes are NOT used here.
+## Cost verification (credits are spend - corrected 2026-11-04)
+- Vendor docs (inference-docs.cerebras.ai/console/account-billing and
+  /support/rate-limits): the Free Trial tier = $5 in free CREDITS,
+  granted after adding a VERIFIED PAYMENT METHOD, expiring 30 days
+  after grant; the Developer (PayGo) tier debits purchased credits.
+  So this account can hold a payment method and credits - free-tier
+  usage still CONSUMES credits, and credits are spend.
+- Bounded exposure: the 20-request cap bounds volume regardless of
+  tier; expected volume (~20 responses of ~1-2K tokens each, input
+  ~1-4K tokens each) is on the order of tens of thousands of tokens
+  total - small against the $5 grant, but NOT zero. Exact per-token
+  price to be confirmed from the console at GO time; actual spend is
+  measured afterward from the usage record, not estimated.
+- No silent paid fallback: the run uses ONLY the existing
+  account/key already in the vault - no new account, no access
+  changes, no payment method changes, no credit purchases. If credits
+  exhaust mid-run, requests start failing, the adapter counts them,
+  the seat caps hold, and the run ESCALATES - it never buys more.
+- Rate limits (free trial): 5 RPM / 30K TPM / 1M TPD per model.
+- Requesty standby routes are NOT used in this run.
 
 ## Final artifact
 The disposable repo's .team record: LOG.jsonl, STATE.json, gates,
