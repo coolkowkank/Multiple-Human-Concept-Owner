@@ -1,72 +1,45 @@
 # Builder task: fix null-handoff routing failure + stall-clock timezone bug
 
-You are the Builder. You have exactly THREE tools: write_file, git_commit,
-git_push. NOTHING else exists (no file reading, no listing, no shell) - do
-not call any other tool name. The full current content of the file you must
-fix is embedded below. write_file writes a WHOLE file (complete content,
-not a diff). Commit with git_commit, then finish with git_push.
+Tools: write_file, git_commit, git_push ONLY (no reading/listing/shell).
+write_file writes a WHOLE file. STRICT JSON: escape newlines as \n and
+quotes as \" inside argument strings - a raw line break inside a JSON
+string fails provider validation. ONE tool call per round. Plan: round 1
+write_file launcher/supervisor.py; round 2 write_file
+tests/test_deadlock_fix.py (compact, <150 lines); round 3 git_commit;
+round 4 git_push.
 
-## Background (from the live experiment record, 2026-11-04)
+## Defects (from the live run record)
 
-A live 5-seat run on google/gemma-4-31b-it exposed two defects:
+1. _check_stall parses turn_since (UTC "Z" stamp) with time.mktime,
+   which treats it as LOCAL time: in a UTC+2 container every new turn is
+   instantly "2 hours stalled" and the supervisor SIGTERMs the fresh
+   seat seconds after each handoff.
+2. A seat returned handoff=null; runtime wrote STATE.turn=None; all
+   seats idle (they act only when the turn names them), _check_stall
+   returns on falsy turn, first-turn seed only fires while "forming":
+   silent permanent hang until a human re-issued the turn by hand.
 
-1. STALL-CLOCK TIMEZONE BUG: the supervisor logged "turn stalled;
-   restarting seat" about 4 seconds after EVERY handoff and SIGTERMed the
-   fresh seat. Cause: supervisor._check_stall parses turn_since (a UTC
-   "Z" stamp) with time.mktime, which interprets it as LOCAL time; in a
-   UTC+2 container every new turn is instantly "2 hours stalled".
-2. NULL-HANDOFF ROUTING FAILURE: a builder seat returned handoff=null;
-   the runtime wrote STATE.turn=None; every seat then idled forever -
-   seats act only when the turn names them, _check_stall returns on a
-   falsy turn, and the first-turn seed fires only while status=="forming".
-   The bus hung silently with no escalation until a human operator
-   re-issued the turn to the coordinator by hand.
+## Required changes (launcher/supervisor.py ONLY)
 
-## What to implement (ALL changes inside launcher/supervisor.py only)
+A. Parse turn_since as UTC (calendar.timegm or timezone-aware datetime).
+   Unparseable stamp: skip the check, as now.
+B. When state["status"]=="running" and state["turn"] is falsy, treat as
+   a routing failure: append a LOUD log entry (kind "routing-failure")
+   quoting the bus record; re-issue state["turn"]="coordinator" with a
+   fresh turn_since, write state, commit (prefix "supervisor:" allowed).
+   On the SECOND consecutive occurrence escalate via _escalate() instead.
+   NEVER fabricate or rewrite the model's routing decision. A falsy turn
+   with status "done" is a VALID terminal state: do nothing there.
+C. Do not change any other file. Do not modify tests/test_launcher.py.
 
-A. Parse turn_since as UTC, not local time (e.g. calendar.timegm(
-   time.strptime(...)) or a timezone-aware datetime). Keep behavior on
-   unparseable stamps: skip the check, as now.
-B. New routing-failure handling: when state["status"] == "running" and
-   state["turn"] is falsy, treat it as a routing failure:
-   - append a LOUD log entry (kind "routing-failure") quoting what the
-     bus recorded (e.g. the last handoff log entry) - NEVER fabricate or
-     rewrite the model's routing decision; its output stays untouched;
-   - re-issue the turn: set state["turn"] = "coordinator" with a fresh
-     turn_since, write state, commit (prefix "supervisor:" is allowed);
-   - if this happens twice in a row (the coordinator again yields a null
-     turn without DONE), escalate via the existing _escalate() gate
-     instead of re-issuing a third time.
-   - A null turn together with status "done" is a VALID terminal state:
-     never fire routing-failure handling there.
-C. Do not change any other file's logic. Do not modify tests/test_launcher.py.
+## tests/test_deadlock_fix.py (new file)
 
-## Tests to add: NEW file tests/test_deadlock_fix.py
-
-Write focused unittest tests for A and B: a stubbed bus/state where
-turn_since is 5 seconds old in UTC must NOT be judged stalled while the
-local timezone is non-UTC (set os.environ["TZ"] and time.tzset() in the
-test, restore after); a running state with turn=None triggers one
-re-issue to coordinator and logs "routing-failure"; a second consecutive
-occurrence escalates; status "done" + turn=None does nothing. Follow the
-existing suite's style (plain unittest, temp dirs, no network).
-
-## CRITICAL tool-call format rules (read twice)
-
-- Tool arguments must be STRICTLY VALID JSON: every newline inside a
-  string MUST be escaped as \n, every quote as \", never emit a raw
-  line break inside a JSON string value. A previous attempt failed
-  because the file content contained unescaped newlines.
-- Write ONE file per round, and only ONE tool call per round. Plan:
-  round 1 write_file launcher/supervisor.py; round 2 write_file
-  tests/test_deadlock_fix.py; round 3 git_commit; round 4 git_push.
-- Keep code lines short and the test file compact (aim under 150 lines):
-  a few focused tests beat a long file.
-
-## Bounds
-
-- Only write launcher/supervisor.py and tests/test_deadlock_fix.py.
-- Then ONE git_commit, then git_push. No other tools, no extra commits.
+unittest tests for A and B: stub the bus/state; a 5-second-old UTC
+turn_since must NOT be stalled under a non-UTC local TZ (set
+os.environ["TZ"]+time.tzset(), restore after); running+turn=None =>
+re-issue to coordinator + "routing-failure" log; second consecutive =>
+escalation gate; done+turn=None => nothing. Plain unittest, temp dirs,
+no network.
 
 ## Current launcher/supervisor.py (verbatim - base your rewrite on this)
 
