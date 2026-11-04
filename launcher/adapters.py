@@ -20,6 +20,8 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import time
+import urllib.error
 import urllib.request
 
 
@@ -162,11 +164,20 @@ class HttpAdapter(Adapter):
     """OpenAI-compatible chat completions. Works with any provider or
     local server exposing that API shape. API key from env var."""
 
-    def __init__(self, base_url, model, api_key_env, timeout=600):
+    def __init__(self, base_url, model, api_key_env, timeout=600,
+                 max_retries=3, backoff=2.0, sleeper=time.sleep):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.api_key_env = api_key_env
         self.timeout = timeout
+        # 429/backoff policy: retry rate-limited requests with
+        # exponential backoff, honoring Retry-After when the provider
+        # sends one. Other HTTP errors are not retried (a 4xx will not
+        # heal by waiting; a 5xx storm should not be hammered either -
+        # only 429 carries an explicit "come back later" meaning).
+        self.max_retries = max_retries
+        self.backoff = backoff
+        self.sleeper = sleeper
 
     def complete(self, system, prompt):
         key = os.environ.get(self.api_key_env)
@@ -188,10 +199,33 @@ class HttpAdapter(Adapter):
                 # Python-urllib user agent; send an explicit one.
                 "user-agent": "team-launcher-http-adapter/0.1",
             })
-        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-            data = json.loads(resp.read())
+        data = self._post(req)
         text = data["choices"][0]["message"]["content"]
         return parse_response(text)
+
+    def _post(self, req):
+        delay = self.backoff
+        for attempt in range(self.max_retries + 1):
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout)                         as resp:
+                    return json.loads(resp.read())
+            except urllib.error.HTTPError as exc:
+                if exc.code != 429 or attempt == self.max_retries:
+                    raise AdapterError(
+                        f"provider HTTP {exc.code} after {attempt + 1} "
+                        f"attempt(s): {exc.read()[:200]!r}") from exc
+                retry_after = exc.headers.get("Retry-After")
+                wait = float(retry_after) if retry_after else delay
+                self.sleeper(wait)
+                delay *= 2
+            except urllib.error.URLError as exc:
+                if attempt == self.max_retries:
+                    raise AdapterError(
+                        f"provider unreachable after {attempt + 1} "
+                        f"attempt(s): {exc.reason}") from exc
+                self.sleeper(delay)
+                delay *= 2
+        raise AdapterError("unreachable")  # pragma: no cover
 
 
 def parse_response(text):

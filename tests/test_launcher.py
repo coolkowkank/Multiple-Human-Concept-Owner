@@ -1058,3 +1058,84 @@ class PatchReviewRegressionTests(unittest.TestCase):
             ".team/STATE.json", ".team/LOG.jsonl", ".team/roster.json",
             ".team/brief.md", ".team/gates/PENDING.jsonl",
             ".team/gates/ANSWERS.jsonl"})
+
+
+class HttpAdapterBackoffTests(unittest.TestCase):
+    """429 handling: retry with backoff, honor Retry-After, never
+    retry other HTTP errors (a 4xx does not heal by waiting)."""
+
+    def _server(self, script):
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        import threading
+        calls = {"n": 0}
+
+        class H(BaseHTTPRequestHandler):
+            def do_POST(self):
+                calls["n"] += 1
+                n = int(self.headers.get("content-length", 0))
+                self.rfile.read(n)
+                status, extra = script[min(calls["n"], len(script)) - 1]
+                self.send_response(status)
+                for k, v in extra.items():
+                    self.send_header(k, v)
+                if status == 200:
+                    payload = {"choices": [{"message": {"content":
+                        '{"summary": "ok after retry", "handoff": null}'}}]}
+                    data = json.dumps(payload).encode()
+                    self.send_header("content-type", "application/json")
+                    self.send_header("content-length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                else:
+                    self.end_headers()
+
+            def log_message(self, *a):
+                pass
+
+        srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+        self.addCleanup(srv.shutdown)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        return srv, calls
+
+    def _adapter(self, srv, sleeps):
+        from launcher.adapters import HttpAdapter
+        os.environ["TEAM_TEST_BACKOFF_KEY"] = "k"
+        self.addCleanup(os.environ.pop, "TEAM_TEST_BACKOFF_KEY", None)
+        return HttpAdapter(
+            f"http://127.0.0.1:{srv.server_address[1]}", "m",
+            "TEAM_TEST_BACKOFF_KEY", max_retries=3, backoff=2.0,
+            sleeper=sleeps.append)
+
+    def test_429_retry_after_honored_then_success(self):
+        srv, calls = self._server([(429, {"Retry-After": "7"}),
+                                   (200, {})])
+        sleeps = []
+        out = self._adapter(srv, sleeps).complete("sys", "prompt")
+        self.assertEqual(out["summary"], "ok after retry")
+        self.assertEqual(calls["n"], 2)
+        self.assertEqual(sleeps, [7.0])  # Retry-After wins over backoff
+
+    def test_429_exponential_backoff_without_retry_after(self):
+        srv, calls = self._server([(429, {}), (429, {}), (200, {})])
+        sleeps = []
+        self._adapter(srv, sleeps).complete("sys", "prompt")
+        self.assertEqual(sleeps, [2.0, 4.0])
+
+    def test_429_exhaustion_raises_adapter_error(self):
+        srv, calls = self._server([(429, {})] * 5)
+        sleeps = []
+        from launcher.adapters import AdapterError
+        with self.assertRaises(AdapterError) as ctx:
+            self._adapter(srv, sleeps).complete("sys", "prompt")
+        self.assertIn("429", str(ctx.exception))
+        self.assertEqual(calls["n"], 4)  # 1 initial + 3 retries
+
+    def test_non_429_http_error_not_retried(self):
+        srv, calls = self._server([(400, {}), (200, {})])
+        sleeps = []
+        from launcher.adapters import AdapterError
+        with self.assertRaises(AdapterError) as ctx:
+            self._adapter(srv, sleeps).complete("sys", "prompt")
+        self.assertIn("400", str(ctx.exception))
+        self.assertEqual(calls["n"], 1)
+        self.assertEqual(sleeps, [])

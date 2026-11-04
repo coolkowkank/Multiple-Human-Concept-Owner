@@ -21,10 +21,10 @@ readiness for parallel or unattended operation.**
 
 | ID | Sev | Finding | State |
 | --- | --- | --- | --- |
-| F1 | major | Queued responses unbound to bus state; stale apply possible | verified, fixed `9407acc` + cross-clone proof `a80255f` |
-| F2 | minor | `respond` swept untracked dirt via `git add -A` | verified, fixed `9407acc` |
-| F3 | minor | Prompt render wrote session-id file as side effect | verified, fixed `9407acc` |
-| F4 | minor | `respond` hinted fixed branch, not actual checkout | verified, fixed `9407acc` |
+| F1 | major | Queued responses unbound to bus state; stale apply possible | verified subcase: turn/seq stale refusal + queue preservation (`9407acc`, cross-clone proof `a80255f`); full head binding tracked as P2 |
+| F2 | minor | `respond` swept untracked dirt via `git add -A` | verified subcase: untracked dirt not swept (`9407acc`); pre-staged index case tracked as P3 |
+| F3 | minor | Prompt render wrote session-id file as side effect | verified, fixed `9407acc` (lazy ids, independently reproduced) |
+| F4 | minor | `respond` hinted fixed branch, not actual checkout | verified, fixed `9407acc` (independently reproduced) |
 
 ### Patch review of `9407acc` (independent, read-only)
 
@@ -57,7 +57,7 @@ in the owner's vault, never in the repo.
 ## Proven vs not
 
 Proven: queue mechanism - cross-clone handoffs, leases, stale
-refusal + recovery, conformance checks (66 tests). One bounded Groq
+refusal + recovery, conformance checks (70 tests). One bounded Groq
 live exchange.
 
 Not proven: unattended/parallel operation, live models closing cycles
@@ -71,5 +71,6 @@ autonomy.
    fixed head, live-1 protocol, hard stop.
 3. Open gaps before any unattended claim: cooperative local leases;
    best-effort relay; supervisor restart untested; models may not
-   close cycles; minimal 429 backoff; unsandboxed `verify_command`
-   shell; manual prompt-size budgeting.
+   close cycles; unsandboxed `verify_command` shell; manual
+   prompt-size budgeting. (429 backoff with Retry-After landed in
+   `HttpAdapter`, regression-tested against a stub server.)
