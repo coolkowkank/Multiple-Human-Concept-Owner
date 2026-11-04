@@ -122,5 +122,11 @@
       "ok": true,
       "output": "To https://github.com/coolkowkank/Multiple-Human-Concept-Owner.git\n   015e551..5ca0261  HEAD -> live/groq-dev-4\n"
     }
+  },
+  {
+    "budget_stop": {
+      "used": 2,
+      "budget": 2
+    }
   }
 ]
