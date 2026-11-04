@@ -3,9 +3,15 @@
 Status: ON HOLD 2026-11-04. Free Trial = $5 credits against a verified
 payment method (vendor docs), so this route spends credits - no approval
 yet. Whether the account's earlier 181-token qualification probe consumed
-credit is UNVERIFIED: the account ledger is only visible via the Cerebras
-console/account API, which this run has not accessed. All Cerebras use is
-paused until the account tier/ledger is checked and scope is settled.
+credit is UNVERIFIED from this run: billing is console-only
+(cloud.cerebras.ai), the API key cannot read the ledger, and no console
+credentials are stored. Vendor policy (same docs): credits are consumed
+across all public models, auto-recharge is OFF by default, and adding
+the payment method itself is not charged - so the probe most likely
+consumed a negligible slice of the $5 grant (ESTIMATE: ~$0.0001 at
+published gpt-oss-120b rates; not ledger-verified). All Cerebras use is
+paused until the user confirms the ledger/tier in the console or
+provides console access.
 
 ## Exact concept and target
 - Concept (the whole .team/brief.md content): "Build a tiny Python

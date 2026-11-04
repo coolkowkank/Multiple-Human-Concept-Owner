@@ -16,10 +16,22 @@ Status: PROPOSED 2026-11-04, not run. Awaiting bounded GO.
   model errors, the adapter's 429/error handling applies and the budget
   counts it - no silent reroute to a paid model (fallback policies are
   opt-in router features this run does not enable).
-- Residual check at GO time: confirm in the Requesty dashboard that the
-  account carries no paid balance/payment method, so even a listing
-  error could not debit anything. Until then the hard bound is: 20
-  requests x $0.00 listed price = $0.00 maximum listed cost.
+- Billing model grounding (docs.requesty.ai/features/billing): Requesty
+  bills from a PREPAID USD balance only - every request deducts its
+  listed cost, and a request is REJECTED with HTTP 402 once the balance
+  runs out. There is no postpaid invoicing of usage (pay-by-invoice is
+  a top-up method, still prepaid), so an empty balance cannot accrue
+  debt: paid requests fail instead. Auto top-up is opt-in and requires
+  a saved payment method plus explicit configuration; this run changes
+  no billing settings.
+- Account reads attempted 2026-11-04 (read-only, authorized): the
+  org-balance management API (api-v2.requesty.ai/v1/manage/org) refused
+  this inference key - "API key does not have manage permissions" - and
+  no console credentials are stored, so the current balance/payment
+  state is unread by this run. The hard bound stands without it: 20
+  requests x $0.00 listed price on pinned zero-price models = $0.00
+  listed cost, and any non-zero-priced request would need balance the
+  router would 402 if absent.
 
 ## Exact concept and target
 Same as the held Cerebras proposal: brief = "Build a tiny Python library
