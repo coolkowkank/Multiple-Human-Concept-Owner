@@ -90,5 +90,56 @@
       "x-ratelimit-reset-tokens": "8.684s"
     },
     "call": 2
+  },
+  {
+    "api_response": {
+      "id": "chatcmpl-63a330eb-0f06-4687-958e-254123c7a8f0",
+      "object": "chat.completion",
+      "created": 1793799626,
+      "model": "openai/gpt-oss-120b",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "reasoning": "We need locate code.",
+            "tool_calls": [
+              {
+                "id": "fc_5699d6fe-4e21-4a43-aacf-924afcf3f71f",
+                "type": "function",
+                "function": {
+                  "name": "edit_file",
+                  "arguments": "{\"new_string\":\"if self._routing_failure_count \\u003e 0:\\n                self._routing_failure_count = 0\",\"old_string\":\"if self._routing_failure_count \\u003e 0:\",\"path\":\"launcher/supervisor.py\"}"
+                }
+              }
+            ]
+          },
+          "logprobs": null,
+          "finish_reason": "tool_calls"
+        }
+      ],
+      "usage": {
+        "queue_time": 0.114840013,
+        "prompt_tokens": 1103,
+        "prompt_time": 0.004816941,
+        "completion_tokens": 74,
+        "completion_time": 0.156717344,
+        "total_tokens": 1177,
+        "total_time": 0.161534285,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 7
+        }
+      },
+      "usage_breakdown": null,
+      "system_fingerprint": "fp_c868cf1eaa",
+      "x_groq": {
+        "id": "req_01m6kcm7v9ezys0vdyawkk132t",
+        "seed": 642014072
+      },
+      "service_tier": "on_demand"
+    }
   }
 ]
