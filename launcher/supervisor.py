@@ -13,6 +13,7 @@ stalled interactive seat becomes a gate for the humans instead.
 
 from __future__ import annotations
 
+import calendar
 import os
 import subprocess
 import sys
@@ -122,14 +123,32 @@ class Supervisor:
             self.start_seat(name)
 
     def _check_stall(self, state):
+        # Handle routing failures before stall detection
         turn = state.get("turn")
-        if not turn or state.get("status") != "running":
+        status = state.get("status")
+        if status == "running" and not turn:
+            # routing failure detected
+            count = getattr(self, "_routing_failure_count", 0) + 1
+            self._routing_failure_count = count
+            self.bus.append_log("supervisor", "routing-failure",
+                                f"routing failure detected; state: {state}")
+            if count >= 2:
+                self._escalate("consecutive routing failures")
+                return
+            # re-issue turn to coordinator
+            state["turn"] = "coordinator"
+            state["turn_since"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            self.bus.write_state(state)
+            self.bus.commit_all("supervisor: reissued turn to coordinator after routing failure")
+            return
+        if not turn or status != "running":
             return
         since = state.get("turn_since")
         if not since:
             return
         try:
-            ts = time.mktime(time.strptime(since, "%Y-%m-%dT%H:%M:%SZ"))
+            # parse as UTC using calendar.timegm
+            ts = calendar.timegm(time.strptime(since, "%Y-%m-%dT%H:%M:%SZ"))
         except ValueError:
             return
         if time.time() - ts < self.stall_timeout:
