@@ -1,40 +1,53 @@
 # Blueprint: Coordinator Assistant
 
-- **Status:** vacant (role available under the owner's 2026-11-04
-  dynamic-team approval; no instance until a clear workload exists)
-- **Purpose:** takes over well-defined coordination support work -
-  handoff tracking and status-evidence gathering - so the coordinator
-  can focus on assignments and acceptance.
-- **Current model / provider:** unassigned (qualification trial
-  required first).
-- **Owns (scope):** status/evidence collection and handoff logs;
+- **Status:** active (dedicated assignment from the owner, 2026-11-04:
+  keep the GitHub Pages project status current - Gantt chart, S-curve,
+  team, timeline)
+- **Purpose:** owns status-evidence collection and status publication
+  for the project Pages site, so the coordinator can focus on
+  assignments, priorities and acceptance.
+- **Current model / provider:** not project-configured. The routine
+  status-maintenance workflow (hourly, changes-only, day-end archive)
+  is currently executed through the coordinator's maintenance process.
+  An external-model activation for short status-delta drafting is
+  proposed as its own bounded trial (see Open issues); it is NOT
+  assumed and NOT required for the current maintenance to continue.
+- **Owns (scope):** project status evidence (scores, pins, timeline
+  events) and its publication to GitHub Pages within existing grants;
   writes proposals, not decisions.
-- **Explicitly NOT in scope:** task assignment, acceptance, gates,
-  credentials, merges - all stay with the coordinator/owner.
-- **Inputs / outputs:** coordinator-delegated tracking questions;
-  produces status summaries with evidence links.
+- **Explicitly NOT in scope:** task assignment, priorities, acceptance,
+  gates, credentials, merges - all stay with the coordinator/owner.
+- **Inputs / outputs:** coordinator-supplied status facts and pins;
+  produces status summaries, status-delta drafts and Pages updates with
+  evidence links.
 - **Evidence standard:** every status claim carries its source pin;
   unknowns are reported as unknowns.
-- **Completed work:** none (vacant).
-- **Qualification trial 2026-11-04 (NOT activated):** one bounded
-  free-only trial (5 attempts, Requesty cost 0) of
-  nvidia/nemotron-3.5-lightning-30b-a3b on log-reconciliation tasks.
+- **Completed work:** ongoing Pages status maintenance (hourly,
+  changes-only) under the coordinator's maintenance process; see the
+  timeline/charts commit history.
+- **Qualification trial 2026-11-04 (heavy-log workload, NOT the active
+  scope):** one bounded free-only trial (5 attempts, Requesty cost 0)
+  of nvidia/nemotron-3.5-lightning-30b-a3b on log-reconciliation tasks.
   Result: good uncertainty discipline on one small task, but quote
   fidelity flawed (analysis presented as verbatim quotes), one empty
   answer and one truncated table on the realistic workload, reasoning
   overhead 4-11x visible output. Decision (coordinator, 2026-11-04):
-  not activated; the recurring reconciliation workload goes to a
+  not qualified for heavy log reconciliation; that workload goes to a
   deterministic extractor instead - see
-  docs/proposals/deterministic-log-reconciliation.md. First candidate
-  nvidia/nemotron-3-super-120b-a12b was listed free but uncallable
-  (404). Same-day org usage floor 26 requests, daily reset boundary
-  unknown.
-- **Open issues:** role stays vacant until a workload exists that is
-  model-shaped (judgment, not extraction) and a fresh bounded trial
-  passes on it.
-- **Handoff notes:** activate only when the tracking workload is real
-  and recurring; follows the same registry/blueprint rules so its work
-  can be handed over or resumed.
+  docs/proposals/deterministic-log-reconciliation.md. This trial does
+  NOT block the active status-publication scope: the failed workload
+  was whole-log analysis, not the short structured-status drafting this
+  role actually does. First candidate nvidia/nemotron-3-super-120b-a12b
+  was listed free but uncallable (404). Same-day org usage floor 26
+  requests, daily reset boundary unknown.
+- **Open issues:** external-model activation for short status-delta
+  drafting needs its own bounded trial on that small job (structured
+  input under ~2KB, fixed-template output, per-task coordinator
+  review), with a fresh explicit attempt cap - the earlier 6-attempt
+  grant is closed and is not reused.
+- **Handoff notes:** hourly changes-only cadence and day-end archive
+  rules are preserved exactly; activation does not add a second
+  maintainer or watcher.
 - **Retirement conditions:** workload ends or is absorbed back by the
   coordinator.
 - **Reactivation checklist:** fit re-check; qualification trial if
