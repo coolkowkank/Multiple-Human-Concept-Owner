@@ -161,7 +161,8 @@ def api(messages):
         raise RuntimeError(f"API call budget exhausted ({CALLS['n']}/{MAX_CALLS}); refusing further provider requests")
     CALLS["n"] += 1  # counted BEFORE the request: failed/transport-blocked attempts consume budget too
     payload = {"model": MODEL, "messages": messages, "tools": TOOLS,
-               "reasoning_effort": "low", "max_completion_tokens": 4096}
+               "reasoning_effort": "low",
+               "max_completion_tokens": int(os.environ.get("MAX_COMPLETION_TOKENS", "4096"))}
     p = subprocess.run(["curl", "-sS", "--max-time", "120", "-w", "\n%{http_code}",
         API_URL,
         "-H", f"Authorization: Bearer {KEY}", "-H", "Content-Type: application/json",
