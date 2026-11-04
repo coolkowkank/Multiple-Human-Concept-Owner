@@ -20,6 +20,14 @@ The Researcher role's deliverable is sourced literature insight, so WP8a does no
 
 No plan or schedule existed before 2026-11-04 14:40 EET, so there is no planned-versus-actual history and none is invented here. The dashed forecast is a baseline set on that date. Later updates keep it visible so slips show up honestly. It is a guess, not a commitment.
 
+## Baseline and as-of time
+
+ in progress.json is frozen at 2026-11-04 14:40 EET and must never be edited.  is the time of the latest update. The current forecast () can move; the red diamonds on the Gantt chart and the pink S-curve line keep the original dates visible.
+
+## Owners (PIC)
+
+The large icon is the accountable current owner by role assignment, not by who authored commits. Small icons are contributors. The shared bot account is not a unique model identity, and the Researcher has no GitHub account, so it uses a role icon.
+
 ## Updating
 
 Edit `progress.json` (status, `credit_at`, `forecast_end`, evidence), then run `python3 docs/progress/render_progress.py` (needs matplotlib) and commit the regenerated files. Do not mark a package done without linking the passing test run or review.

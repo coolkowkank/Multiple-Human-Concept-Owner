@@ -2,15 +2,15 @@
 
 ## Project progress
 
-*As of 2026-11-04 14:47 EET. Weighted milestone progress is **40.0%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
+*As of 2026-11-04 14:48 EET. Weighted milestone progress is **40.0%**, including 50% credit for partial work. This is not independently verified completion. No autonomous end-to-end run has passed yet.*
 
-![Gantt chart](docs/progress/gantt.png?v=144722)
+![Gantt chart](docs/progress/gantt.png?v=144840)
 
-![Progress S-curve](docs/progress/s-curve.png?v=144722)
+![Progress S-curve](docs/progress/s-curve.png?v=144840)
 
-PIC icons show who is in charge of each package, with a name and role legend under the Gantt chart. The Researcher has no GitHub account, so it uses a role icon.
+The large icon on each Gantt row is the accountable current owner (a role assignment, not authorship). Small icons are contributors. A legend under the chart gives names and roles. The Researcher has no GitHub account, so it uses a role icon.
 
-Only milestones backed by passing tests or an independent review count. The dashed lines are forecasts, not commitments, and no earlier plan existed to compare against. See [how progress is measured](docs/progress/README.md).
+Only milestones backed by passing tests or an independent review count. The dashed lines are forecasts, not commitments. The pink baseline was frozen at 14:40 on 2026-11-04 and is never edited, so slips against it stay visible. No plan existed before that. See [how progress is measured](docs/progress/README.md).
 
 *Repository: `coolkowkank/Multiple-Human-Concept-Owner` - a reusable blueprint for human-led AI project teams: roles, coordination, handoffs, independent review, and project setup.*
 

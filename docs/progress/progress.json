@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04T14:47:00+02:00",
+ "as_of": "2026-11-04T14:48:00+02:00",
  "timezone": "EET (UTC+2), same as commit timestamps",
  "rules": "Weighted milestone progress, not independently verified completion. Milestone done = 100% of weight (tests pass or an independent review passed). Partial = 50%. In progress / not started = 0%. Weights are judgment calls. Commits alone never count.",
  "packages": [
@@ -13,6 +13,9 @@
    "credit_at": "2026-11-04T00:59",
    "evidence": "On main: roles, rules, templates, references (commits 2026-11-03 15:51 to 2026-11-04 00:59)",
    "pic": [
+    "instinct-telkomsel"
+   ],
+   "contributors": [
     "instinct-christina"
    ]
   },
@@ -27,7 +30,8 @@
    "evidence": "team-launcher at d02927f: 178/178 offline tests pass. Not proof the runtime works end to end: runtime defects (WP5) are unresolved",
    "pic": [
     "instinct-telkomsel"
-   ]
+   ],
+   "contributors": []
   },
   {
    "id": "WP3",
@@ -39,6 +43,9 @@
    "credit_at": "2026-11-04T09:52",
    "evidence": "review/groq-dev-3 4451611: independent review VERIFIED, docs scope only",
    "pic": [
+    "instinct-telkomsel"
+   ],
+   "contributors": [
     "coolkowkank-bot",
     "instinct-christina"
    ]
@@ -55,7 +62,9 @@
    "forecast_end": "2026-11-05T12:00",
    "pic": [
     "instinct-telkomsel"
-   ]
+   ],
+   "contributors": [],
+   "baseline_end": "2026-11-05T12:00"
   },
   {
    "id": "WP5",
@@ -67,7 +76,9 @@
    "evidence": "live/builder-deadlock-fix: Builder commit 0fa083a pushed with 1 of 4 regression tests failing. Repair batch 3 running (2 of 6 calls used). No green pin or review yet. Not fixed",
    "pic": [
     "coolkowkank-bot"
-   ]
+   ],
+   "contributors": [],
+   "baseline_end": "2026-11-04T17:00"
   },
   {
    "id": "WP6",
@@ -81,7 +92,9 @@
    "evidence": "Gate 93b3552 shipped a stale executor that dropped edit_file and the ledger; fixed forward in d02927f (178/178 offline tests). No independent review yet, so credit stays partial",
    "pic": [
     "instinct-telkomsel"
-   ]
+   ],
+   "contributors": [],
+   "baseline_end": "2026-11-04T19:00"
   },
   {
    "id": "WP7",
@@ -93,7 +106,9 @@
    "evidence": "Waits for green tests on WP5",
    "pic": [
     "instinct-christina"
-   ]
+   ],
+   "contributors": [],
+   "baseline_end": "2026-11-04T19:00"
   },
   {
    "id": "WP8a",
@@ -107,7 +122,9 @@
    "evidence": "Note b42f670 published with citations, evidence classes, limits and proposed experiments. Independent spot check at 14:44: 3 of 3 arXiv links resolve with matching titles; F1 numbers match the paper abstract. F2 and F3 numbers not yet checked, so partial",
    "pic": [
     "researcher"
-   ]
+   ],
+   "contributors": [],
+   "baseline_end": "2026-11-04T20:00"
   },
   {
    "id": "WP8b",
@@ -119,7 +136,8 @@
    "evidence": "No experiment run yet. Adoption is a separate decision and is not required for WP8a",
    "pic": [
     "researcher"
-   ]
+   ],
+   "contributors": []
   },
   {
    "id": "WP9",
@@ -131,7 +149,9 @@
    "evidence": "Delta-only handoff rule adopted; token savings not yet measured",
    "pic": [
     "instinct-telkomsel"
-   ]
+   ],
+   "contributors": [],
+   "baseline_end": "2026-11-04T20:00"
   },
   {
    "id": "WP10",
@@ -142,26 +162,29 @@
    "forecast_end": "2026-11-05T12:00",
    "evidence": "No autonomous PASS yet. Also re-proves WP4 cleanly",
    "pic": [
-    "instinct-telkomsel",
+    "instinct-telkomsel"
+   ],
+   "contributors": [
     "coolkowkank-bot",
     "instinct-christina"
-   ]
+   ],
+   "baseline_end": "2026-11-05T12:00"
   }
  ],
  "people": {
   "instinct-telkomsel": {
    "label": "instinct-telkomsel",
-   "role": "Coordinator and project support (Habibil's Telkomsel Instinct)",
+   "role": "Coordinator: planning, scaffold and support, token controls, Requesty coordination",
    "icon": "avatars/instinct-telkomsel.png"
   },
   "instinct-christina": {
    "label": "instinct-christina",
-   "role": "Independent reviewer and blueprint author (Christina's Instinct)",
+   "role": "Independent reviewer; wrote the original blueprint (Christina's Instinct)",
    "icon": "avatars/instinct-christina.png"
   },
   "coolkowkank-bot": {
    "label": "coolkowkank-bot",
-   "role": "Builder: Groq gpt-oss-120b model acting through the shared project bot account",
+   "role": "Builder: Groq gpt-oss-120b via the shared project bot account (not a unique model identity)",
    "icon": "avatars/coolkowkank-bot.png"
   },
   "researcher": {
@@ -170,5 +193,40 @@
    "icon": "avatars/researcher-role.png"
   }
  },
- "pic_note": "PIC = person or agent in charge, by who authored or reviewed the evidence. A shared bot account is not a unique model identity."
+ "pic_note": "Large icon = accountable current owner (role assignment, not authorship). Small icons = contributors.",
+ "baseline": {
+  "set_at": "2026-11-04T14:40",
+  "start_pct": 38.5,
+  "note": "Frozen. Do not edit. Compare current forecast against this to see slips.",
+  "steps": [
+   [
+    "2026-11-04T17:00",
+    15
+   ],
+   [
+    "2026-11-04T19:00",
+    4
+   ],
+   [
+    "2026-11-04T19:00",
+    6
+   ],
+   [
+    "2026-11-04T20:00",
+    5
+   ],
+   [
+    "2026-11-04T20:00",
+    5
+   ],
+   [
+    "2026-11-05T12:00",
+    3.5
+   ],
+   [
+    "2026-11-05T12:00",
+    23
+   ]
+  ]
+ }
 }
