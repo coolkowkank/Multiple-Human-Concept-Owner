@@ -452,6 +452,27 @@ class ExecutorCase(unittest.TestCase):
         open(os.path.join(self.repo, ".team", "attempts", "run.json"), "w").write("{}")
         self.assertIsNone(ns["_push_gate_check"](self.repo))
 
+
+    def test_push_gate_tracked_team_file_invalidates(self):
+        # regression: a .team/ file that is TRACKED (and therefore pushable)
+        # must stay bound - the runtime-artifact exemption covers only
+        # untracked .team/ content
+        self._committed_repo()
+        ns = self.load()
+        gate = os.path.join(self.tmp, "gate.json")
+        os.environ["PUSH_GATE_FILE"] = gate
+        self.addCleanup(lambda: os.environ.pop("PUSH_GATE_FILE", None))
+        os.makedirs(os.path.join(self.repo, ".team", "attempts"), exist_ok=True)
+        tracked_team = os.path.join(self.repo, ".team", "attempts", "pinned.json")
+        open(tracked_team, "w").write("{\"v\": 1}")
+        git("-c", "user.name=t", "-c", "user.email=t@t", "add", ".team", cwd=self.repo)
+        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "track team", cwd=self.repo)
+        subprocess.run([sys.executable, EXECUTOR, "--write-gate", gate, self.repo],
+                       check=True, capture_output=True)
+        self.assertIsNone(ns["_push_gate_check"](self.repo))
+        open(tracked_team, "w").write("{\"v\": 2}")
+        self.assertIn("STALE", ns["_push_gate_check"](self.repo))
+
     def test_push_gate_pycache_does_not_invalidate(self):
         self._committed_repo()
         ns = self.load()
