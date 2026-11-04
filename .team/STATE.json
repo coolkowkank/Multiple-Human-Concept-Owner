@@ -1,9 +1,9 @@
 {
-  "turn": null,
+  "turn": "coordinator",
   "turn_seq": 2,
-  "turn_since": "2026-11-04T11:13:18Z",
+  "turn_since": "2026-11-04T11:19:29Z",
   "status": "running",
-  "status_line": "Implementing library and tests",
+  "status_line": "operator re-issued turn to coordinator after null-handoff deadlock",
   "leases": {
     "coordinator": {
       "holder": "coordinator-32a14394",
