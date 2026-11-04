@@ -302,5 +302,11 @@
       "nudge": 1,
       "content": ""
     }
+  },
+  {
+    "pacing_wait": {
+      "seconds": 58.9,
+      "min_interval": 65.0
+    }
   }
 ]
