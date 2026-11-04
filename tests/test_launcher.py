@@ -2187,6 +2187,71 @@ class LaunchBudgetGuardTests(unittest.TestCase):
         self.assertEqual(unbounded_http_seats(repo, "team-work"), [])
 
 
+class HttpAdapterZeroCostGuardTests(unittest.TestCase):
+    """Zero-price route guard: a nonzero reported cost stops the seat
+    fail-closed before any further request."""
+
+    def _server(self, cost):
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        import threading
+        calls = {"n": 0}
+
+        class H(BaseHTTPRequestHandler):
+            def do_POST(self):
+                calls["n"] += 1
+                n = int(self.headers.get("content-length", 0))
+                self.rfile.read(n)
+                self.send_response(200)
+                usage = {"total_tokens": 9}
+                if cost is not None:
+                    usage["cost"] = cost
+                payload = {"choices": [{"message": {"content":
+                    '{"summary": "ok", "handoff": null}'}}], "usage": usage}
+                data = json.dumps(payload).encode()
+                self.send_header("content-type", "application/json")
+                self.send_header("content-length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def log_message(self, *a):
+                pass
+
+        srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+        self.addCleanup(srv.shutdown)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        return srv, calls
+
+    def _adapter(self, srv, log):
+        from launcher.adapters import HttpAdapter
+        os.environ["TEAM_TEST_ZC_KEY"] = "k"
+        self.addCleanup(os.environ.pop, "TEAM_TEST_ZC_KEY", None)
+        return HttpAdapter(
+            f"http://127.0.0.1:{srv.server_address[1]}", "m",
+            "TEAM_TEST_ZC_KEY", call_budget=5, usage_log=log,
+            require_zero_cost=True)
+
+    def _log(self):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        return os.path.join(d, "u.jsonl")
+
+    def test_nonzero_cost_stops_fail_closed(self):
+        srv, calls = self._server(cost=0.0003)
+        from launcher.adapters import AdapterError
+        a = self._adapter(srv, self._log())
+        with self.assertRaises(AdapterError) as ctx:
+            a.complete("s", "p")
+        self.assertIn("nonzero cost", str(ctx.exception))
+        self.assertEqual(calls["n"], 1)  # exactly one request, then stop
+
+    def test_zero_and_missing_cost_pass(self):
+        srv, calls = self._server(cost=0)
+        self._adapter(srv, self._log()).complete("s", "p")
+        srv2, calls2 = self._server(cost=None)
+        self._adapter(srv2, self._log()).complete("s", "p")
+        self.assertEqual((calls["n"], calls2["n"]), (1, 1))
+
+
 class HttpAdapterMaxTokensTests(unittest.TestCase):
     """Reasoning models can exhaust the provider's default completion
     cap on reasoning and return empty content (observed live against

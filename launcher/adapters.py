@@ -188,7 +188,7 @@ class HttpAdapter(Adapter):
     def __init__(self, base_url, model, api_key_env, timeout=600,
                  max_retries=3, backoff=2.0, sleeper=time.sleep,
                  max_tokens=None, reasoning_effort=None,
-                 call_budget=None, usage_log=None):
+                 call_budget=None, usage_log=None, require_zero_cost=False):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.api_key_env = api_key_env
@@ -241,6 +241,11 @@ class HttpAdapter(Adapter):
                 "derived from the log so it survives restarts")
         self.usage_log = usage_log
         self._calls = self._prior_attempts()
+        # require_zero_cost: for zero-price routes only. If a response's
+        # usage reports a nonzero "cost", STOP fail-closed before any
+        # further request - an unexpected charge means the route is not
+        # what the roster claimed, and continuing would spend unbounded.
+        self.require_zero_cost = require_zero_cost
 
     def _prior_attempts(self):
         if not self.usage_log or not os.path.exists(self.usage_log):
@@ -305,6 +310,12 @@ class HttpAdapter(Adapter):
                 with urllib.request.urlopen(req, timeout=self.timeout)                         as resp:
                     data = json.loads(resp.read())
                     self._record(attempt + 1, "ok", data.get("usage"))
+                    if self.require_zero_cost:
+                        cost = (data.get("usage") or {}).get("cost")
+                        if cost:
+                            raise AdapterError(
+                                f"provider reported nonzero cost {cost} on a "
+                                f"zero-price route; stopping fail-closed")
                     return data
             except urllib.error.HTTPError as exc:
                 self._record(attempt + 1, f"http_{exc.code}")
@@ -391,5 +402,6 @@ def build_adapter(spec):
             max_tokens=spec.get("max_tokens"),
             reasoning_effort=spec.get("reasoning_effort"),
             call_budget=spec.get("call_budget"),
-            usage_log=spec.get("usage_log"))
+            usage_log=spec.get("usage_log"),
+            require_zero_cost=spec.get("require_zero_cost", False))
     raise AdapterError(f"unknown adapter type {kind!r}")
