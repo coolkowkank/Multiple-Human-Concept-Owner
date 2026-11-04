@@ -6,6 +6,8 @@ history and accepted review work only - no invented dates or roles.
 
 ![Current developers diagram](docs/developers.png)
 
+![Team roster as tested 4 Nov 2026](docs/team-roster.png)
+
 ## Current roles
 
 | Role | Identity | Responsibility |
