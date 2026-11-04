@@ -126,5 +126,16 @@
       "ok": true,
       "head": "651c5c4505ad641d5b0efcd9eabe7c63795f09df"
     }
+  },
+  {
+    "api_error": {
+      "kind": "api",
+      "status": "429",
+      "detail": {
+        "message": "Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01m5navq21edybnz2d1tg8r3br` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Used 6339, Requested 4799. Please try again in 23.535s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing",
+        "type": "tokens",
+        "code": "rate_limit_exceeded"
+      }
+    }
   }
 ]
