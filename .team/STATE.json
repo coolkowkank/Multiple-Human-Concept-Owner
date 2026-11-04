@@ -1,5 +1,5 @@
 {
-  "turn": null,
+  "turn": "builder",
   "turn_seq": 0,
   "turn_since": null,
   "status": "forming",
