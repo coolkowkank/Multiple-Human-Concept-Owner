@@ -28,6 +28,10 @@ No plan or schedule existed before 2026-11-04 14:40 EET, so there is no planned-
 
 The large icon is the accountable current owner by role assignment, not by who authored commits. Small icons are contributors. The shared bot account is not a unique model identity, and the Researcher has no GitHub account, so it uses a role icon.
 
+## Publishing the images
+
+GitHub caches branch-path image URLs (query strings are ignored), so the main README links the charts pinned to a commit. After regenerating: commit and push the charts, then set the two image URLs in the main README to `https://github.com/coolkowkank/Multiple-Human-Concept-Owner/raw/<that commit sha>/docs/progress/<chart>.png`, and push again.
+
 ## Updating
 
 Edit `progress.json` (status, `credit_at`, `forecast_end`, evidence), then run `python3 docs/progress/render_progress.py` (needs matplotlib) and commit the regenerated files. Do not mark a package done without linking the passing test run or review.
