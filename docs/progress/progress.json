@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04T15:06:00+02:00",
+ "as_of": "2026-11-04T15:17:00+02:00",
  "timezone": "EET (UTC+2), same as commit timestamps",
  "rules": "Weighted milestone progress, not independently verified completion. Milestone done = 100% of weight (tests pass or an independent review passed). Partial = 50%. In progress / not started = 0%. Weights are judgment calls. Commits alone never count.",
  "packages": [
@@ -121,7 +121,7 @@
    "end": "2026-11-04T14:44",
    "credit_at": "2026-11-04T14:44",
    "forecast_end": "2026-11-04T20:00",
-   "evidence": "Note b42f670 plus research plan v3 and REFERENCES published (76351f3, per execution report). Spot check: 3 of 3 arXiv links resolve with matching titles; F1 numbers match the paper abstract. The Researcher later labelled the F2 figures as abstract-only. Partial until F2 and F3 are checked",
+   "evidence": "Note b42f670 plus research plan v3 and REFERENCES published (76351f3, per execution report). Spot check: 3 of 3 arXiv links resolve with matching titles; F1 numbers match the paper abstract. The Researcher later labelled the F2 figures as abstract-only. Partial until F2 and F3 are checked. Since then two more docs-only notes on Research_lab: 947a498 (RW5 prior art) and ad93523 (RW4 liveness design), both read from partial sources and labelled hypotheses. Researcher commits now use role author and owner committer. No credit change",
    "pic": [
     "researcher"
    ],
@@ -191,7 +191,7 @@
   },
   "researcher": {
    "label": "Researcher role",
-   "role": "Literature research agent. No GitHub account of its own; role icon, not an avatar",
+   "role": "Literature research agent. No separate GitHub account; publishes as role author through the owner's authenticated account. Role icon, not an avatar",
    "icon": "avatars/researcher-role.png"
   }
  },

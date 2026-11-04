@@ -30,7 +30,7 @@ No plan or schedule existed before 2026-11-04 14:40 EET, so there is no planned-
 
 ## Owners (PIC)
 
-The large icon is the accountable current owner by role assignment, not by who authored commits. Small icons are contributors. The shared bot account is not a unique model identity, and the Researcher has no GitHub account, so it uses a role icon.
+The large icon is the accountable current owner by role assignment, not by who authored commits. Small icons are contributors. The shared bot account is not a unique model identity, and the Researcher has no separate GitHub account, so it uses a role icon. Since 15:10 it publishes through the owner's dedicated token with the Researcher role as commit author and the owner as committer. That is a publishing route, not a new identity, and earns no product credit.
 
 ## Publishing the images
 
