@@ -227,5 +227,11 @@
       "ok": false,
       "error": "push fail-closed: gate /tmp/push-gate-b9 absent or unreadable; do other work or retry git_push in a later round"
     }
+  },
+  {
+    "pacing_wait": {
+      "seconds": 54.0,
+      "min_interval": 65.0
+    }
   }
 ]
