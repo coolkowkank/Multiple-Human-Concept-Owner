@@ -534,6 +534,92 @@ class ClosingValidationTests(unittest.TestCase):
                          problems)
 
 
+class LiveAdapterFixtureTests(unittest.TestCase):
+    """CLI + HTTP adapters exercised through the REAL seat path
+    (Seat.act_once, lease, _apply, LOG) with benign local fixtures.
+    These are fixture commands and a loopback fixture server - NOT
+    live models, and no claim about model behavior follows."""
+
+    def _seat_repo(self, adapter_spec):
+        repo, bus = make_repo(seats={"solo": {
+            "role": "builder", "allowed_paths": ["src/"],
+            "adapter": adapter_spec}})
+        self.addCleanup(shutil.rmtree, repo, True)
+        state = bus.state()
+        state["turn"] = "solo"
+        bus.write_state(state)
+        bus.commit_all("operator: turn to solo")
+        return repo, bus
+
+    def test_cli_adapter_seat_turn_fixture(self):
+        fd, script = tempfile.mkstemp(suffix=".py")
+        with os.fdopen(fd, "w") as fh:
+            fh.write("print('{\"summary\": \"cli fixture ok\", "
+                     "\"verify_command\": \"true\", "
+                     "\"handoff\": null}')\n")
+        self.addCleanup(os.unlink, script)
+        repo, bus = self._seat_repo({"type": "cli", "command": [
+            "python3", script]})
+        seat = Seat(bus, "solo")
+        self.assertTrue(seat.act_once())
+        state = bus.state()
+        self.assertEqual((state["turn"], state["turn_seq"]), (None, 1))
+        body = bus.log()[-1]["body"]
+        self.assertIn("cli fixture ok", body)
+        self.assertIn("exit=0", body)
+
+    def test_http_adapter_seat_turn_fixture(self):
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        seen = {}
+
+        class H(BaseHTTPRequestHandler):
+            def do_POST(self):
+                n = int(self.headers.get("content-length", 0))
+                seen["body"] = json.loads(self.rfile.read(n))
+                seen["auth"] = self.headers.get("authorization")
+                payload = {"choices": [{"message": {"content":
+                    '{"summary": "http fixture ok", "handoff": null}'}}]}
+                data = json.dumps(payload).encode()
+                self.send_response(200)
+                self.send_header("content-type", "application/json")
+                self.send_header("content-length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def log_message(self, *a):
+                pass
+
+        srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+        self.addCleanup(srv.shutdown)
+        import threading
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        os.environ["TEAM_TEST_FIXTURE_KEY"] = "fixture-key"
+        self.addCleanup(os.environ.pop, "TEAM_TEST_FIXTURE_KEY", None)
+        repo, bus = self._seat_repo({
+            "type": "http",
+            "base_url": f"http://127.0.0.1:{srv.server_address[1]}",
+            "model": "fixture-model",
+            "api_key_env": "TEAM_TEST_FIXTURE_KEY"})
+        seat = Seat(bus, "solo")
+        self.assertTrue(seat.act_once())
+        self.assertEqual((bus.state()["turn"], bus.state()["turn_seq"]),
+                         (None, 1))
+        self.assertIn("http fixture ok", bus.log()[-1]["body"])
+        self.assertEqual(seen["auth"], "Bearer fixture-key")
+        self.assertEqual(seen["body"]["model"], "fixture-model")
+        self.assertEqual(seen["body"]["messages"][0]["role"], "system")
+
+    def test_http_adapter_missing_key_env_fails_clean(self):
+        os.environ.pop("TEAM_TEST_ABSENT_KEY", None)
+        repo, bus = self._seat_repo({
+            "type": "http", "base_url": "http://127.0.0.1:1",
+            "model": "m", "api_key_env": "TEAM_TEST_ABSENT_KEY"})
+        seat = Seat(bus, "solo")
+        from launcher.runtime import SeatError
+        with self.assertRaises(SeatError):
+            seat.act_once()
+
+
 class FalseGreenTests(unittest.TestCase):
     def test_claimed_green_cannot_override_recorded_exit_code(self):
         # Builder's prose claims green; the runtime records the true

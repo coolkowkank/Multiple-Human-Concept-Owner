@@ -28,7 +28,7 @@ Whether a fresh team can adopt this blueprint on a new project and run one full 
 
 ## Team launcher runtime (added 4 Nov 2026, branch team-launcher)
 
-Tested by the mechanism and integration suites (30 tests) and the self-checking demo, all
+Tested by the mechanism and integration suites (46 tests) and the self-checking demo, all
 on mock adapters in local git repos: turn-token enforcement (off-turn
 and out-of-path commits rejected), single-session leases, adapter crash
 leaving the turn for retry with no duplicate write, verify exit codes
@@ -40,9 +40,40 @@ and webhook receivers; conformance checker acceptance/rejection;
 false-green recording (a seat's prose claim cannot change the recorded
 exit code).
 
-Implemented but not yet exercised live: the cli and http adapters
-against real models, cross-machine bus sharing over a remote, the relay
-beyond loopback.
+The cli and http adapters are exercised through the real seat path
+(lease, apply, LOG, recorded exit) against local fixtures only - a
+fixture command and a loopback fixture HTTP server, NOT live models.
+The relay remains loopback-only.
+
+## Two-operator rehearsal cycle (4 Nov 2026, branches rehearsal/i2i-1 and rehearsal/i2i-2)
+
+One bounded cycle, two real operators (two same-kind Instincts - NOT
+heterogeneous platforms), all seat content static operator-authored
+mock material - NOT model judgment. Observed: one handoff per turn_seq
+(1-4, strictly increasing), one lease per seat turn, per-turn queues
+consumed once each, runtime-executed verify commands with real recorded
+exit codes at every seat, independent re-run of the builder's verify by
+the reviewer, a QC gate whose FAIL stands. One real procedure failure
+(dirty tree blocking the seat's pull) was caught by the HALT rule
+before any mutation - it preceded mutation and is not transaction-race
+evidence; race recovery is covered by simulated tests only.
+
+FAILED acceptance metric, kept visible: the QC verdict FAILED the
+all-artifact metric - review/batch-1-findings.md is structurally
+nonconformant (invalid finding types, missing Reproduced:/Probed:
+entries). The original is preserved unedited; a correction needs a
+future agreed turn. The batch code verdict (a genuine earlier review
+finding fixed and regression-covered) stands.
+
+NOT exercised or proven: real duplicate-wake and crash faults (F1/F3),
+independent QC (same worker held Reviewer and QC, disclosed), live
+models, cross-platform generality, any sustained or unattended run.
+i2i-1 additionally gave: fallback receipt after a withheld wake hint
+(~13 min, operator-measured, not server-authoritative), one diagnosed
+direct-record-mutation deviation (no lease - visible in the record),
+and two checker repairs (turn_seq rule vs the interface, guard vs
+runtime-provenance limits). A closed cycle must now be marked done;
+i2i-2's final state (turn null, status active) predates that check.
 
 Proposed, not started: a real-model rehearsal (routes in
 docs/launcher.md), the staged fault-injection and days-long soak tests
