@@ -1,3 +1,6 @@
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import unittest
 from dataclasses import replace
 from launcher.completion_policy import Binding, Policy, Evidence, evaluate_completion

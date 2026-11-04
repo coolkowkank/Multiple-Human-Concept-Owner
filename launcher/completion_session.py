@@ -1,5 +1,10 @@
 """Opt-in process-local completion guard. Restart loses evidence, fails closed.
 
+If the process dies while committed STATE is completing, a new process cannot
+resume finalization because review observations were in memory. Operator-led
+recovery and fresh independent reviews are required; this is not unattended
+restart recovery or the no-manual-repair WP4 acceptance result.
+
 Only the host constructs this object and supplies it to Seat. Model responses,
 log records and files cannot populate its evidence store. Not cross-process
 identity, sandbox security, portable evidence authentication or model quality.
@@ -139,4 +144,3 @@ class CompletionSession:
                                capture_output=True, text=True, check=True).stdout
         if dirty.strip():
             raise ValueError('post-commit tree is dirty; completion unconfirmed')
-
