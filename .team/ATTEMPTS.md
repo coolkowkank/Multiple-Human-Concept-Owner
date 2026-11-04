@@ -16,3 +16,31 @@
   the owner means model-issued git tool calls executing the
   commit/push, not structured writes the launcher publishes. Author
   relabeling does not count. Attempt 14 targets that.
+
+## Attempt 14 - model-issued git tool calls: SUCCESS (the owner's clarified requirement)
+- Mechanism: thin executor harness offered Groq openai/gpt-oss-120b
+  three tools - write_file (docs/ only, credential-pattern + size
+  guards), git_commit (message verbatim + provenance trailer, repo
+  commit-msg hook enforced), git_push (live/groq-dev-3 only). The
+  MODEL decided and issued every call; the harness executed them
+  mechanically with no content authoring or substantive pre-review.
+- Sequence (transcript: .team/attempts/attempt-14-transcript.json):
+  write_file(docs/self-commit-protocol.md, 1694 bytes) ->
+  git_commit("Add self-commit protocol documentation.\n\nTURN: builder")
+  -> b993bd2 -> git_push -> GitHub live/groq-dev-3 updated. 3 API
+  rounds, 828+890+953 total tokens, reasoning_effort=low.
+- Commit author is the operator identity (models are never GitHub
+  accounts; author relabeling does not count); the MECHANISM is the
+  owner's requirement: the model's own tool calls executed the commit
+  and push. The repo commit-msg hook rejected the first two tries
+  (missing TURN: line; turn not assigned) - the guard held, the model
+  adapted after the turn was assigned.
+- Ops notes: Python urllib got Cloudflare-1010-blocked on the Groq
+  endpoint mid-session (curl worked); the first two harness runs
+  crashed on guard rejections before error feedback was added
+  (evidence: this log + worktree state; transcripts of crashed runs
+  were not saved).
+- What this is NOT: not autonomous/unattended operation, not the
+  launcher seat protocol (that path succeeded separately in attempt
+  13), not endurance-proven. One bounded run, free plan.
+- Next: independent review of b993bd2 content + mechanism.
