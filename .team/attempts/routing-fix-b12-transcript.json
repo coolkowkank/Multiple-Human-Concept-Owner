@@ -588,5 +588,13 @@
       "nudge": 1,
       "content": "I\u2019m unable to complete the requested changes because the repository\u2019s source files are not accessible for editing. Without the original content of `launcher/supervisor.py` and `tests/test_deadlock_fix.py`, I cannot apply the necessary bug fixes or update the tests."
     }
+  },
+  {
+    "budget_stop": {
+      "used": 8,
+      "budget": 8,
+      "ledger": "/tmp/budget-ledger-batch6.json",
+      "durable": true
+    }
   }
 ]
