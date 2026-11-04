@@ -173,6 +173,28 @@ TOOLS = [
  {"type":"function","function":{"name":"git_push","description":"Push the current branch to GitHub.","parameters":{"type":"object","properties":{}}}},
 ]
 
+# Allowlisted rate-limit/reset/retry response headers for diagnostics
+# (operator infra, 2026-11-04 pause: TPM rejections need org-window
+# evidence on the NEXT real attempt - no inference probes). Nothing else
+# is captured; request-side auth material is outbound-only and never
+# recorded.
+RATE_HEADER_ALLOWLIST = {
+    "x-ratelimit-limit-requests", "x-ratelimit-limit-tokens",
+    "x-ratelimit-remaining-requests", "x-ratelimit-remaining-tokens",
+    "x-ratelimit-reset-requests", "x-ratelimit-reset-tokens",
+    "retry-after"}
+
+def _rate_headers(header_text):
+    out = {}
+    for line in (header_text or "").splitlines():
+        if ":" not in line:
+            continue
+        k, v = line.split(":", 1)
+        k = k.strip().lower()
+        if k in RATE_HEADER_ALLOWLIST:
+            out[k] = v.strip()
+    return out
+
 def api(messages):
     if CALLS["n"] >= MAX_CALLS:
         record({"budget_stop": {"used": CALLS["n"], "budget": MAX_CALLS}})
@@ -181,10 +203,22 @@ def api(messages):
     payload = {"model": MODEL, "messages": messages, "tools": TOOLS,
                "reasoning_effort": "low",
                "max_completion_tokens": int(os.environ.get("MAX_COMPLETION_TOKENS", "4096"))}
+    hdr_path = os.path.join(RECORDS_DIR, f".team-headers-{os.getpid()}.tmp")
     p = subprocess.run(["curl", "-sS", "--max-time", "120", "-w", "\n%{http_code}",
+        "-D", hdr_path,
         API_URL,
         "-H", f"Authorization: Bearer {KEY}", "-H", "Content-Type: application/json",
         "-d", json.dumps(payload)], capture_output=True, text=True)
+    try:
+        with open(hdr_path) as hf:
+            rate_headers = _rate_headers(hf.read())
+    except OSError:
+        rate_headers = {}
+    finally:
+        try:
+            os.unlink(hdr_path)
+        except OSError:
+            pass
     if p.returncode != 0:
         record({"api_error": {"kind": "transport", "detail": p.stderr[:300]}})
         raise RuntimeError(f"curl failed: {p.stderr[:300]}")
@@ -197,7 +231,8 @@ def api(messages):
         record({"api_error": {"kind": "http", "status": status.strip(), "body_head": safe}})
         raise RuntimeError(f"non-JSON HTTP {status.strip()}")
     if "error" in r:
-        record({"api_error": {"kind": "api", "status": status.strip(), "detail": r["error"]}})
+        record({"api_error": {"kind": "api", "status": status.strip(), "detail": r["error"],
+                              "rate_headers": rate_headers}})
         raise RuntimeError(f"API error: {r['error']}")
     if REQUIRE_ZERO_COST:
         cost = (r.get("usage") or {}).get("cost")
@@ -206,6 +241,8 @@ def api(messages):
             raise RuntimeError(
                 f"require_zero_cost: provider reported nonzero cost {cost!r} on {MODEL}; "
                 "refusing further provider requests")
+    if rate_headers:
+        record({"rate_headers": rate_headers, "call": CALLS["n"]})
     return r
 
 # Paths the model may write. docs/tasks markdown for records; launcher/tests

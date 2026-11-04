@@ -290,6 +290,33 @@ class ExecutorCase(unittest.TestCase):
 
     # 7. every event checkpointed exactly once; no duplicate clean-exit checkpoint
 
+
+    # -- allowlisted rate-header diagnostics (operator infra) --
+
+    def test_rate_headers_allowlist_only(self):
+        ns = self.load()
+        hdrs = ("HTTP/2 429\r\n"
+                "x-ratelimit-limit-tokens: 8000\r\n"
+                "X-RateLimit-Remaining-Tokens: 0\r\n"
+                "x-ratelimit-reset-tokens: 9.03s\r\n"
+                "retry-after: 10\r\n"
+                "authorization: Bearer gsk_SECRET\r\n"
+                "set-cookie: session=abc\r\n"
+                "x-request-id: req_123\r\n\r\n")
+        out = ns["_rate_headers"](hdrs)
+        self.assertEqual(out, {"x-ratelimit-limit-tokens": "8000",
+                               "x-ratelimit-remaining-tokens": "0",
+                               "x-ratelimit-reset-tokens": "9.03s",
+                               "retry-after": "10"})
+        self.assertNotIn("gsk_SECRET", json.dumps(out))
+        self.assertNotIn("session=abc", json.dumps(out))
+
+    def test_rate_headers_empty_and_malformed(self):
+        ns = self.load()
+        self.assertEqual(ns["_rate_headers"](""), {})
+        self.assertEqual(ns["_rate_headers"]("garbage-no-colon\n"), {})
+        self.assertEqual(ns["_rate_headers"](None), {})
+
     def test_checkpoint_idempotent_on_relaunch(self):
         # A relaunched run re-saves identical first-event bytes; the
         # checkpoint must not fail on "nothing to commit" (b6 halt lesson).
