@@ -525,5 +525,11 @@
       "path": "tests/test_deadlock_fix.py",
       "bytes": 13
     }
+  },
+  {
+    "pacing_wait": {
+      "seconds": 57.5,
+      "min_interval": 65.0
+    }
   }
 ]
