@@ -53,5 +53,17 @@
       },
       "service_tier": "on_demand"
     }
+  },
+  {
+    "tool_call": "write_file",
+    "args": {
+      "content": "# Committer identity demonstration (2026-11-04)\n\nFrom today, model-issued commits in this project carry the model's name as\nauthor and the shared bot account coolkowkank-bot as committer; the bot's\ntoken authenticates the push. Author, committer and pusher are three\nseparate facts: model credit, git identity at commit time, and the\nauthenticated transport. This commit is itself the demonstration.\n",
+      "path": "docs/model-committer-demo.md"
+    },
+    "result": {
+      "ok": true,
+      "path": "docs/model-committer-demo.md",
+      "bytes": 400
+    }
   }
 ]
