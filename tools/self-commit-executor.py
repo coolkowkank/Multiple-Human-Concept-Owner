@@ -40,12 +40,13 @@ checkpoint landing; earlier events survive on the records branch.
 
 Usage: GROQ_KEY_FILE=... RECORDS_DIR=... groq-harness.py REPO_PATH BRANCH ATTEMPT_ID TASK_FILE
 """
-import json, os, re, subprocess, sys, atexit, time, fcntl, hashlib
+import hashlib
+import json, os, re, subprocess, sys, atexit, time, fcntl
 
 WRITE_GATE_MODE = sys.argv[1:2] == ["--write-gate"]
 if WRITE_GATE_MODE:
     # Operator approval-writer mode: no provider key, task or committer
-    # identity is needed - only repo content hashing.
+    # identity needed - only repo content hashing.
     REPO, BRANCH, ATTEMPT, TASK_FILE = sys.argv[3], "-", "gate", os.devnull
 else:
     REPO, BRANCH, ATTEMPT, TASK_FILE = sys.argv[1:5]
@@ -354,69 +355,61 @@ def safe_path(path):
         return "symlink target refused"
     return None
 
-# --- Operator test-verification push gate -------------------------------
-# Rule (2026-11-04): the changed worktree's tests must actually run green
-# BEFORE publish; compile-clean is not verification. The gate binds one
-# approval to the EXACT HEAD commit AND the exact content of every
-# model-writable tree (launcher/ tests/ docs/ tasks/): a new commit, an
-# edit after approval, or a missing/corrupt gate all fail CLOSED. The
-# approval is written only by the operator, via `--write-gate`, after a
-# green suite run. No timing/window/poll state participates.
-GATE_TREE_DIRS = ("launcher", "tests", "docs", "tasks")
+
+# ---- strong push gate -------------------------------------------------
+# Approval binds the exact HEAD plus a hash over EVERY tracked file's
+# working-tree content and every relevant untracked file (not only named
+# dirs), so any pushed change - runtime paths included - is covered by the
+# tested tree. Only generated noise (.git, __pycache__, *.pyc) is exempt.
+def _git(repo, *a):
+    return subprocess.run(["git", "-C", repo] + list(a), capture_output=True, text=True)
 
 def _worktree_fingerprint(repo):
     h = hashlib.sha256()
-    for base in GATE_TREE_DIRS:
-        bdir = os.path.join(repo, base)
-        if not os.path.isdir(bdir):
+    tracked = _git(repo, "ls-files", "-z").stdout.split("\x00")
+    untracked = _git(repo, "ls-files", "--others", "--exclude-standard", "-z").stdout.split("\x00")
+    paths = sorted(p for p in tracked + untracked
+                   if p and "__pycache__" not in p and not p.endswith(".pyc"))
+    for rel in paths:
+        fp = os.path.join(repo, rel)
+        if not os.path.isfile(fp):
+            h.update(b"MISSING\x00" + rel.encode() + b"\x00")
             continue
-        for root, dirs, files in os.walk(bdir):
-            dirs[:] = sorted(d for d in dirs if d != "__pycache__")
-            for fn in sorted(files):
-                if fn.endswith(".pyc"):
-                    continue
-                fp = os.path.join(root, fn)
-                h.update(os.path.relpath(fp, repo).encode() + b"\0")
-                with open(fp, "rb") as fh:
-                    h.update(fh.read())
-                h.update(b"\0")
+        h.update(rel.encode() + b"\x00")
+        with open(fp, "rb") as f:
+            h.update(f.read())
+        h.update(b"\x00")
     return h.hexdigest()
 
 def _write_gate(gate_path, repo):
-    head = subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"],
-                          capture_output=True, text=True).stdout.strip()
-    approval = {"head": head,
-                "worktree_sha256": _worktree_fingerprint(repo),
-                "tree_dirs": list(GATE_TREE_DIRS),
-                "approved_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "meaning": "operator ran the changed-worktree test suite green at exactly this head+content"}
+    pin = {"head": _git(repo, "rev-parse", "HEAD").stdout.strip(),
+           "worktree_sha256": _worktree_fingerprint(repo),
+           "approved_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+           "meaning": "operator ran the changed-worktree test suite green at exactly this head+content"}
     with open(gate_path, "w") as f:
-        json.dump(approval, f, indent=2)
-    return approval
+        json.dump(pin, f, indent=2)
+    return pin
 
 def _push_gate_check(repo):
+    """Return None when push is approved for the exact tested state, else an error string."""
     gate = os.environ.get("PUSH_GATE_FILE")
     if not gate:
         if os.environ.get("ALLOW_UNGATED_PUSH") == "1":
             return None
-        return ("push refused (fail-closed): PUSH_GATE_FILE not configured; "
-                "the operator must run the tests and write a gate approval first")
-    if not os.path.isfile(gate):
-        return ("push gated: operator test verification pending; do other "
-                "work or retry git_push in a later round")
+        return "push fail-closed: PUSH_GATE_FILE unset and ALLOW_UNGATED_PUSH!=1"
     try:
-        g = json.load(open(gate))
-    except Exception as e:
-        return f"push refused (fail-closed): gate approval unreadable ({str(e)[:120]}); operator must rewrite it"
-    head = subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"],
-                          capture_output=True, text=True).stdout.strip()
-    if g.get("head") != head:
-        return ("push refused: gate is STALE - approved head "
-                f"{str(g.get('head'))[:12]} != current {head[:12]}; a new commit invalidates the approval")
+        with open(gate) as f:
+            pin = json.load(f)
+    except Exception:
+        return f"push fail-closed: gate {gate} absent or unreadable"
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    if pin.get("head") != head:
+        return (f"push STALE: approved head {pin.get('head')} != current {head}; "
+                "operator must re-run tests and re-approve")
     fp = _worktree_fingerprint(repo)
-    if g.get("worktree_sha256") != fp:
-        return ("push refused: gate is STALE - model-writable files changed "
-                "after approval; the operator must re-run tests and re-approve")
+    if pin.get("worktree_sha256") != fp:
+        return ("push STALE: worktree content changed after approval "
+                "(edit, new file, or removal); operator must re-run tests and re-approve")
     return None
 
 def run_tool(name, args):
@@ -482,9 +475,18 @@ def run_tool(name, args):
             head = subprocess.run(["git", "-C", REPO, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
             return {"ok": True, "head": head}
         if name == "git_push":
+            # Operator test-verification gate (2026-11-04 rule: the changed
+            # worktree's tests must actually run green BEFORE publish; a
+            # compile pass is not verification). When PUSH_GATE_FILE is set
+            # and absent, refuse loudly; the MODEL retries after the gate
+            # opens. Gate creation is always an operator act after running
+            # the suite; the model cannot create it (path outside its
+            # writable set).
             err = _push_gate_check(REPO)
             if err:
-                return {"ok": False, "error": err}
+                if err.startswith("push STALE"):
+                    return {"ok": False, "error": err + "; do other work or retry git_push in a later round"}
+                return {"ok": False, "error": err + "; do other work or retry git_push in a later round"}
             p = subprocess.run(["git", "-C", REPO, "push", "origin", f"HEAD:{BRANCH}"], capture_output=True, text=True)
             out = (p.stdout + p.stderr).replace(KEY, "[REDACTED]")
             if p.returncode != 0:
@@ -552,8 +554,7 @@ def main():
 if __name__ == "__main__":
     if WRITE_GATE_MODE:
         # Operator-only approval writer: binds the gate to the exact HEAD +
-        # model-writable tree content AFTER a green suite run. Prints the
-        # approval; the executor reads it back through the same checker.
+        # whole-tree content AFTER a green suite run.
         print(json.dumps(_write_gate(sys.argv[2], sys.argv[3]), indent=2))
     else:
         main()

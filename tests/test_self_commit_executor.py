@@ -361,7 +361,7 @@ class ExecutorCase(unittest.TestCase):
         gate = os.path.join(self.tmp, "gate.json")
         os.environ["PUSH_GATE_FILE"] = gate
         self.addCleanup(lambda: os.environ.pop("PUSH_GATE_FILE", None))
-        self.assertIn("gated", ns["_push_gate_check"](self.repo))
+        self.assertIn("fail-closed", ns["_push_gate_check"](self.repo))
         # operator writes approval via the CLI path (same code), then a
         # RESTARTED run (fresh namespace) accepts it
         subprocess.run([sys.executable, EXECUTOR, "--write-gate", gate, self.repo],
@@ -393,6 +393,27 @@ class ExecutorCase(unittest.TestCase):
         os.environ["PUSH_GATE_FILE"] = gate
         self.addCleanup(lambda: os.environ.pop("PUSH_GATE_FILE", None))
         self.assertIn("fail-closed", ns["_push_gate_check"](self.repo))
+
+
+    def test_push_gate_stale_on_root_file_edit_and_untracked_addition(self):
+        # whole-tree binding: changes OUTSIDE launcher/tests/docs/tasks and
+        # new untracked relevant files must also invalidate the approval
+        self._committed_repo()
+        ns = self.load()
+        gate = os.path.join(self.tmp, "gate.json")
+        os.environ["PUSH_GATE_FILE"] = gate
+        self.addCleanup(lambda: os.environ.pop("PUSH_GATE_FILE", None))
+        subprocess.run([sys.executable, EXECUTOR, "--write-gate", gate, self.repo],
+                       check=True, capture_output=True)
+        self.assertIsNone(ns["_push_gate_check"](self.repo))
+        open(os.path.join(self.repo, "README.md"), "w").write("changed\n")
+        self.assertIn("STALE", ns["_push_gate_check"](self.repo))
+        os.remove(os.path.join(self.repo, "README.md"))
+        subprocess.run([sys.executable, EXECUTOR, "--write-gate", gate, self.repo],
+                       check=True, capture_output=True)
+        self.assertIsNone(ns["_push_gate_check"](self.repo))
+        open(os.path.join(self.repo, "runtime_new.py"), "w").write("x = 1\n")
+        self.assertIn("STALE", ns["_push_gate_check"](self.repo))
 
     def test_push_gate_pycache_does_not_invalidate(self):
         self._committed_repo()
