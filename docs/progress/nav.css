@@ -4,3 +4,4 @@
 .sitenav a{color:#d9dcec;text-decoration:none;padding:13px 10px;min-height:44px;display:inline-block;border-bottom:3px solid transparent}
 .sitenav a:hover{color:#fff;background:#25254a}
 .sitenav a[aria-current="page"]{color:#fff;border-bottom-color:#e8b84a;font-weight:600}
+@media(max-width:700px){.sitenav .in{flex-wrap:wrap;overflow:visible;gap:0;padding:0 6px}.sitenav b{flex:0 0 100%;padding:8px 6px 0;font-size:13px}.sitenav a{padding:10px 9px;min-height:40px}}
