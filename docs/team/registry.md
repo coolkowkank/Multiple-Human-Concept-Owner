@@ -22,7 +22,7 @@ row; the numbering is never reused after retirement.
 
 | Instance | Role | Member | Status | Assignment (current) | Model / provider | Blueprint | Parallels | Last verified |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| coordinator-1 | Coordinator | Telkomsel (@instinct-telkomsel) | active | team coordination, assignments, acceptance prep | - (human-operated account) | - | 1* | 2026-11-04 (coordination commits on team-launcher) |
+| coordinator-1 | Coordinator | Telkomsel (@instinct-telkomsel) | active | team coordination, assignments, acceptance prep | - (human-operated account) | [coordinator](blueprints/coordinator.md) | 1* | 2026-11-04 (coordination commits on team-launcher) |
 | builder-1 | Builder | Alex (@coolkowkank-bot) | active | reviewer-skip guard (batch 7, in flight) | Groq openai/gpt-oss-120b, free tier | [builder](blueprints/builder.md) | 1* | 2026-11-04 (batches 1-7 records) |
 | reviewer-1 | Independent reviewer | Bill (@instinct-christina) | active | pinned-commit peer review | - (independent human-operated account) | - | 1* | 2026-11-04 (WP7 review exchange) |
 | researcher-1 | Researcher | Nora | active | sourced literature findings, Research_lab | Nemotron-3 Ultra 550B via Requesty free route | [researcher](blueprints/researcher.md) | 1* | 2026-11-04 (RW5, author corrections 61143ba) |
