@@ -1,3 +1,19 @@
 {
-  "seats": {}
+  "seats": {
+    "coordinator": {
+      "role": "coordinator",
+      "allowed_paths": [".team/"],
+      "adapter": {"type": "queue", "path": ".team/queues/coordinator.jsonl"}
+    },
+    "reviewer": {
+      "role": "reviewer",
+      "allowed_paths": ["review/.live-1-reviewer.jsonl", "review/live-1-findings.md"],
+      "adapter": {"type": "queue", "path": "review/.live-1-reviewer.jsonl"}
+    },
+    "qc": {
+      "role": "qc",
+      "allowed_paths": ["review/.live-1-qc.jsonl", "review/live-1-qc.md"],
+      "adapter": {"type": "queue", "path": "review/.live-1-qc.jsonl"}
+    }
+  }
 }
