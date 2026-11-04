@@ -51,6 +51,22 @@
       "status": "uncallable",
       "evidence": "2026-11-04 HTTP 404 twice; listing != callable",
       "job_shapes": []
+    },
+    {
+      "id": "nvidia/nemotron-3-ultra-550b-a55b",
+      "provider": "requesty",
+      "price": 0,
+      "status": "untested",
+      "evidence": "2026-11-04 19:32 EET live Requesty /v1/models listing (814 entries): exact id, input/output/cached price all numeric 0. Listing fact only, NOT callable-verified; first qualification call pending; distinct from the recorded -550b entry",
+      "job_shapes": []
+    },
+    {
+      "id": "novita/ling-3.1-flash",
+      "provider": "requesty",
+      "price": 0,
+      "status": "untested",
+      "evidence": "2026-11-04 19:32 EET live Requesty /v1/models listing (814 entries): exact id, input/output/cached price all numeric 0. Listing fact only, NOT callable-verified; first qualification call pending; model lab inclusionAI (different lab from nvidia); candidate verifier alternative while gemma stays cooldown",
+      "job_shapes": []
     }
   ],
   "supply_map": {
