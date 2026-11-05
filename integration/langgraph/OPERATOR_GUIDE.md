@@ -239,3 +239,19 @@ process exit; it opens one gate for an operator. A live declaration (`.git/lg-li
 is cooperative evidence only: it does not renew the lease and does not stop another launcher.
 Residual: the classification is sticky in memory only (a supervisor restart re-reads the
 roster), a clean DONE exit can raise one spurious gate, and a down seat with a new turn escalates.
+
+Notes on the handoff record: `preexisting_dirty` is captured after the model call and before
+this turn's writes (under the action lock), not at the start of the turn. If the
+`handoff_record` module is not importable (the launcher needs its parent directory on
+PYTHONPATH, as `python -m launcher` from integration/langgraph provides), handoffs are logged
+with `record: null` and `record_error: capture_error`. The handoff log BODY already carries the
+verify command text as before; only the record holds hashes.
+
+## Write paths
+
+A seat's `writes` keys are checked and written through one canonical relative path. Absolute
+or backslash paths, control characters or NUL, `.` / `..` / empty segments, and a leading `.git`
+are refused before any write, as is any path whose existing component is a symlink (the final
+file is opened with O_NOFOLLOW). A batch naming a file and a path under it is refused. This is a
+check-then-open on a same-user filesystem: it is not descriptor-relative, so a symlink swapped in
+between the check and the write by another process is not covered. Not a sandbox.
