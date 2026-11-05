@@ -229,6 +229,19 @@ def init_repo(repo: str, queue_seats=()) -> None:
 
 # ---------- operator controls (assign / pause / update / resume) ----------
 
+def _committed_json(repo: str, path: str):
+    """JSON document as COMMITTED at HEAD, or None. Worktree edits that
+    were never committed are invisible, like read_control."""
+    proc = subprocess.run(["git", "-C", repo, "show", f"HEAD:{path}"],
+                          capture_output=True, text=True)
+    if proc.returncode != 0:
+        return None
+    try:
+        return json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        return None
+
+
 def read_control(repo: str) -> dict:
     """The graph obeys the COMMITTED control only (git show HEAD:...),
     never the worktree file: an operator change that failed to commit -
@@ -281,8 +294,14 @@ def _operator_transact(repo: str, message: str, paths, mutate):
     try:
         return bus.transact_paths(message, paths, mutate)
     except Exception:
-        subprocess.run(["git", "-C", repo, "checkout", "--"] + list(paths),
-                       check=False)
+        # Restore worktree AND index for exactly these paths from HEAD
+        # (the precheck guarantees HEAD is the pre-change state).
+        # Concurrency note: restoration is not race-safe against a
+        # simultaneous seat commit; the coherent fix is the upstream
+        # shared repo lock (executor-owned, already requested).
+        subprocess.run(
+            ["git", "-C", repo, "checkout", "HEAD", "--"] + list(paths),
+            check=False)
         raise
 
 
@@ -443,8 +462,12 @@ class GuardedAdapter:
         names this seat, operator control is run at the instruction_seq
         this step started with, and the roster spec still resolves to
         the preselected safe constructor. Called before the adapter
-        runs, again after it returns, and at the pre-apply hook."""
-        live = self._bus.state()
+        runs, again after it returns, and at the pre-apply hook.
+
+        All three reads (state, control, roster) are the COMMITTED
+        view: an uncommitted hand-edit left in the worktree cannot
+        authorize a seat action."""
+        live = _committed_json(self._bus.repo, ".team/STATE.json") or {}
         if live.get("status") != "running":
             raise SeatError(
                 f"{self._seat} refused at seat boundary: bus status "
@@ -464,7 +487,8 @@ class GuardedAdapter:
                 f"{self._seat} refused at seat boundary: instructions "
                 f"moved to seq {control['instruction_seq']}, this seat "
                 f"step started at seq {self._instruction_seq}")
-        spec = self._bus.roster().get("seats", {}).get(self._seat, {})
+        roster = _committed_json(self._bus.repo, ".team/roster.json") or {}
+        spec = roster.get("seats", {}).get(self._seat, {})
         spec_type = spec.get("adapter", {}).get("type")
         if (spec_type not in SAFE_CONSTRUCTORS
                 or type(self._inner) is not SAFE_CONSTRUCTORS[spec_type]):
