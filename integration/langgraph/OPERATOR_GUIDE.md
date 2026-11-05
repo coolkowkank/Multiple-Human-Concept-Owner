@@ -215,3 +215,27 @@ The relay (`launcher serve`, loopback only, bearer token) carries wake hints onl
 ## Handoff validation
 
 Before any write, a seat response is refused (SeatError, recorded, the turn stays with the seat) when: `handoff` is not null or the name of a roster seat; `status_line` is present but not a string; or `handoff` is null and `status_line` does not start with `DONE`. The last case used to leave `turn: null` with status `running`, a bus no seat could ever act on. DONE still closes only the cycle; closeout evidence is separate (see the closeout section).
+
+## Handoff record (handoff/v1) and what the runtime does and does not undo
+
+Each turn's handoff log row may carry an additive `record` (facts the runtime observed,
+plus length-and-hash-only claims) or `record_error` (a fixed short code) with `record: null`.
+A missing or null record is "no record" and is never evidence. A record that validates is
+well formed, not proven: verify it against the real commit with `handoff_record.check_commit`.
+The record is observed after verify and before the commit. It is not proof that tests passed
+and not a pinned tested tree; gitignored paths are not seen; a change set over 200 paths gets
+`capture_too_many_entries`. Prompts and the audit hash never include the record.
+
+`bus.transact` has NO rollback (only `transact_paths` restores). Malformed responses are
+refused BEFORE any write; a failure after the writes leaves them in the worktree, and a lost
+push race replays the adapter call (at-least-once). Do not read this as whole-turn
+transactional cleanup. A record failure never raises and never causes a retry by itself.
+
+## Spending seats and the supervisor
+
+A seat whose adapter is not a known non-spending type (mock, queue, interactive) is treated as
+spending. The supervisor never terminates or restarts it on elapsed time, unknown liveness or
+process exit; it opens one gate for an operator. A live declaration (`.git/lg-live-<seat>.json`)
+is cooperative evidence only: it does not renew the lease and does not stop another launcher.
+Residual: the classification is sticky in memory only (a supervisor restart re-reads the
+roster), a clean DONE exit can raise one spurious gate, and a down seat with a new turn escalates.

@@ -298,7 +298,13 @@ class Bus:
     def roster(self):
         return self._read_json(ROSTER, {"seats": {}})
 
-    def append_log(self, seat, kind, body, turn_seq=None):
+    _NO_RECORD_ARG = object()
+
+    def append_log(self, seat, kind, body, turn_seq=None,
+                   record=_NO_RECORD_ARG, record_error=None):
+        """Additive: `record` (handoff/v1 dict or None) and `record_error`
+        (a fixed short code) become extra keys on the row. They are not
+        rendered into any prompt (prompt_log_tail reads ts/seat/kind/body)."""
         entry = {
             "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "seat": seat,
@@ -307,6 +313,10 @@ class Bus:
         }
         if turn_seq is not None:
             entry["turn_seq"] = turn_seq
+        if record is not self._NO_RECORD_ARG:
+            entry["record"] = record
+        if record_error is not None:
+            entry["record_error"] = str(record_error)[:64]
         with open(os.path.join(self.repo, LOG), "a") as fh:
             fh.write(json.dumps(entry) + "\n")
 

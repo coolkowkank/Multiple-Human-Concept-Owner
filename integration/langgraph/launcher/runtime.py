@@ -124,6 +124,10 @@ def _verify_env():
 
 import re as _re
 from . import liveness as _liveness
+try:   # pure module next to the launcher package (PYTHONPATH = its parent)
+    import handoff_record as _hr
+except ImportError:   # absent: handoffs are logged without a record
+    _hr = None
 _DONE_RE = _re.compile(r"DONE(?![A-Za-z0-9_])")
 
 
@@ -164,6 +168,12 @@ def validate_response_shape(name, response):
         rec = gate.get("recommendation")
         if rec is not None and not isinstance(rec, str):
             raise SeatError(f"{name}: gate recommendation must be a string")
+
+
+def _hr_fields(code):
+    if _hr is not None:
+        return _hr.no_record_fields(code)
+    return {"record": None, "record_error": "capture_error"}
 
 
 def prompt_log_tail(bus, limit=20):
@@ -882,6 +892,11 @@ class Seat:
         argv = None
         if verify_cmd and not legacy:
             argv = verify_argv(verify_cmd)   # refuse BEFORE any write
+        # handoff/v1: capture what was ALREADY dirty before this turn's
+        # writes (action lock held, per attempt). Failure degrades to no
+        # record; it never raises (bus.transact has no rollback).
+        pre_state, pre_val = _hr.safe_capture(self.bus.repo) if _hr else ("no_record", "capture_error")
+        ver = {"ran": False}
         if verify_cmd:
             # Apply writes first so the verify command sees the batch.
             for path, content in writes.items():
@@ -902,6 +917,9 @@ class Seat:
                     self._undeclare()
             exit_code = proc.returncode
             tail = (proc.stdout + proc.stderr).strip().splitlines()[-5:]
+            ver = {"ran": True, "exit_code": exit_code, "command": verify_cmd,
+                   "tail": "\n".join(tail),
+                   "sandboxed": (not legacy) and bool(os.environ.get("LG_VERIFY_SANDBOX"))}
         else:
             for path, content in writes.items():
                 self._write(self.bus.repo, path, content)
@@ -920,6 +938,15 @@ class Seat:
                 options=gate.get("options"),
                 recommendation=gate.get("recommendation"))
 
+        # decide next/status BEFORE the row so the record carries the same
+        # values STATE gets (DONE closes: next None; DONE+handoff is refused)
+        done = is_done_status(response.get("status_line"))
+        nxt = None if done else handoff
+        final_status = ("done" if done else
+                        "running" if state["status"] == "forming" else state["status"])
+        record_kw = self._handoff_record_kw(
+            state, seq, nxt, final_status, bool(gate), response, writes,
+            pre_state, pre_val, ver)
         summary = response.get("summary", "(no summary)")
         body = summary
         for note in response.pop("_corrections", []):
@@ -927,7 +954,7 @@ class Seat:
         if verify_cmd:
             body += (f" | verify: `{verify_cmd}` exit={exit_code}"
                      + (f" | tail: {' / '.join(tail)}" if tail else ""))
-        self.bus.append_log(self.name, "handoff", body, turn_seq=seq)
+        self.bus.append_log(self.name, "handoff", body, turn_seq=seq, **record_kw)
 
         state["turn_seq"] = seq
         state["turn"] = handoff
@@ -940,6 +967,33 @@ class Seat:
         elif state["status"] == "forming":
             state["status"] = "running"
         self.bus.write_state(state)
+
+    def _handoff_record_kw(self, state, seq, nxt, status, gate_opened,
+                           response, writes, pre_state, pre_val, ver):
+        """Keyword args for append_log: a handoff/v1 record, or an explicit
+        no_record with a FIXED error code. Never raises, never retries."""
+        try:
+            if _hr is None or pre_state != "ok":
+                return _hr_fields(pre_val if pre_state != "ok" else "capture_error")
+            obs_state, obs_val = _hr.safe_capture(self.bus.repo)
+            if obs_state != "ok":
+                return _hr_fields(obs_val)
+            st, val = _hr.safe_build({
+                "seat": self.name, "turn_seq": seq,
+                "base": head_hash(self.bus.repo), "next": nxt,
+                "status": status, "gate_opened": gate_opened,
+                "correction_rounds": len(response.get("_corrections") or []),
+                "declared_writes": list(writes),
+                "observed": obs_val,
+                "preexisting_dirty": [e["path"] for e in pre_val],
+                "verify": ver,
+                "summary": response.get("summary"),
+                "status_line": response.get("status_line")})
+            if st != "ok":
+                return _hr_fields(val)
+            return {"record": val}
+        except Exception:
+            return _hr_fields("capture_error")
 
     def _path_allowed(self, path):
         path = path.replace("\\", "/").lstrip("/")
