@@ -69,6 +69,23 @@ def verify_argv(cmd):
     return argv
 
 
+def sandboxed_verify_argv(argv):
+    """When LG_VERIFY_SANDBOX is set (the live-run operator sets it),
+    verify may ONLY run python3/python through sandbox/python3 (bwrap: no
+    network, no home, no secrets, read-only repo copy, CPU/memory limits).
+    Anything else (pytest, test, true, false) is refused, and the shim
+    must exist, so a missing sandbox fails closed instead of running bare."""
+    if not os.environ.get("LG_VERIFY_SANDBOX"):
+        return argv
+    shim = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), "sandbox", "python3")
+    if argv[0] not in ("python3", "python"):
+        raise SeatError("verify refused under sandbox: only python3 allowed")
+    if not (os.path.isfile(shim) and os.access(shim, os.X_OK)):
+        raise SeatError("verify refused: sandbox shim missing")
+    return [shim] + argv[1:]
+
+
 def _verify_env():
     """Minimal environment: no API keys or tokens reach verify code."""
     keep = ("PATH", "LANG", "LC_ALL", "TMPDIR")
@@ -614,6 +631,7 @@ class Seat:
                     verify_cmd, shell=True, cwd=self.bus.repo,
                     capture_output=True, text=True, timeout=600)
             else:
+                argv = sandboxed_verify_argv(argv)
                 proc = subprocess.run(
                     argv, shell=False, cwd=self.bus.repo, env=_verify_env(),
                     capture_output=True, text=True, timeout=600)

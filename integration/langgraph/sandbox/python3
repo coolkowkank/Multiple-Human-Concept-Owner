@@ -1,0 +1,16 @@
+#!/bin/sh
+# Sandboxed python3 shim for seat verify commands. Put this directory FIRST
+# on PATH for the graph process. Runs the command with: empty environment,
+# no network, no PID/IPC/UTS/user-visible host namespaces, only /usr plus the
+# lane worktree (read-only, mounted at /work), an empty tmpfs /tmp, CPU and
+# memory limits, no home, no /downloads, no other files. It is bwrap-based
+# isolation under the same unprivileged user; it is NOT a security boundary
+# against kernel bugs.
+set -eu
+REAL=/usr/bin/python3
+exec env -i PATH=/usr/bin:/bin prlimit --cpu=20 --as=1073741824 --nproc=64 -- \
+  bwrap --unshare-all --die-with-parent --new-session \
+    --ro-bind /usr /usr --symlink usr/lib /lib --symlink usr/lib64 /lib64 \
+    --symlink usr/bin /bin --proc /proc --dev /dev --tmpfs /tmp \
+    --ro-bind "$PWD" /work --chdir /work \
+    "$REAL" -E -s -B "$@"
