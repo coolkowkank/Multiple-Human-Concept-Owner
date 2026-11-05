@@ -1,10 +1,10 @@
 {
  "content_as_of": "2026-11-04T20:57:00+02:00",
- "next_check_at": "2026-11-05T03:51:34+02:00",
- "schedule_recorded_at": "2026-11-05T02:51:40+02:00",
+ "next_check_at": "2026-11-05T04:51:48+02:00",
+ "schedule_recorded_at": "2026-11-05T03:52:00+02:00",
  "schedule_expires_at": "2026-11-05T14:38:28+02:00",
  "cadence": "Hourly evidence check; publish only when something changes",
  "notice": "This is the recorded next check, not a promise that new content will be published then. Sam model execution is not confirmed by this timer. The published page cannot see an uncommitted check or a deployment waiting in GitHub.",
- "last_check_at": "2026-11-05T02:51:48+02:00",
- "check_result": "Authenticated branch check unchanged. Existing dashboard access retained by owner decision. No new qualified cycle or WP credit; chart content unchanged."
+ "last_check_at": "2026-11-05T03:51:54+02:00",
+ "check_result": "Ryan in-flight stale-result fix46fa728 accepted offline. LangGraph mock-only runner branch published; live provider calls still held. No qualified cycle or WP credit; chart content unchanged pending material batch."
 }
