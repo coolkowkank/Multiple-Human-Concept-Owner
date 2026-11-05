@@ -46,6 +46,12 @@ class BusError(Exception):
     pass
 
 
+class BusPushUnknown(BusError):
+    """A push returned an error and the remote state could not be read.
+    The local commit is kept: it may already have landed. Nothing is reset
+    or retried, so no batch of external effects is repeated."""
+
+
 def _git(repo, *args, check=True):
     proc = subprocess.run(
         ["git", "-C", repo, *args],
@@ -162,8 +168,14 @@ class Bus:
                 self.push()
                 return result
             except BusError:
-                if self._confirm_landed():
+                landed = self._confirm_landed()
+                if landed is True:
                     return result
+                if landed is None:
+                    raise BusPushUnknown(
+                        f"push to {self.branch} failed and the remote state "
+                        "could not be read: the commit is kept locally and "
+                        "may have landed; not reset, not retried")
                 _git(self.repo, "reset", "--hard", "HEAD~1", check=False)
                 if attempt == self.retries - 1:
                     raise BusError(f"lost {self.retries} commit races on {self.branch}")
@@ -259,22 +271,43 @@ class Bus:
                 # (missing ack != no execution). Check before retrying,
                 # or a retry would duplicate the batch's external
                 # effects (model calls, verify runs).
-                if self._confirm_landed():
+                landed = self._confirm_landed()
+                if landed is True:
                     return result
+                if landed is None:
+                    raise BusPushUnknown(
+                        f"push to {self.branch} failed and the remote state "
+                        "could not be read: the commit is kept locally and "
+                        "may have landed; not reset, not retried")
                 _git(self.repo, "reset", "--hard", "HEAD~1", check=False)
                 if attempt == self.retries - 1:
                     raise BusError(f"lost {self.retries} commit races on {self.branch}")
         return result
 
     def _confirm_landed(self):
-        """True when the remote already contains our local HEAD commit."""
+        """True: our HEAD is on the remote. False: the remote was read
+        and provably does not contain it. None: unknown (the remote could
+        not be read, so absence is not proven; a failed fetch or a stale
+        local ref is never evidence of absence)."""
         if not self.has_remote():
             return True  # local-only bus: the commit itself is the record
         head = _git(self.repo, "rev-parse", "HEAD").stdout.strip()
-        _git(self.repo, "fetch", "origin", self.branch, check=False)
-        proc = _git(self.repo, "merge-base", "--is-ancestor",
-                    head, f"origin/{self.branch}", check=False)
-        return proc.returncode == 0
+        ref = f"refs/heads/{self.branch}"
+        ls = _git(self.repo, "ls-remote", "origin", ref, check=False)
+        if ls.returncode != 0:
+            return None
+        line = ls.stdout.strip()
+        if not line:
+            return False  # remote read fine and the branch is absent
+        remote_sha = line.split()[0]
+        if remote_sha == head:
+            return True
+        if _git(self.repo, "fetch", "origin", self.branch,
+                check=False).returncode != 0:
+            return None
+        rc = _git(self.repo, "merge-base", "--is-ancestor", head,
+                  remote_sha, check=False).returncode
+        return True if rc == 0 else (False if rc == 1 else None)
 
     # -- state -----------------------------------------------------------
 
