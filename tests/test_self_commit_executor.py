@@ -1198,5 +1198,30 @@ class ExecutorPushBindingCase(ExecutorFixture):
         self.assertTrue(r["published_unverified"])
         self.assertEqual(self._tip(), self.h1)  # it did publish: unverified, not unpublished
 
+    def test_nonzero_push_with_two_urls_first_lands_second_unreachable_is_unknown_not_unpublished(self):
+        ns = self.load()
+        gone = os.path.join(self.tmp, "gone2.git")
+        git("remote", "set-url", "--push", "origin", self.up, cwd=self.repo)
+        git("remote", "set-url", "--add", "--push", "origin", gone, cwd=self.repo)
+        r = ns["run_tool"]("git_push", {})
+        self.assertFalse(r["ok"], r)
+        self.assertTrue(r["published_unknown"])
+        self.assertEqual(r["approved"], self.h1)
+        self.assertIn("do not retry", r["error"])
+        self.assertEqual(self._tip(), self.h1)  # first destination did receive it
+
+    def test_nonzero_push_remote_moved_is_also_reported_unknown_without_retry_wording_loss(self):
+        ns = self.load()
+        other = os.path.join(self.tmp, "other2")
+        git("clone", self.up, other)
+        git("checkout", "-b", "records", cwd=other)
+        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "--allow-empty", "-m", "theirs", cwd=other)
+        git("push", "origin", "records", cwd=other)
+        theirs = self._tip()
+        r = ns["run_tool"]("git_push", {})
+        self.assertFalse(r["ok"])
+        self.assertTrue(r["published_unknown"])
+        self.assertEqual(self._tip(), theirs)
+
 if __name__ == "__main__":
     unittest.main()

@@ -663,7 +663,14 @@ def run_tool(name, args):
             p = subprocess.run(["git", "-C", REPO, "push", "origin", f"{approved}:refs/heads/{BRANCH}"], capture_output=True, text=True)
             out = (p.stdout + p.stderr).replace(KEY, "[REDACTED]")
             if p.returncode != 0:
-                return {"ok": False, "error": out[-500:]}
+                # A nonzero push may still have published (several push URLs:
+                # an earlier destination can land while a later one fails;
+                # transport errors are ambiguous). Only a refusal that is
+                # provable before any ref update would mean "unpublished", and
+                # this path cannot prove that, so it is reported as unknown.
+                return {"ok": False, "published_unknown": True, "approved": approved,
+                        "error": out[-500:] + " | push exited nonzero: some destination may already hold "
+                                 f"{approved}; do not retry git_push, the operator checks every push destination"}
             vok, detail = _verify_pushed(REPO, BRANCH, approved)
             if not vok:
                 return {"ok": False, "published_unverified": True, "approved": approved,
