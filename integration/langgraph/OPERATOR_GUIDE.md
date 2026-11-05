@@ -125,12 +125,29 @@ older 0755 dir must be `chmod 700`ed; contents untouched).
 - `preflight.expected_min_reserves`: refuse if fewer reserves are recorded.
   Zero counts as NOT set. Set it to the last known total.
 - `preflight.anchor_file`: a `reserve_preflight.snapshot()` JSON stored outside the
-  log dir, mode 0600, which must already exist. It catches tail truncation and
-  rewritten history. There is no command that creates the first one. With a
-  verified ledger, from `integration/langgraph`:
-  `python3 -c "import json,reserve_preflight as r;s=r.snapshot(r.preflight(0));print(json.dumps(s))" > /ops/anchor.json; chmod 600 /ops/anchor.json`
-  If the ledger does not verify it prints `null`. Delete that file: `live` reads a
-  `null` anchor as no anchor at all (source gap, listed below).
+  log dir, in a private (0700) directory you own, mode 0600, which must already
+  exist before `live` runs. It catches tail truncation and rewritten history.
+  There is no command that creates the first one. This script writes it only from
+  a verified ledger, exits without writing otherwise, creates the file 0600 and
+  refuses to overwrite an existing file. Run it from `integration/langgraph`
+  with the real account HOME:
+
+```
+mkdir -p -m 700 /ops/private
+python3 - <<'PY'
+import json, os, sys, reserve_preflight as r
+s = r.snapshot(r.preflight(0))
+if s is None:
+    sys.exit("ledger does not verify; no anchor written")
+fd = os.open("/ops/private/reserve_anchor.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+with os.fdopen(fd, "w") as fh:
+    json.dump(s, fh)
+print("anchor written; reserves =", s["reserves"])
+PY
+```
+
+Then set `expected_min_reserves` to the printed `reserves` value. Never point
+`anchor_file` at a file that was not produced by a verified preflight.
 - After a run, if the ledger verifies against the old anchor, `live` replaces the
   anchor atomically with a fresh snapshot. It never raises
   `expected_min_reserves`; do that yourself.
@@ -138,8 +155,16 @@ older 0755 dir must be `chmod 700`ed; contents untouched).
   `live` at a time. Anchor, ledger and config are same-user storage: deleting
   the ledger and the anchor together is not detectable.
 
-The example config ships `preflight.anchor_file` and `expected_min_reserves: 0`.
-A first run needs a real anchor path that exists, or delete the `preflight` block.
+First run on an account with no ledger: `live ... --allow-fresh` with no
+`preflight` block is the only supported path (the flag is an operator statement,
+not proof). After that run, create the anchor with the script above and set
+`expected_min_reserves` to the printed total. On an account that already spent
+requests, always configure both `anchor_file` and `expected_min_reserves`.
+
+The example config's `expected_min_reserves` value is a placeholder. 0 counts as
+not set, so it must be replaced with your account's last known reserve total
+before a real run. The number in any example is not universal and is not a limit
+you can rely on. The ledger on your account is the source of truth.
 
 ### What the example proves and does not prove
 
