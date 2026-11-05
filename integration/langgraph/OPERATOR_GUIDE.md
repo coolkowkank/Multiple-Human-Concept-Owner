@@ -180,9 +180,9 @@ free-unlimited.
 ## Rough edges (source gaps, not documented features)
 
 - No command creates the first anchor except the script above.
-- `reserve_preflight.py` run by itself treats an anchor-file argument that is
-  null or not an object as a refusal. Do not use it to build an anchor; use the
-  script above or the post-run refresh in `live`.
+- `reserve_preflight.py` run by itself applies the same anchor rule as `live`: a
+  v1 snapshot with a non-empty `files` object and well-formed entries, else it
+  refuses (exit 1). It still does not create anchors; use the script above.
 - `init-http` hard-codes `call_budget` 2, so `live` is the only way to set budgets.
 - `live` runs with `stop_after` from the config; `stop_after: 0` or absent runs to
   the end of the graph.
