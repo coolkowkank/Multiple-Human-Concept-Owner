@@ -1,7 +1,13 @@
 {
-  "asOf": "2026-11-05T16:32",
+  "asOf": "2026-11-05T16:46",
   "note": "Project-only status, newest first. This page replaces routine chat reports. It is edited by hand when the project changes; nothing here is a live feed, and it does not claim live, unattended or independently verified operation.",
   "items": [
+    {
+      "at": "2026-11-05T16:46",
+      "title": "Next step chosen: Reviewer-skip acceptance guard (WP4/WP10), draft in review",
+      "status": "in review",
+      "body": "Of the two recorded candidates, the guard came first: batch 7 closed failed with the independent reviewer never asked (record 35b0a3c), the guard blocks both the WP4 re-proof and WP10 (weight 23), and WP9's request-ID join already exists (launcher/usage_join.py) while its matched savings comparison stays blocked on provider composition - so WP9 could not advance regardless. The guard is on branch live/wp10-reviewer-skip-guard at 29d6ca5 (https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/29d6ca549767f8fede5e53619c77cdcb6f609a2f), one commit on the execution line 5e140fc. A QC turn now records a machine-checkable verdict row (PASS/FAIL plus the head it rules on). A DONE claim closes only with a fresh QC PASS verdict - fresh means no application work was committed after the verdict, with review and archive paths counted as evidence, not work. Without it the DONE is refused: the turn routes to a QC seat and a review-required row names the claimant, and when the roster has no QC seat a human gate opens and the turn parks. A refused DONE never records a DONE status_line. Evidence: 17 focused checks pass, 12 of them fail on the pre-guard runtime (mutation), the full 32-file offline suite passes serially, and the self-checking demo closes end to end - all author-run in one sandbox, offline. An independent review of that exact commit is pending, so it is not accepted and not a rollout. No model calls, no provider or account changes."
+    },
     {
       "at": "2026-11-05T16:32",
       "title": "Coordination bus fix: reviewed offline and integrated, execution line now 5e140fc",
