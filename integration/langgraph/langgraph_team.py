@@ -237,7 +237,11 @@ def read_control(repo: str) -> dict:
                 "instruction_seq": c.get("instruction_seq", 1),
                 "note": c.get("note", "")}
     except (OSError, json.JSONDecodeError):
-        return {"mode": "run", "instruction_seq": 1, "note": ""}
+        # Fail CLOSED: a missing/unreadable/invalid control file must
+        # never default to "run" - the team holds until the operator
+        # writes a readable control file.
+        return {"mode": "pause", "instruction_seq": 1,
+                "note": "control missing/unreadable: fail-closed hold"}
 
 
 def _write_control(repo: str, **changes) -> dict:
@@ -249,15 +253,19 @@ def _write_control(repo: str, **changes) -> dict:
 
 
 def operator_pause(repo: str, note="operator pause") -> None:
+    # transact_paths, never commit_all: an operator commit must not sweep
+    # an in-flight seat's worktree changes into the control commit.
     repo = os.path.abspath(repo)
-    _write_control(repo, mode="pause", note=note)
-    Bus(repo, BRANCH).commit_all(f"operator: pause - {note}")
+    Bus(repo, BRANCH).transact_paths(
+        f"operator: pause - {note}", [CONTROL_PATH],
+        lambda: _write_control(repo, mode="pause", note=note))
 
 
 def operator_resume(repo: str, note="operator resume") -> None:
     repo = os.path.abspath(repo)
-    _write_control(repo, mode="run", note=note)
-    Bus(repo, BRANCH).commit_all(f"operator: resume - {note}")
+    Bus(repo, BRANCH).transact_paths(
+        f"operator: resume - {note}", [CONTROL_PATH],
+        lambda: _write_control(repo, mode="run", note=note))
 
 
 def operator_update_instructions(repo: str, text: str,
@@ -267,11 +275,17 @@ def operator_update_instructions(repo: str, text: str,
     stale by the project's own head-binding rule and will be refused at
     apply time - old instructions can never be applied after an update."""
     repo = os.path.abspath(repo)
-    with open(os.path.join(repo, ".team", "brief.md"), "w") as fh:
-        fh.write(text)
-    c = _write_control(repo, instruction_seq=read_control(repo)["instruction_seq"] + 1,
-                       note=note)
-    Bus(repo, BRANCH).commit_all(f"operator: {note}")
+
+    def mutate():
+        with open(os.path.join(repo, ".team", "brief.md"), "w") as fh:
+            fh.write(text)
+        return _write_control(
+            repo,
+            instruction_seq=read_control(repo)["instruction_seq"] + 1,
+            note=note)
+
+    c = Bus(repo, BRANCH).transact_paths(
+        f"operator: {note}", [".team/brief.md", CONTROL_PATH], mutate)
     return c["instruction_seq"]
 
 
@@ -281,15 +295,22 @@ def operator_assign(repo: str, brief: str, seat: str,
     running - through the same bus commit path as the human seed."""
     repo = os.path.abspath(repo)
     bus = Bus(repo, BRANCH)
-    with open(os.path.join(repo, ".team", "brief.md"), "w") as fh:
-        fh.write(brief)
-    state = bus.state()
-    state["turn"] = seat
-    state["status"] = "running"
-    bus.write_state(state)
-    _write_control(repo, instruction_seq=read_control(repo)["instruction_seq"] + 1,
-                   note=note)
-    bus.commit_all(f"operator: assign to {seat} - {note}")
+
+    def mutate():
+        with open(os.path.join(repo, ".team", "brief.md"), "w") as fh:
+            fh.write(brief)
+        state = bus.state()
+        state["turn"] = seat
+        state["status"] = "running"
+        bus.write_state(state)
+        _write_control(
+            repo,
+            instruction_seq=read_control(repo)["instruction_seq"] + 1,
+            note=note)
+
+    bus.transact_paths(f"operator: assign to {seat} - {note}",
+                       [".team/brief.md", ".team/STATE.json", CONTROL_PATH],
+                       mutate)
 
 
 # ---------- graph nodes ---------------------------------------------------
@@ -330,25 +351,55 @@ def route_after_sync(state: TeamState) -> str:
     return f"seat_{turn}"
 
 
+# verify_command payloads may run with shell=True inside the seat
+# runtime. This screen is a SHALLOW guard, not a sandbox: only simple
+# local test-runner commands pass, and it says nothing about what a
+# vetted command itself does. Authorship of mock/queue payloads is a
+# trust decision by the operator, not authenticated provenance.
+_VERIFY_CMD_ALLOWED = ("python3", "python", "pytest")
+_VERIFY_CMD_METACHARS = set(";&|`$<>\n\r")
+
+
+def _screen_verify_command(cmd, seat: str) -> None:
+    if cmd is None:
+        return
+    if (not isinstance(cmd, str) or not cmd.strip()
+            or any(c in _VERIFY_CMD_METACHARS for c in cmd)):
+        raise SeatError(
+            f"{seat} refused response: verify_command {str(cmd)[:40]!r} "
+            f"is not a simple command (no shell metacharacters allowed)")
+    tokens = cmd.split()
+    if (tokens[0] not in _VERIFY_CMD_ALLOWED
+            or any(t.startswith("/") or ".." in t for t in tokens)):
+        raise SeatError(
+            f"{seat} refused response: verify_command must start with "
+            f"{_VERIFY_CMD_ALLOWED} and stay relative to the repo")
+
+
 class GuardedAdapter:
     """Boundary guard wrapped around the constructed adapter.
 
-    Seat.act_once() claims the seat lease INSIDE its transaction - the
-    bus moves to held - and only then invokes the adapter. Checks that
-    ran before act_once therefore have a window: an operator halt (or a
-    roster/turn move) landing between the pre-check and the actual
-    adapter call would still be acted on. This guard closes that window:
-    it re-validates at the moment of the adapter call itself, inside the
-    transaction, after the lease mutation, at the real mutation/adapter
-    boundary. A failed check raises SeatError, which aborts the
-    transaction - the held lease and every other mutation of this turn
-    roll back with it.
+    Seat.act_once() invokes the adapter INSIDE its transaction, after
+    claim_lease. Checks that ran before act_once therefore have a
+    window: an operator pause/halt, instruction update, or roster swap
+    landing between the pre-checks and the actual adapter call would
+    still be acted on. This guard re-validates at the adapter call
+    itself - the real mutation boundary - including the operator
+    CONTROL mode and instruction_seq, so a pause issued while this seat
+    waited on the seat gate is still honored.
+
+    Exact guarantee on refusal: SeatError propagates out of mutate()
+    BEFORE this turn's commit, so the in-memory lease/turn changes are
+    never committed. The git bus transact is pull/commit/push/retry -
+    it is NOT isolation and NOT rollback of already-committed state;
+    nothing in this turn has committed yet when the guard raises.
     """
 
-    def __init__(self, inner, bus: Bus, seat: str):
+    def __init__(self, inner, bus: Bus, seat: str, instruction_seq: int):
         self._inner = inner
         self._bus = bus
         self._seat = seat
+        self._instruction_seq = instruction_seq
 
     def __getattr__(self, name):  # consume(), attributes: pass through
         return getattr(self._inner, name)
@@ -363,6 +414,17 @@ class GuardedAdapter:
             raise SeatError(
                 f"{self._seat} refused at adapter boundary: turn is "
                 f"{live.get('turn')!r}")
+        control = read_control(self._bus.repo)
+        if control["mode"] != "run":
+            raise SeatError(
+                f"{self._seat} refused at adapter boundary: operator "
+                f"control mode is {control['mode']!r} "
+                f"({control['note']})")
+        if control["instruction_seq"] != self._instruction_seq:
+            raise SeatError(
+                f"{self._seat} refused at adapter boundary: instructions "
+                f"moved to seq {control['instruction_seq']}, this seat "
+                f"step started at seq {self._instruction_seq}")
         spec = self._bus.roster().get("seats", {}).get(self._seat, {})
         spec_type = spec.get("adapter", {}).get("type")
         if (spec_type not in SAFE_CONSTRUCTORS
@@ -371,7 +433,26 @@ class GuardedAdapter:
                 f"{self._seat} refused at adapter boundary: adapter "
                 f"{type(self._inner).__name__} is not the preselected "
                 f"constructor for spec {spec_type!r}")
-        return self._inner.complete(system, prompt)
+        response = self._inner.complete(system, prompt)
+        if spec_type == "queue":
+            # Queue is an EFFECTS channel, not inherently bound: the
+            # runtime's stale-binding check only fires when a _queue
+            # block exists, so a raw unbound line would be applied
+            # unconditionally. Require the operator-channel binding
+            # (turn/turn_seq/head) here. Peek-only: the line is NOT
+            # consumed on refusal, the queue is preserved.
+            binding = response.get("_queue") if isinstance(response, dict) else None
+            if (not isinstance(binding, dict)
+                    or not all(k in binding
+                               for k in ("turn", "turn_seq", "head"))):
+                raise SeatError(
+                    f"{self._seat} refused at adapter boundary: queued "
+                    f"response carries no _queue binding "
+                    f"(turn/turn_seq/head); queue it through "
+                    f"`launcher respond`, not by hand")
+        if isinstance(response, dict):
+            _screen_verify_command(response.get("verify_command"), self._seat)
+        return response
 
 
 def seat_node(seat: str, state: TeamState) -> dict:
@@ -409,9 +490,10 @@ def seat_node(seat: str, state: TeamState) -> dict:
                               f"adapter is {type(adapter).__name__}, not "
                               f"the preselected "
                               f"{SAFE_CONSTRUCTORS[spec_type].__name__}"}
-    # Boundary guard: re-validates status/turn/adapter AFTER the lease
-    # acquire, at the actual adapter call (see GuardedAdapter).
-    seat_obj.adapter = GuardedAdapter(adapter, bus, seat)
+    # Boundary guard: re-validates status/turn/control/adapter at the
+    # actual adapter call, after the lease claim (see GuardedAdapter).
+    seat_obj.adapter = GuardedAdapter(
+        adapter, bus, seat, read_control(repo)["instruction_seq"])
 
     if SEAT_GATE is not None:
         SEAT_GATE.acquire()
