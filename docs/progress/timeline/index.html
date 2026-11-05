@@ -102,7 +102,7 @@ function render(scrollMode){
  const defs=el('defs',{});const pat=el('pattern',{id:'hatch',width:6,height:6,patternUnits:'userSpaceOnUse',patternTransform:'rotate(45)'});pat.appendChild(el('rect',{width:6,height:6,fill:'#fff'}));pat.appendChild(el('line',{x1:0,y1:0,x2:0,y2:6,stroke:'#5d5855','stroke-width':2}));defs.appendChild(pat);svg.appendChild(defs);
  if(S.show.plan&&isAs){svg.appendChild(el('rect',{x:0,y:planY,width:width-2,height:40,rx:8,'class':'lane'}));
   const w=Math.max(14,6*ppm);svg.appendChild(el('rect',{x:x(mins(asOfTime)),y:planY+9,width:w,height:22,fill:'url(#hatch)',stroke:'#5d5855'}));
-  svg.appendChild(el('text',{x:x(mins(asOfTime))+w+8,y:planY+24,'class':'tick','text-anchor':'start'},'Next check about every 30 min, time not fixed'))}
+  svg.appendChild(el('text',{x:x(mins(asOfTime))+w+8,y:planY+24,'class':'tick','text-anchor':'start'},'No automatic checks running (manual snapshot)'))}
  if(isAs){const ax=x(mins(asOfTime));svg.appendChild(el('line',{x1:ax,x2:ax,y1:14,y2:axisY,stroke:'#1f1c1b','stroke-dasharray':'4 3'}));svg.appendChild(el('text',{x:ax,y:10,'text-anchor':'middle','class':'tick bold'},'snapshot '+asOfTime))}
  if(S.day==='2026-11-04'){const bx=x(mins('14:40'));svg.appendChild(el('line',{x1:bx,x2:bx,y1:14,y2:axisY,stroke:'#b23b3b','stroke-dasharray':'4 3'}));svg.appendChild(el('text',{x:bx,y:10,'text-anchor':'middle','class':'tick',fill:'#b23b3b'},'baseline frozen 14:40'))}
  sc.appendChild(svg);
