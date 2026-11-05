@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import calendar
 import time
 
 from .bus import Bus
@@ -129,14 +130,18 @@ class Supervisor:
         if not since:
             return
         try:
-            ts = time.mktime(time.strptime(since, "%Y-%m-%dT%H:%M:%SZ"))
-        except ValueError:
+            # the stamp is UTC (runtime._now): timegm, never local-time mktime
+            ts = calendar.timegm(time.strptime(since, "%Y-%m-%dT%H:%M:%SZ"))
+        except (ValueError, TypeError, OverflowError):
             return
         if time.time() - ts < self.stall_timeout:
             return
-        if turn in self._stalled_seats:
+        # identity of THIS turn: a later distinct turn of the same seat has a
+        # different turn_seq/turn_since and must be acted on again
+        ident = (turn, state.get("turn_seq"), since)
+        if ident in self._stalled_seats:
             return
-        self._stalled_seats.add(turn)
+        self._stalled_seats = {ident}
         if turn in self.procs:
             self.bus.append_log("supervisor", "stall",
                                 f"turn stalled on {turn}; restarting seat")
