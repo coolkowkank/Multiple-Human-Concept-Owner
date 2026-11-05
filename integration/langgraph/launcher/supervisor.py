@@ -20,6 +20,7 @@ import calendar
 import time
 
 from .bus import Bus
+from .runtime import EXIT_TORN_STATE
 from . import liveness
 
 
@@ -97,6 +98,9 @@ class Supervisor:
                 self._stop_all()
                 return "timeout"
             self._reap_and_restart()
+            if self._torn_blocked and not self.procs:
+                self._stop_all()
+                return "blocked"
             self._check_stall(state)
             self._report_gates()
             time.sleep(self.poll)
@@ -129,9 +133,35 @@ class Supervisor:
 
     # -- internals -------------------------------------------------------
 
+    _torn_blocked = frozenset()
+
+    def _note_blocked(self, name, why):
+        """Operator-blocked: one sanitized console line, NO bus write, no
+        gate, no commit (committing would sweep the torn control state)."""
+        first = not self._torn_blocked
+        self._torn_blocked = self._torn_blocked | {name}
+        print(f"[blocked] seat {name}: {why}. Not restarted. Nothing was "
+              "written or committed. Inspect `git status`/`git diff` in the "
+              "repo, commit or discard the uncommitted .team control state, "
+              "then relaunch. A short transient control-writer window is "
+              "possible but persisted over the seat's recheck.", flush=True)
+        return first
+
     def _reap_and_restart(self):
         for name, proc in list(self.procs.items()):
             if proc.poll() is None:
+                continue
+            if proc.returncode == EXIT_TORN_STATE:
+                del self.procs[name]
+                self._note_blocked(name, "refused to start on uncommitted "
+                                   "coordination state (exit %d)" % EXIT_TORN_STATE)
+                continue
+            if self._torn_blocked:
+                # another seat already found torn control state: any bus write
+                # here (log/gate/commit) would sweep it, so do not touch the bus
+                del self.procs[name]
+                self._note_blocked(name, "exited %s while control state is "
+                                   "torn" % proc.returncode)
                 continue
             if self._is_spending(name):
                 # Conservative policy: a spending seat that exited is NEVER
@@ -169,6 +199,8 @@ class Supervisor:
             self.start_seat(name)
 
     def _check_stall(self, state, now=None):
+        if self._torn_blocked:
+            return   # no bus writes while control state is torn
         turn = state.get("turn")
         if not turn or state.get("status") != "running":
             return

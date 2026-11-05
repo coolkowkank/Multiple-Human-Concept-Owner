@@ -64,11 +64,17 @@ def cmd_seat(args):
         webhook = WebhookSink(hook_url)
     seat = Seat(bus, args.name, poll_interval=args.poll, relay=relay,
                 webhook=webhook)
-    if args.once:
-        acted = seat.act_once()
-        print(f"{args.name}: {'acted' if acted else 'not our turn'}")
-        return
-    seat.run()
+    from .runtime import TornStateError, EXIT_TORN_STATE
+    try:
+        if args.once:
+            acted = seat.act_once()
+            print(f"{args.name}: {'acted' if acted else 'not our turn'}")
+            return
+        seat.run()
+    except TornStateError as exc:
+        print(f"{args.name}: BLOCKED ({exc.code}): {exc}", file=sys.stderr,
+              flush=True)
+        raise SystemExit(EXIT_TORN_STATE)
 
 
 def unbounded_http_seats(repo, branch):

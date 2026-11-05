@@ -29,6 +29,17 @@ class SeatError(Exception):
     pass
 
 
+# A typed refusal (never matched on message text): the working tree holds
+# uncommitted coordination state, so a turn must not start. Seat.run does
+# not append to the torn LOG for it, the CLI exits with EXIT_TORN_STATE,
+# and the supervisor treats that exit as operator-blocked.
+class TornStateError(SeatError):
+    code = "torn_control_state"
+
+
+EXIT_TORN_STATE = 75
+
+
 VERIFY_EXECUTABLES = ("python3", "python", "pytest", "test", "true", "false")
 _VERIFY_BAD_CHARS = set(";&|`$<>\n\r(){}*?~\\\"'!#")
 
@@ -501,6 +512,9 @@ class Seat:
         while True:
             try:
                 acted = self.act_once()
+            except TornStateError:
+                # never write over torn control state: no LOG append, no commit
+                raise
             except SeatError as exc:
                 self.bus.append_log(self.name, "error", str(exc))
                 # Record the error WITHOUT sweeping the worktree (second
@@ -831,16 +845,29 @@ class Seat:
         # on it spends a model call whose commit the guard rejects and
         # builds on state nobody committed. Refuse; never auto-discard.
         ctrl = {STATE, LOG, GATES_PENDING, GATES_ANSWERS}
-        torn = sorted({l[3:].split(" -> ")[-1] for l in out.splitlines()
-                       if l[3:].split(" -> ")[-1] in ctrl})
+
+        def torn_paths(porcelain):
+            return sorted({l[3:].split(" -> ")[-1] for l in porcelain.splitlines()
+                           if l[3:].split(" -> ")[-1] in ctrl})
+        torn = torn_paths(out)
         if torn:
-            raise SeatError(
+            # a control writer's own commit window can look torn for a
+            # moment: look once more after a short bounded pause
+            time.sleep(getattr(self, "torn_recheck_seconds", 2.0))
+            out = subprocess.run(
+                ["git", "-C", self.bus.repo, "status", "--porcelain"],
+                capture_output=True, text=True).stdout
+            torn = torn_paths(out)
+        if torn:
+            raise TornStateError(
                 f"{self.name} refuses to start: uncommitted coordination "
                 f"state {torn} - a previous process was probably killed "
-                "between apply and commit. No model call was made. An "
-                "operator must inspect `git status`/`git diff` and either "
-                "commit or discard it (see OPERATOR_GUIDE: crash residue); "
-                "nothing is discarded automatically.")
+                "between apply and commit (a transient control-writer "
+                "window is possible but persisted over a recheck). No model "
+                "call was made. An operator must inspect `git status`/"
+                "`git diff` and either commit or discard it (see "
+                "OPERATOR_GUIDE: crash residue); nothing is discarded or "
+                "written automatically.")
         for line in out.splitlines():
             path = line[3:].split(" -> ")[-1]
             if path.startswith(".team/"):
