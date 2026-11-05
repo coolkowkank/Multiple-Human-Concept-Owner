@@ -51,28 +51,19 @@ operation on the project, not an owner approval question.
    determination rests on vendor docs + the fresh price-0 listing, not
    on observed usage fields.
 
-   Accounting integration, ENFORCED in live_lane.bounded_live_step (not
-   delegated to helper names):
-   - Transport identity: the injected factory must carry
-     REVIEWED_TRANSPORT_ID equal to this run's expected value, else
-     refusal. The vendored rc.http_post_factory does NOT carry it and
-     is refused.
-   - The factory is invoked ONLY inside rc.step: no direct-call
-     surface exists in the module, so a bare post cannot bypass the
-     reserve ledger.
-   - Pre-I/O recheck: the vendored runner (88a610a) reserves and then
-     posts with NO fresh halt/grant recheck in between. live_lane adds
-     it: a wrapper re-reads the ledger and grant from disk immediately
-     before any socket opens (after the runner's reservation) and
-     raises Halt on any halt line, invalid or expired grant; the
-     runner's settle() records that as a consumed unknown outcome,
-     never a silent retry. Completion-side checks remain the runner's.
-   - Per-process counter caps actual post invocations at the signed
-     window's max_requests (hard ceiling PER_RUN_REQUEST_CEILING=2);
-     the runner's reserve ledger is the durable count.
-   - Run allowlist: every model in the committed assignments.json must
-     be in the run's exact free-ID allowlist AND pass check_free_route
-     (working route, price 0/0, fresh listing).
+   Accounting integration (reviewer-corrected, 2026-11-05): the live
+   boundary is owned by the ACCEPTED UPSTREAM chain - the corrected
+   guarded transport and the runner's own pre-I/O snapshot gate under
+   store.lock. The DURABLE bound on spend is the signed allowance
+   window and its ledger debits, enforced by the runner - not any
+   in-process counter here. An earlier draft of this lane carried a
+   pre-I/O recheck wrapper, a per-process counter and a window
+   re-check; review showed them to be weaker duplicates (historic-halt
+   overreach, deleted-grant revalidation missed, Halt-inside-post
+   leaving an unsettled reserve, counter resetting per step), so they
+   were REMOVED in favor of the upstream boundary. live_lane now does
+   wiring only: reviewed-transport identity check, run-model allowlist
+   + setup-time route sanity, factory passed exclusively into rc.step.
 5. Ledger: append-only. The run adds reserve/result/window lines to the
    existing ledger; nothing is rewritten. Clearing the durable halt and
    reconfiguring the self-imposed envelope are executor operations on
