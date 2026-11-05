@@ -105,17 +105,31 @@ IMMEDIATELY before acting:
    guaranteed-timed pause; push-retry is at-least-once. Pause NEVER
    cancels in-flight work - it refuses application of responses that
    complete after it lands, and blocks the next seat action.
-4. Refusals (including `SeatError` from the project's own stale/lease/
+4. Dirty-input fence: the seat runtime builds its adapter and prompt
+   from WORKTREE files (roster spec, brief, queue lines) and the bus
+   commit stages everything, so an uncommitted same-class input - a
+   locally edited roster naming a script adapter, a hand-edited brief
+   with no instruction_seq bump, a raw queue edit - would pass a
+   committed-view fence yet drive construction and be swept into the
+   turn commit. The graph therefore refuses to act while any of the
+   seat's exact committed inputs (`.team/STATE.json`, `roster.json`,
+   `brief.md`, `CONTROL.json`, the seat's queue file for queue specs)
+   diverges from HEAD - checked at construction and at every boundary
+   check under the action lock. COMMITTED changes stay permitted:
+   committed reads and the queue-binding staleness checks handle them,
+   and mid-turn queue commits are ordinary operation. Unrelated files
+   elsewhere in the repo do not block a turn.
+5. Refusals (including `SeatError` from the project's own stale/lease/
    verify machinery) are recorded and route to the terminal node, never
    swallowed.
-5. Repo and checkpoint paths must be canonical: `realpath` is applied
+6. Repo and checkpoint paths must be canonical: `realpath` is applied
    and any symlink/alias spelling is refused, so the checkpoint-outside-
   -repo and resume-identity checks cannot be bypassed by a linked
    parent directory.
-6. `run_graph` resumes a thread only if the stored repo and checkpoint
+7. `run_graph` resumes a thread only if the stored repo and checkpoint
    path exactly match the requested ones (fail closed on identity
    mismatch).
-5. `init_repo` refuses root/home/cwd, non-directories, and ANY non-empty
+8. `init_repo` refuses root/home/cwd, non-directories, and ANY non-empty
    directory; it never deletes data (recreating a demo is a manual
    delete).
 
