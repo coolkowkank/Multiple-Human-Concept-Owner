@@ -46,21 +46,37 @@ IMMEDIATELY before acting:
    - a resumed pending seat after an operator halt is refused.
 2. The roster adapter spec must be an allowed type: `mock` (scripted,
    local) or `queue`. A queue seat applies OPERATOR-AUTHORED responses
-   queued through the project's own `launcher respond` channel (local
-   JSONL, stale-bound by turn/seq/head - zero network): a human's
-   content, applied by the seat under the project's binding rules. Note
-   the scope difference: the independently reviewed boundary was
-   mock-only; admitting `queue` is new in this increment and has not
-   had the same independent review. The CONSTRUCTED adapter is then checked by exact class
+   queued through the project's own `launcher respond` channel. The
+   queue is an EFFECTS channel, not inherently bound: the guard
+   REQUIRES every queued response to carry the `_queue` binding
+   (turn/turn_seq/head) at the adapter boundary - a raw hand-written
+   line is refused and left unconsumed. Scope notes: (a) the
+   independently reviewed boundary was mock-only; admitting `queue` is
+   new in this increment and has not had the same independent review;
+   (b) mock/queue payloads are trusted operator-authored fixtures -
+   authorship is a trust decision, NOT authenticated provenance;
+   (c) response `verify_command`s run with shell=True in the seat
+   runtime, so the guard screens them against a conservative allowlist
+   (simple python3/pytest commands, no shell metacharacters, relative
+   paths only) - a SHALLOW guard, not a sandbox; (d) no zero-network
+   claim is made for response payloads, only for the transport. The CONSTRUCTED adapter is then checked by exact class
    identity against the preselected safe constructor for that spec (the
    imported class object itself, not a forgeable `__name__` string).
    Provider-calling adapters (http/cli/live) are refused at sync and at
    execution. No provider call is possible from this graph.
-3. A `GuardedAdapter` wrapper re-validates status, turn and adapter
-   identity AT the adapter call - inside the seat transaction, after the
-   lease acquire moves the bus to held. An operator halt or roster swap
-   landing between the pre-checks and the call raises `SeatError` and
-   rolls the transaction back instead of being acted on.
+3. A `GuardedAdapter` wrapper re-validates status, turn, OPERATOR
+   CONTROL (mode and instruction_seq) and adapter identity AT the
+   adapter call - inside the seat transaction, after the lease claim.
+   An operator pause/halt, instruction update or roster swap landing
+   between the pre-checks and the call (including a pause issued while
+   the seat waited on the seat gate) raises `SeatError` BEFORE this
+   turn's commit; the in-memory lease/turn changes are never committed.
+   The bus transact itself is pull/commit/push/retry - no isolation,
+   no rollback of already-committed state.
+   The control file fails CLOSED: missing/unreadable/invalid CONTROL
+   means hold, never run. Operator commits stage exactly their own
+   paths (`transact_paths`), so a control commit can never sweep an
+   in-flight seat's worktree changes.
 4. Refusals (including `SeatError` from the project's own stale/lease/
    verify machinery) are recorded and route to the terminal node, never
    swallowed.
