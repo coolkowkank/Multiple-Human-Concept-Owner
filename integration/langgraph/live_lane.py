@@ -12,11 +12,12 @@ accepted by main, vendored BYTE-EXACT into runner/:
   - model_resources.py  md5 148d1e609f466332ebb1d6ce85ccf40d
   - requesty_transport.py md5 701321b3a753b82365575b0b40f2acfd
   - make_allowance.py   md5 8587d6e2d5ffd5b86446baa68a7a89ab
-Run config: run-config/assignments.json byte-exact from the local
-assignment head 49f189dd (main's delta: verifier mistral/leanstral-1-5,
-researcher Ultra unchanged, ryan unchanged and NOT authorized for this
-run - ONE verifier-only window; the builder/runner binding prevents a
-second window, by design).
+Run config: run-config/assignments.json carries the exact assignment
+content of the local assignment head 49f189dd (main's delta: verifier
+mistral/leanstral-1-5, researcher Ultra unchanged, ryan unchanged and
+NOT authorized for this run - ONE verifier-only window; the
+builder/runner binding prevents a second window, by design). The web
+editor normalized the final newline; the JSON content is identical.
 
 DESIGN RULE (reviewer, 2026-11-05): the live boundary is owned by the
 ACCEPTED UPSTREAM chain - the guarded transport (exact free IDs, fixed
