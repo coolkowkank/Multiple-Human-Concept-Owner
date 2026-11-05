@@ -121,11 +121,62 @@ def _verify_env():
     return env
 
 
-def head_binding_clean(repo, stamped):
+def _error_record_commit_ok(repo, commit, binding):
+    """True only for the seat's OWN error-record commit (M1): exactly the
+    commit Seat.run writes after a SeatError (`TURN: <seat> error recorded
+    (turn not taken)`), touching ONLY the LOG file, adding ONLY append lines
+    that are JSON {seat: <the bound seat>, kind: "error"[, turn_seq: <the
+    bound turn_seq>]}. It carries no new input for the prompt's decision
+    (brief, roster, code, state are untouched) and records that the turn was
+    NOT taken, so a response reasoned before it is still the answer to the
+    same question. Anything else is staleness."""
+    seat = binding.get("turn")
+    if not isinstance(seat, str) or not seat:
+        return False
+    def git(*a):
+        return subprocess.run(["git", "-C", repo, *a], capture_output=True,
+                              text=True)
+    if git("log", "-1", "--format=%s", commit).stdout.strip() != \
+            f"TURN: {seat} error recorded (turn not taken)":
+        return False
+    files = git("diff-tree", "--no-commit-id", "--name-only", "-r",
+                commit).stdout.split()
+    if files != [LOG]:
+        return False
+    patch = git("show", "--format=", "-U0", commit, "--", LOG).stdout
+    added = 0
+    for line in patch.splitlines():
+        if line.startswith(("+++", "---", "@@", "diff ", "index ", "\\")):
+            continue
+        if line.startswith("-"):
+            return False          # a rewrite or deletion of history
+        if not line.startswith("+"):
+            return False
+        try:
+            entry = json.loads(line[1:])
+        except ValueError:
+            return False
+        if (not isinstance(entry, dict) or entry.get("seat") != seat
+                or entry.get("kind") != "error"
+                or entry.get("turn_seq") not in (None, binding.get("turn_seq"))):
+            return False
+        added += 1
+    return added > 0
+
+
+def head_binding_clean(repo, stamped, binding=None):
     """True when the stamped head is an ancestor of HEAD and every
     change since touches only queue files. Shared by the seat runtime
     (apply-time refusal) and `launcher respond` (stale-line scan), so
-    both use ONE definition of staleness (live-1 patch review R1)."""
+    both use ONE definition of staleness (live-1 patch review R1).
+
+    M1: when `binding` (the queued line's _queue stamp) is passed, commits
+    are judged one by one and the seat's own exact error-record commit (see
+    _error_record_commit_ok) also counts as clean, so a transient failure
+    that was recorded does not force the operator to discard and re-reason a
+    response that is still valid. Merges, any other LOG change, and any
+    non-queue file change remain stale. Without `binding` the original
+    aggregate rule applies unchanged."""
     if not stamped:
         return False
     ancestor = subprocess.run(
@@ -133,10 +184,29 @@ def head_binding_clean(repo, stamped):
          stamped, "HEAD"], capture_output=True)
     if ancestor.returncode != 0:
         return False
-    changed = subprocess.run(
-        ["git", "-C", repo, "diff", "--name-only", stamped, "HEAD"],
-        capture_output=True, text=True).stdout.split()
-    return all(p.startswith(".team/queues/") for p in changed)
+    if binding is None:
+        changed = subprocess.run(
+            ["git", "-C", repo, "diff", "--name-only", stamped, "HEAD"],
+            capture_output=True, text=True).stdout.split()
+        return all(p.startswith(".team/queues/") for p in changed)
+    rl = subprocess.run(
+        ["git", "-C", repo, "rev-list", "--parents", "--reverse",
+         f"{stamped}..HEAD"], capture_output=True, text=True)
+    if rl.returncode != 0:
+        return False
+    for row in rl.stdout.splitlines():
+        parts = row.split()
+        if len(parts) != 2:       # a merge (or a root) is never clean
+            return False
+        commit = parts[0]
+        files = subprocess.run(
+            ["git", "-C", repo, "diff-tree", "--no-commit-id", "--name-only",
+             "-r", commit], capture_output=True, text=True).stdout.split()
+        if files and all(p.startswith(".team/queues/") for p in files):
+            continue
+        if not _error_record_commit_ok(repo, commit, binding):
+            return False
+    return True
 
 
 def _now():
@@ -287,7 +357,7 @@ class Seat:
                 if (binding.get("turn") != state.get("turn")
                         or binding.get("turn_seq") != state.get("turn_seq")):
                     stale = "turn/turn_seq moved"
-                elif not self._head_binding_clean(binding.get("head")):
+                elif not self._head_binding_clean(binding.get("head"), binding):
                     stale = "head moved by non-queue commits"
                 if stale:
                     raise SeatError(
@@ -586,8 +656,8 @@ class Seat:
         retry["_corrections"] = corrections
         return retry
 
-    def _head_binding_clean(self, stamped):
-        return head_binding_clean(self.bus.repo, stamped)
+    def _head_binding_clean(self, stamped, binding=None):
+        return head_binding_clean(self.bus.repo, stamped, binding)
 
     def _preflight_dirt_check(self):
         """Refuse to START a turn when the worktree carries changes the

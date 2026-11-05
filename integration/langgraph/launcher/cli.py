@@ -213,7 +213,7 @@ def cmd_respond(args):
                     or bound.get("turn") != state.get("turn")
                     or bound.get("turn_seq") != state.get("turn_seq")
                     or not head_binding_clean(
-                        bus.repo, bound.get("head"))):
+                        bus.repo, bound.get("head"), bound)):
                 stale.append(line)
     if stale:
         if not args.discard_stale:
