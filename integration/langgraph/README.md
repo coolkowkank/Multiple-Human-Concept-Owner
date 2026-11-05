@@ -194,8 +194,9 @@ real model team.
 ## Runner lane integration (offline, refusing post)
 
 `runner_lane.py` drives the ACCEPTED Ryan runner (`runner/ryan_cycle.py`,
-byte-exact accepted tip `3b09eea8ccacebc4e5d3131e4b58fa9cf58a0fe2`, chain
-through tag `source-88a610a`) from inside a LangGraph node. The
+vendored from accepted tip `3b09eea8ccacebc4e5d3131e4b58fa9cf58a0fe2`, chain
+through tag `source-88a610a`, plus one documented successor-shape patch: see
+`OPERATOR_GUIDE.md` "Patched vendor delta") from inside a LangGraph node. The
 provider-call injection point (`post`) is explicit and REFUSING as
 shipped: it records the attempt and returns an 'unknown' transport
 outcome without any network access, and the runner's own settle() then

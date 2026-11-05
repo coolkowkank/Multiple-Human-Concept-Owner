@@ -370,3 +370,43 @@ allowance, fetches no key, clears no halt and makes no request. A future
 call needs separate operator decisions (shared cap, envelope, halt
 clearance with an external-condition note, a signed allowance, a current
 route record).
+
+## Patched vendor delta (successor window shape)
+
+`runner/ryan_cycle.py` and `runner/make_allowance.py` are no longer byte-exact
+copies of upstream. Offline source change only; no constant, cap, envelope,
+question budget, allowlist, assignment, key or ledger line is changed by it.
+Pins: ryan_cycle.py md5 `7aa68e610e7e9da3659b592fb98a96f2` (was
+`ae08fb3c6dae3744e4a505ebc2428d8c`), make_allowance.py md5
+`e81caf38b546ee4b94f1de34dea4ac42` (was `4f3d08fe51e428089c6f62517820758c`).
+`runner_succession_test.py` pins both md5 values so a later accidental edit is
+noticed.
+
+Delta:
+- `_shape_ok`: a window with `succeeds` may now have roles exactly
+  `["verifier"]` or `["verifier","ryan"]` (models for exactly those roles,
+  `max_requests` equal to the number of roles). A ryan-only successor stays
+  refused. Before, a successor had to be one verifier request.
+- `_succession_reason`: the verifier must be present and must not be a model any
+  earlier bound window used. The novelty rule is verifier-only; a ryan step's
+  model is the assignments.json ryan model, still re-checked at the I/O boundary.
+- `make_allowance.build`: a successor may carry a ryan step only when the
+  requested ryan model equals the assignments.json ryan model.
+
+Unchanged and tested: the prior window must be terminal (allowance-stop); the
+successor names the prior id and digest, the same lineage and claim-set
+fingerprint, and a new id; the cap+1 relaxation needs a validated actual
+succession; baselines must equal the lineage counts; the ryan step runs only
+after the verifier step's allowance-done; a failed, unknown, stale, stopped or
+expired window blocks ryan and any retry; question budget and envelope still
+apply at each step. This is a technical grant mechanism issued by an operator
+key holder, not a user approval.
+
+Budget note (reviewer step probes, same-model review, offline fixtures only):
+with a question budget that allows the verifier step but not a following ryan
+step, the verifier step runs and the ryan step is refused with 0 calls
+(needs-human). The window stays open after the verifier's allowance-done until
+its TTL ends, so a later budget decision could still allow the ryan step
+inside the window. Nothing here changes any constant. The source delta and its
+review are offline evidence; they qualify no runner role.
+

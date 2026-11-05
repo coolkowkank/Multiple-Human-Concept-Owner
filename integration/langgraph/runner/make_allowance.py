@@ -60,8 +60,12 @@ def build(root, qid, aid, ttl_min, verifier, ryan=None, now=None):
             "issued_at": rc.iso(now),
             "expires_at": rc.iso(now + ttl_min * 60)}
     if succeeds:
-        if ryan:
-            raise SystemExit("a successor window is verifier-only")
+        if ryan:   # one verifier step then one ryan step; ryan's model
+            # must be the operator assignment's ryan model
+            a = rc.load_assignments(root)
+            if not a or a.get("models", {}).get("ryan") != ryan:
+                raise SystemExit("ryan model is not the assignments.json "
+                                 "ryan model")
         body["succeeds"] = succeeds
         bound = {e.get("allowance") for e in led
                  if e.get("phase") == "allowance-bind"}

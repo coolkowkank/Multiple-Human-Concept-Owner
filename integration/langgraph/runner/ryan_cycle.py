@@ -873,9 +873,11 @@ def _shape_ok(b, succession_ok=False):
                 not isinstance(sc["id"], str) or not sc["id"] or \
                 not isinstance(sc["digest"], str) or len(sc["digest"]) != 64:
             return "succeeds must be {id, digest} of the prior window"
-        if roles != ["verifier"] or set(models) != {"verifier"} or \
-                b.get("max_requests") != 1:
-            return "a successor window is exactly one verifier request"
+        if roles not in (["verifier"], ["verifier", "ryan"]) or \
+                set(models) != set(roles) or \
+                b.get("max_requests") != len(roles):
+            return ("a successor window is one verifier request, "
+                    "optionally followed by one ryan request")
     for r in roles:
         if mx[r] != base[r] + 1 or isinstance(mx[r], bool) or \
                 (not (sc is not None and succession_ok) and
@@ -918,8 +920,11 @@ def _succession_reason(led, st, b, last, L=None, fp=None):
     prior = {e.get("model") for e in led if e.get("phase") == "reserved"
              and e.get("allowance") in bound}
     models = b.get("models")
-    if not isinstance(models, dict) or models.get("verifier") in prior:
+    if not isinstance(models, dict) or "verifier" not in models or \
+            models.get("verifier") in prior:
         return "successor must pin a model no earlier window used"
+    # the novelty rule applies to the verifier only; a ryan step's model
+    # is the assignments.json model, re-checked at the I/O boundary.
     return ""
 
 

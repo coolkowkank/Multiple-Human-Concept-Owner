@@ -1,5 +1,6 @@
 """Runner-backed LangGraph lane: drives the ACCEPTED Ryan runner
-(tools/ryan_cycle.py, vendored byte-exact at source-88a610a under
+(tools/ryan_cycle.py, vendored from source-88a610a with ONE documented
+successor-shape patch, see OPERATOR_GUIDE 'Patched vendor delta', under
 runner/) from inside the LangGraph orchestration.
 
 The provider-call injection point (`post`) is explicit and REFUSING as
@@ -26,7 +27,7 @@ import time
 _HERE = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(_HERE, "runner"))
 
-import ryan_cycle as rc  # vendored, byte-exact source-88a610a
+import ryan_cycle as rc  # vendored source-88a610a + documented patch
 import fenced_http as fh
 from typing import Annotated, TypedDict
 import operator as op

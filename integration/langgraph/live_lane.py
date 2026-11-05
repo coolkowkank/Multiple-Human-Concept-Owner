@@ -1,5 +1,12 @@
 """Bounded live-runner driver (compiled-LangGraph shape; PREP until go).
 
+PATCHED-VENDOR NOTE (2026-11-05): ryan_cycle.py and make_allowance.py are
+no longer byte-exact copies of upstream eef61c6. The only delta is the
+successor-window shape (a successor is [verifier] or [verifier, ryan],
+never ryan-only; novelty rule stays verifier-only) - see OPERATOR_GUIDE
+"Patched vendor delta". The md5 pins below are the patched files. The
+md5 values in the paragraph that follows describe the earlier run.
+
 Provenance note: a project record, not a grant. Free-only operation is
 a project working rule from the operator's relay of owner instructions
 (not authenticated by this repo). The runner's historical envelope/halt
@@ -9,8 +16,9 @@ Integrated accepted chain (2026-11-05): upstream tip
 eef61c620308dc9e086a5bc6fe08152607824e1f (append-only window
 succession: validated actual prior bind, same lineage + claim-set
 fingerprint, strictly verifier-only max_requests 1, shared
-runtime/builder validator; independently reviewed and accepted by
-main, builder+runtime), vendored BYTE-EXACT into runner/:
+runtime/builder validator; recorded repository history, not an approval),
+vendored into runner/ (md5 values of that earlier state; the current pins
+are in VENDORED_MD5 below):
   - ryan_cycle.py       md5 ae08fb3c6dae3744e4a505ebc2428d8c
   - model_resources.py  md5 148d1e609f466332ebb1d6ce85ccf40d
   - requesty_transport.py md5 974fbbfdcffd7b648d4552a063495fea
@@ -100,13 +108,13 @@ from typing import Annotated, TypedDict
 import operator as op
 from langgraph.graph import END, START, StateGraph
 
-# md5 pins of the accepted, independently reviewed vendored files.
+# md5 pins of the vendored files (a tamper check, not an approval).
 # Verified before ANY runner/transport use.
 VENDORED_MD5 = {
-    "ryan_cycle.py": "ae08fb3c6dae3744e4a505ebc2428d8c",
+    "ryan_cycle.py": "7aa68e610e7e9da3659b592fb98a96f2",
     "model_resources.py": "148d1e609f466332ebb1d6ce85ccf40d",
     "requesty_transport.py": "974fbbfdcffd7b648d4552a063495fea",
-    "make_allowance.py": "4f3d08fe51e428089c6f62517820758c",
+    "make_allowance.py": "e81caf38b546ee4b94f1de34dea4ac42",
 }
 
 

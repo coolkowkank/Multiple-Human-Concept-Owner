@@ -18,7 +18,7 @@ HTTP status, fixed shape/origin enums, message-key vocabulary, sanitized usage.
 No fallback parse, no cause claimed, no new call authority) is vendored
 BYTE-EXACT into `runner/` and md5-pinned in `live_lane.VENDORED_MD5`:
 
-- `ryan_cycle.py` (ae08fb3c6dae3744e4a505ebc2428d8c) - envelope 7
+- `ryan_cycle.py` (ae08fb3c6dae3744e4a505ebc2428d8c at that time; now a patched vendor, md5 7aa68e610e7e9da3659b592fb98a96f2, see OPERATOR_GUIDE 'Patched vendor delta') - envelope 7
   (historic reserves are never reset; the project-internal reserve cap of 7
   is a self-imposed bookkeeping control, not an owner limit; its count
   is read from the authoritative ledger at run time, never from this doc),
@@ -43,7 +43,7 @@ BYTE-EXACT into `runner/` and md5-pinned in `live_lane.VENDORED_MD5`:
   bounded reads on every error path, max-3 attempts per factory counted
   BEFORE I/O, and cost-zero accounting: an absent or invalid cost
   signal is cost-unverified and surfaces as unknown, never ok.
-- `make_allowance.py` (4f3d08fe51e428089c6f62517820758c) - offline
+- `make_allowance.py` (4f3d08fe51e428089c6f62517820758c at that time; now patched, md5 e81caf38b546ee4b94f1de34dea4ac42) - offline
   bookkeeping builder; runs the runtime's own succession validator
   against the actual last bind line BEFORE signing, so it cannot sign
   a window the runtime would refuse; a successor is verifier-only and
