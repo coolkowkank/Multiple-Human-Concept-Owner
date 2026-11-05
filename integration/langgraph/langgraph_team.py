@@ -71,7 +71,7 @@ from launcher.bus import Bus
 from launcher.cli import default_roster
 from launcher.demo import _scripts
 from launcher.runtime import Seat, SeatError
-from launcher.adapters import MockAdapter, QueueAdapter
+from launcher.adapters import HttpAdapter, MockAdapter, QueueAdapter
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
@@ -101,8 +101,63 @@ MARKER_SUFFIX = ".lg-demo-fresh"
 # type(x).__name__ is, and only these two constructors can ever produce
 # an adapter this graph will execute - no registry lookup, no spec
 # string that could resolve to a provider-calling class.
-SAFE_CONSTRUCTORS = {"mock": MockAdapter, "queue": QueueAdapter}
+SAFE_CONSTRUCTORS = {"mock": MockAdapter, "queue": QueueAdapter,
+                     "http": HttpAdapter}
 ALLOWED_ADAPTERS = set(SAFE_CONSTRUCTORS)
+
+# The "http" type is NOT open: a seat spec is accepted only if it is the
+# exact fenced shape below (fixed router endpoint, exact price-0 model
+# allowlist, zero-cost enforcement, bounded request count with a durable
+# usage log OUTSIDE the repo, no extra keys). Any other http spec is
+# refused at execution and at the seat boundary, so a swapped roster
+# cannot reach a paid model or another host. Allowlist membership is a
+# listing fact (price 0 in the router's public listing), not a
+# qualification of the model.
+HTTP_FREE_BASE = "https://router.requesty.ai/v1"
+HTTP_FREE_MODELS = frozenset({"nvidia/nemotron-3-ultra-550b-a55b",
+                              "novita/ling-3.1-flash"})
+HTTP_KEY_ENV = "REQUESTY_API_KEY"
+HTTP_MAX_BUDGET = 8
+HTTP_MAX_TOKENS = 8000
+HTTP_SPEC_KEYS = {"type", "base_url", "model", "api_key_env", "timeout",
+                  "max_tokens", "reasoning_effort", "call_budget",
+                  "usage_log", "require_zero_cost"}
+
+
+def _http_spec_refusal(spec: dict, repo: str) -> str:
+    """'' if spec is the exact fenced free-route shape, else a reason."""
+    ad = spec.get("adapter", {}) if isinstance(spec, dict) else {}
+    if ad.get("type") != "http":
+        return ""
+    def isint(v, lo, hi):
+        return (isinstance(v, int) and not isinstance(v, bool)
+                and lo <= v <= hi)
+    if set(ad) - HTTP_SPEC_KEYS:
+        return "unknown http spec keys"
+    if ad.get("base_url") != HTTP_FREE_BASE:
+        return "base_url is not the fixed router endpoint"
+    if ad.get("model") not in HTTP_FREE_MODELS:
+        return "model is not on the exact price-0 allowlist"
+    if ad.get("api_key_env") != HTTP_KEY_ENV:
+        return "api_key_env is not the fixed key variable"
+    if ad.get("require_zero_cost") is not True:
+        return "require_zero_cost must be true"
+    if not isint(ad.get("call_budget"), 1, HTTP_MAX_BUDGET):
+        return "call_budget must be an int in 1..%d" % HTTP_MAX_BUDGET
+    if not isint(ad.get("max_tokens"), 1, HTTP_MAX_TOKENS):
+        return "max_tokens must be an int in 1..%d" % HTTP_MAX_TOKENS
+    if "timeout" in ad and not isint(ad["timeout"], 1, 300):
+        return "timeout must be an int in 1..300"
+    if ad.get("reasoning_effort", "low") not in ("low", "medium", "high"):
+        return "invalid reasoning_effort"
+    ul = ad.get("usage_log")
+    if not isinstance(ul, str) or not os.path.isabs(ul):
+        return "usage_log must be an absolute path"
+    real = os.path.realpath(ul)
+    root = os.path.realpath(repo)
+    if real == root or real.startswith(root + os.sep):
+        return "usage_log must be outside the repo"
+    return ""
 
 # Operator control plane. ONE channel: .team/CONTROL.json inside the git
 # bus, mutated only through operator: commits (guard-exempt operational
@@ -167,7 +222,7 @@ def _init_safe(repo: str) -> None:
         os.makedirs(repo)
 
 
-def init_repo(repo: str, queue_seats=()) -> None:
+def init_repo(repo: str, queue_seats=(), http_seats=None) -> None:
     repo = os.path.abspath(repo)
     _init_safe(repo)
     env = dict(os.environ)
@@ -185,6 +240,7 @@ def init_repo(repo: str, queue_seats=()) -> None:
             raise SystemExit(f"init step failed: {' '.join(args)}\n{proc.stderr}")
 
     queue_seats = set(queue_seats or ())
+    http_seats = dict(http_seats or {})
     subprocess.run(["git", "init", "-q", repo], check=True)
     subprocess.run(["git", "-C", repo, "config", "user.name", "lg-demo"], check=True)
     subprocess.run(["git", "-C", repo, "config", "user.email", "lg@example.com"], check=True)
@@ -195,6 +251,11 @@ def init_repo(repo: str, queue_seats=()) -> None:
     scripts = _scripts()
     os.makedirs(os.path.join(repo, ".team", "queues"), exist_ok=True)
     for name in roster["seats"]:
+        if name in http_seats:
+            # Model-backed seat: fenced http spec (see _http_spec_refusal);
+            # an invalid spec is refused at execution, not here.
+            roster["seats"][name]["adapter"] = dict(http_seats[name])
+            continue
         if name in queue_seats:
             # Operator-fed seat: responses arrive through the project's
             # own `launcher respond` channel, bound to turn/seq/head and
@@ -580,6 +641,10 @@ class GuardedAdapter:
                 f"step started at seq {self._instruction_seq}")
         spec = roster.get("seats", {}).get(self._seat, {})
         spec_type = spec.get("adapter", {}).get("type")
+        why = _http_spec_refusal(spec, self._bus.repo)
+        if why:
+            raise SeatError(
+                f"{self._seat} refused at seat boundary: http spec: {why}")
         if (spec_type not in SAFE_CONSTRUCTORS
                 or type(self._inner) is not SAFE_CONSTRUCTORS[spec_type]):
             raise SeatError(
@@ -652,6 +717,11 @@ def seat_node(seat: str, state: TeamState) -> dict:
         return {"seat_error": f"{seat} refused at execution: roster "
                               f"adapter is {spec_type!r}, not one of "
                               f"{sorted(ALLOWED_ADAPTERS)}"}
+    why = _http_spec_refusal(bus.roster().get("seats", {}).get(seat, {}),
+                             repo)
+    if why:
+        return {"seat_error": f"{seat} refused at execution: http spec: "
+                              f"{why}"}
     seat_obj = Seat(bus, seat)
     adapter = getattr(seat_obj, "adapter", None)
     if (adapter is None
@@ -873,10 +943,20 @@ def verify(repo: str, checkpoint_db: str, thread_id: str,
 
 def main(argv) -> int:
     phase, repo, db = argv[1], argv[2], argv[3]
-    stop_after = int(argv[4]) if len(argv) > 4 else 0
-    thread_id = argv[5] if len(argv) > 5 else "team-demo-1"
+    numeric = phase in ("run", "verify")
+    stop_after = int(argv[4]) if numeric and len(argv) > 4 else 0
+    thread_id = argv[5] if numeric and len(argv) > 5 else "team-demo-1"
     if phase == "init":
         init_repo(repo)
+        return 0
+    if phase == "init-http":
+        seat, model, usage_log = argv[4], argv[5], argv[6]
+        init_repo(repo, http_seats={seat: {
+            "type": "http", "base_url": HTTP_FREE_BASE, "model": model,
+            "api_key_env": HTTP_KEY_ENV, "require_zero_cost": True,
+            "call_budget": 4, "max_tokens": 6000, "timeout": 280,
+            "reasoning_effort": "low",
+            "usage_log": os.path.abspath(usage_log)}})
         return 0
     if phase == "run":
         run_graph(repo, db, stop_after, thread_id)
