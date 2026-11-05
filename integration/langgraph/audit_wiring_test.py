@@ -156,6 +156,26 @@ try:
         ok_sl = True
     check("symlinked audit dir refused", ok_sl)
     check("audit dir mode is 0700", (os.stat(ad).st_mode & 0o777) == 0o700)
+    # --- M1: recorded error history must not break the audited seat's own prompt ---
+    for i in range(25):
+        bus.append_log("qc", "error", "boom %d" % i)
+        if i % 3 == 0:
+            bus.append_log("qc", "note", "keep %d" % i)
+    sys_err, p_err = seat_obj.build_prompt(bus.state())
+    check("prompt shows no error entries and keeps the last 20 non-error entries (window not shrunk by errors)",
+          "boom" not in p_err and "keep 24" in p_err and "keep 0" in p_err)
+    seat_obj.correction_meta = None
+    _saved_logs = fenced_http.HTTP_LOG_DIR; fenced_http.HTTP_LOG_DIR = os.path.join(tmp, "logs-m1")  # fresh cap window for this probe
+    aw6 = audit_wiring.AuditedFenced(fenced_http.FencedHttpAdapter(lt.HTTP_FREE_BASE, m, lt.HTTP_KEY_ENV, "z6", 1, 100, 5, "low"), seat_obj, ad)
+    n1 = len(HITS); err6 = None
+    try:
+        aw6.complete(sys_err, p_err)
+    except ValueError as e:
+        err6 = e
+    check("audited seat's own prompt after many recorded errors: accepted (one request, no audit mismatch)", err6 is None and len(HITS) == n1 + 1)
+    fenced_http.HTTP_LOG_DIR = _saved_logs
+    from launcher.runtime import prompt_log_tail
+    check("audit context and build_prompt share one tail helper", audit_wiring.prompt_log_tail is prompt_log_tail)
 finally:
     srv.shutdown(); shutil.rmtree(tmp, ignore_errors=True)
 print("\nCONTINUATION DRY RUN:", "ALL CHECKS PASSED" if ok else "FAILURES ABOVE")

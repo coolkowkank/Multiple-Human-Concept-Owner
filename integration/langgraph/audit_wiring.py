@@ -23,7 +23,7 @@ lifetime cap own those.
 import hashlib, json, os, stat
 
 from launcher.prompt_audit import PromptAuditAdapter, render_audited_prompt
-from launcher.runtime import correction_suffix
+from launcher.runtime import correction_suffix, prompt_log_tail
 
 PINS = {"launcher/prompt_audit.py": "7cf175ed1f2a78adf3fca04f8a567e49",
         "launcher/usage_join.py": "d00259978e57bebfba30ee5f6e8121ab"}
@@ -84,7 +84,7 @@ class AuditedFenced:
         s = self._seat
         brief = s._read(s.bus.repo, ".team/brief.md")
         return dict(seat=s.name, role=s.role, brief=brief,
-                    state=s.bus.state(), recent_log=s.bus.log(limit=20),
+                    state=s.bus.state(), recent_log=prompt_log_tail(s.bus),
                     batch=s.spec.get("batch"), correction_suffix=self._suffix)
 
     def _append(self, path, row):

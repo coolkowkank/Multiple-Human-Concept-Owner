@@ -121,6 +121,15 @@ def _verify_env():
     return env
 
 
+def prompt_log_tail(bus, limit=20):
+    """THE log tail every prompt renders (Seat.build_prompt and the audit
+    wiring's context both call this, so they cannot drift). Runtime-written
+    kind=="error" entries are status, not decision input: they are kept out
+    so recording one can never change what a queued response was reasoned
+    against (M1). The window is the last `limit` NON-error entries."""
+    return [e for e in bus.log() if e.get("kind") != "error"][-limit:]
+
+
 _ERROR_ENTRY_KEYS = {"ts", "seat", "kind", "body"}
 
 
@@ -477,11 +486,7 @@ class Seat:
         interactive or assistant-mediated operator reasons against the
         same input a live model would get - no side-channel context."""
         brief = self._read(self.bus.repo, ".team/brief.md")
-        # Runtime-written error records are status, not decision input: they
-        # are kept out of the rendered context so recording one can never
-        # change what a queued response was reasoned against (M1).
-        recent = [e for e in self.bus.log()
-                  if e.get("kind") != "error"][-20:]
+        recent = prompt_log_tail(self.bus)
         system = prompts.system_prompt(self.role)
         task = prompts.task_prompt(
             self.name, self.role, brief, state, recent,
