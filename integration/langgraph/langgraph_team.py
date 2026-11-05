@@ -229,6 +229,48 @@ def init_repo(repo: str, queue_seats=()) -> None:
 
 # ---------- operator controls (assign / pause / update / resume) ----------
 
+SEAT_INPUTS = (".team/STATE.json", ".team/roster.json",
+               ".team/brief.md", ".team/CONTROL.json")
+
+
+def _seat_scope(roster: dict, seat: str) -> list:
+    """The exact committed files that drive this seat's construction and
+    prompt: the four bus inputs plus the seat's queue file when the
+    committed spec is a queue adapter. Mock/queue specs carry no other
+    file paths (script/legacy adapters are refused outright)."""
+    scope = list(SEAT_INPUTS)
+    spec = roster.get("seats", {}).get(seat, {})
+    if spec.get("adapter", {}).get("type") == "queue":
+        q = spec.get("adapter", {}).get("path")
+        if isinstance(q, str) and q:
+            scope.append(q)
+    return scope
+
+
+def _scoped_dirty(repo: str, paths) -> str:
+    """'' if every scoped input matches HEAD, else a short reason.
+
+    The seat runtime constructs its adapter and prompt inputs (roster
+    spec, brief, queue lines) from WORKTREE files, and the bus commit
+    stages everything in the tree. A dirty input of the same class - a
+    locally edited roster naming a script adapter, a hand-edited brief
+    (no instruction_seq bump), a raw queue edit - would pass a
+    committed-view fence yet drive construction and be swept into the
+    turn commit. COMMITTED changes are fine (committed reads and the
+    queue-binding staleness checks handle them, and mid-turn queue
+    commits are permitted); UNCOMMITTED divergence on a seat input is
+    refused. Scoped to the seat's exact inputs, not the whole repo:
+    unrelated scratch elsewhere does not block a turn."""
+    proc = subprocess.run(["git", "-C", repo, "status", "--porcelain",
+                           "--"] + list(paths),
+                          capture_output=True, text=True)
+    if proc.returncode != 0:
+        return f"git status failed: {proc.stderr.strip()[:80]}"
+    out = proc.stdout.strip()
+    return (f"uncommitted seat input: {out.splitlines()[0][:80]}"
+            if out else "")
+
+
 def _committed_json(repo: str, path: str):
     """JSON document as COMMITTED at HEAD, or None. Worktree edits that
     were never committed are invisible, like read_control."""
@@ -474,6 +516,11 @@ class GuardedAdapter:
             roster = _committed_json(self._bus.repo, ".team/roster.json")
             if not isinstance(roster, dict):  # non-dict: clean refusal
                 roster = {}
+            dirty = _scoped_dirty(self._bus.repo,
+                                  _seat_scope(roster, self._seat))
+            if dirty:
+                raise SeatError(
+                    f"{self._seat} refused at seat boundary: {dirty}")
         if live.get("status") != "running":
             raise SeatError(
                 f"{self._seat} refused at seat boundary: bus status "
@@ -533,6 +580,17 @@ def seat_node(seat: str, state: TeamState) -> dict:
     sync-time checks could miss."""
     repo = state["repo"]
     bus = Bus(repo, BRANCH)
+
+    # Fence 0: dirty seat INPUTS - a locally edited roster, brief or
+    # queue line would drive construction and be swept into the turn
+    # commit. Scoped to this seat's exact inputs; committed changes
+    # (mid-turn queue commits) and unrelated files do not block.
+    committed_roster = _committed_json(repo, ".team/roster.json")
+    if not isinstance(committed_roster, dict):
+        committed_roster = {}
+    dirty = _scoped_dirty(repo, _seat_scope(committed_roster, seat))
+    if dirty:
+        return {"seat_error": f"{seat} refused at execution: {dirty}"}
 
     # Fence 1: re-read live state at execution time - a resumed pending
     # seat after an operator halt, or a turn that moved since sync, is
