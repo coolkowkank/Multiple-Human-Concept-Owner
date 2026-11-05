@@ -30,7 +30,7 @@ class T(unittest.TestCase):
         self.assertEqual(run(dict(self.base, id="chatcmpl-abc"))[0]["response_id"], "chatcmpl-abc")
 
     def test_absent_or_nonstring_id_not_recorded(self):
-        for bad in (None, "", 5):
+        for bad in (None, "", 5, "a b", "x" * 129):
             body = dict(self.base)
             if bad is not None: body["id"] = bad
             self.assertNotIn("response_id", run(body)[0])

@@ -18,6 +18,7 @@ suite does not use; see docs/proposed-vs-tested.md.
 from __future__ import annotations
 
 import json
+import re
 import os
 import subprocess
 import time
@@ -281,9 +282,15 @@ class HttpAdapter(Adapter):
                 # Python-urllib user agent; send an explicit one.
                 "user-agent": "team-launcher-http-adapter/0.1",
             })
+        self.last_call = None  # cleared so a failed call never leaks a stale id
         data = self._post(req)
+        # Provider-REPORTED fields of the last successful response (raw, kept in
+        # memory only). Reported, not verified; consumers must sanitize.
         text = data["choices"][0]["message"]["content"]
-        return parse_response(text)
+        result = parse_response(text)
+        self.last_call = {"origin": "provider", "response_id": data.get("id"),
+                          "usage": data.get("usage")}
+        return result
 
     def _record(self, attempt, outcome, usage=None, response_id=None):
         if not self.usage_log:
@@ -315,7 +322,8 @@ class HttpAdapter(Adapter):
                     data = json.loads(resp.read())
                     rid = data.get("id")
                     self._record(attempt + 1, "ok", data.get("usage"),
-                                 rid if isinstance(rid, str) and rid else None)
+                                 rid if isinstance(rid, str) and re.match(
+                                     r"^[A-Za-z0-9._:-]{1,128}$", rid) else None)
                     if self.require_zero_cost:
                         cost = (data.get("usage") or {}).get("cost")
                         if cost:

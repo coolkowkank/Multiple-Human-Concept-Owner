@@ -247,12 +247,19 @@ rosters keep working, but unattended autonomous runs should set budgets.
 
 ## WP9 usage join (offline, unwired)
 
-`launcher/usage_join.py` joins prompt-audit `call_id` rows to explicit usage
-records that carry `call_id`, `origin` (`provider`|`mock`) and a `request_id`.
-Tested offline only. Not wired into any runtime path; no provider call has
-been made through it and no token savings are measured or claimed.
+`launcher/usage_join.py` joins prompt-audit rows to usage evidence by the LOCAL
+`call_id` minted before any I/O. `PromptAuditAdapter` now adds an optional
+`reported` object to the `adapter_call_returned` row (existing fields and
+`provider_tokens: null` unchanged): `origin` (set by the adapter class, never by
+provider content), `response_id_sha256` (only for ids matching
+`^[A-Za-z0-9._:-]{1,128}$`; raw ids are never stored), and `reported_usage`
+(plain non-negative ints below 1e9, else a status marker).
 
-Known gap: `HttpAdapter` usage_log lines now carry the provider body `id` as
-`response_id` (when present) but do not carry the audit `call_id`; a runtime
-step that writes the `call_id`-keyed usage record from the adapter result is
-still unwritten. Until it exists no live matched comparison is possible.
+Provider fields are REPORTED, not verified: the body `id` is an opaque response
+id, not proven request or billing identity; a provider id is optional and its
+absence does not block counting reported usage. A repeated id across calls
+blocks totals. Mock rows never produce provider totals. Wiring in `HttpAdapter`
+only exposes `last_call`; no runtime path enables this by default. No provider
+call has been made through it and no savings are measured or claimed.
+Requesty lane: sends no client request id and captures no body id, so its rows
+yield no `reported` evidence until that transport is changed (separate lane).

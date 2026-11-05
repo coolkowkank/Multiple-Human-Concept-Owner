@@ -66,6 +66,40 @@ def render_audited_prompt(seat, role, brief, state, recent_log, batch=None):
 
 
 
+_ID_OK = __import__('re').compile(r'^[A-Za-z0-9._:-]{1,128}$')
+_MAX_COUNT = 10 ** 9
+
+
+def reported_call_evidence(last_call):
+    """Sanitized, publishable view of an adapter's reported call fields.
+
+    Raw external ids are never stored: only sha256 of a well-formed id. Usage
+    counts are kept only as plain non-negative ints below 1e9. Anything else is
+    dropped and marked, never repaired. These values are provider-REPORTED, not
+    verified; origin comes from the adapter class, not from provider content.
+    """
+    if not isinstance(last_call, dict) or last_call.get('origin') != 'provider':
+        return None
+    out = {'origin': 'provider'}
+    rid = last_call.get('response_id')
+    if isinstance(rid, str) and _ID_OK.match(rid):
+        out['response_id_sha256'] = hashlib.sha256(rid.encode()).hexdigest()
+    else:
+        out['response_id_status'] = 'absent' if rid is None else 'rejected'
+    usage = last_call.get('usage')
+    counts = {}
+    if isinstance(usage, dict):
+        for k in ('prompt_tokens', 'completion_tokens'):
+            v = usage.get(k)
+            if isinstance(v, int) and not isinstance(v, bool) and 0 <= v < _MAX_COUNT:
+                counts[k] = v
+    if len(counts) == 2:
+        out['reported_usage'] = counts
+    else:
+        out['reported_usage_status'] = 'absent_or_invalid'
+    return out
+
+
 class AuditRecordAfterSuccess(RuntimeError):
     """Adapter returned, but its audit completion record failed. DO NOT RETRY.
 
@@ -125,8 +159,12 @@ class PromptAuditAdapter:
                 raise exc from audit_exc
             raise
         try:
-            self._record(dict(event='adapter_call_returned', call_id=call_id,
-                              provider_tokens=None))
+            row = dict(event='adapter_call_returned', call_id=call_id,
+                       provider_tokens=None)
+            evidence = reported_call_evidence(getattr(self.inner, 'last_call', None))
+            if evidence is not None:
+                row['reported'] = evidence
+            self._record(row)
         except Exception as audit_exc:
             raise AuditRecordAfterSuccess(call_id) from audit_exc
         return result

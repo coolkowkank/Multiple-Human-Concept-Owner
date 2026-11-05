@@ -6,8 +6,9 @@ a provider-reported request id and usage, and keep mock vs provider apart.
 
 Rules (fail closed, never infer):
 - A call_id counts only if it has a start row and exactly one terminal row.
-- Usage comes only from an explicit usage record naming the same call_id AND a
-  non-empty request_id. chars/4 estimates are never promoted to tokens.
+- Usage comes only from an explicit usage record naming the same local call_id.
+  The provider id (request_id field) is OPTIONAL opaque evidence; when present it
+  must be a non-empty string and must not repeat across calls. chars/4 estimates are never promoted to tokens.
 - origin must be 'provider' or 'mock'. Mock rows never produce token totals.
 - Duplicate or conflicting usage for a call_id is an error row, not a pick.
 """
@@ -19,6 +20,26 @@ ORIGINS = ('provider', 'mock')
 
 def _int(v):
     return v if isinstance(v, int) and not isinstance(v, bool) and v >= 0 else None
+
+
+def usage_from_audit(audit_rows):
+    """Derive usage rows from sanitized 'reported' evidence on returned rows.
+
+    request_id is the sha256 of the provider-reported RESPONSE id when it is
+    well-formed, else None; it is not a vendor-proven request id. The local
+    call_id is the join key. Rows without valid usage yield nothing.
+    """
+    out = []
+    for r in audit_rows:
+        rep = r.get('reported') if r.get('event') == 'adapter_call_returned' else None
+        if not isinstance(rep, dict) or rep.get('origin') != 'provider':
+            continue
+        u, rid = rep.get('reported_usage'), rep.get('response_id_sha256')
+        if isinstance(u, dict):
+            out.append({'call_id': r.get('call_id'), 'origin': 'provider',
+                        'request_id': rid or None, 'prompt_tokens': u.get('prompt_tokens'),
+                        'completion_tokens': u.get('completion_tokens')})
+    return out
 
 
 def join(audit_rows, usage_rows):
@@ -56,12 +77,13 @@ def join(audit_rows, usage_rows):
                 row['origin'] = u.get('origin')
                 if u.get('origin') not in ORIGINS:
                     row['status'] = 'error:bad_origin'
-                elif not u.get('request_id') or not isinstance(u.get('request_id'), str):
-                    row['status'] = 'error:missing_request_id'
+                elif u.get('request_id') is not None and not (
+                        isinstance(u.get('request_id'), str) and u['request_id']):
+                    row['status'] = 'error:bad_response_id'
                 elif _int(u.get('prompt_tokens')) is None or _int(u.get('completion_tokens')) is None:
                     row['status'] = 'error:bad_usage_counts'
                 else:
-                    row['request_id'] = u['request_id']
+                    row['request_id'] = u.get('request_id')
                     row['status'] = 'joined_' + u['origin']
                     if u['origin'] == 'provider':
                         row['prompt_tokens'] = u['prompt_tokens']
@@ -88,7 +110,8 @@ def main(argv=None):
     if len(argv) != 2:
         sys.exit('usage: usage_join AUDIT.jsonl USAGE.jsonl')
     rd = lambda p: [json.loads(l) for l in open(p, encoding='utf-8') if l.strip()]
-    json.dump(join(rd(argv[0]), rd(argv[1])), sys.stdout, indent=2)
+    audit = rd(argv[0])
+    json.dump(join(audit, rd(argv[1]) + usage_from_audit(audit)), sys.stdout, indent=2)
     sys.stdout.write('\n')
 
 

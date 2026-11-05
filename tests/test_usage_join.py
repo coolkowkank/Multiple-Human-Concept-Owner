@@ -33,8 +33,11 @@ class T(unittest.TestCase):
         self.assertEqual(self.st(r), 'no_usage_record')
         self.assertIsNone(r['provider_prompt_tokens'])
 
-    def test_missing_request_id(self):
-        self.assertEqual(self.st(join(A('a'), [U('a', rid='')])), 'error:missing_request_id')
+    def test_empty_id_rejected_absent_id_allowed(self):
+        self.assertEqual(self.st(join(A('a'), [U('a', rid='')])), 'error:bad_response_id')
+        r = join(A('a'), [U('a', rid=None)])
+        self.assertEqual(self.st(r), 'joined_provider')
+        self.assertEqual(r['provider_prompt_tokens'], 5)
 
     def test_bad_counts_and_bool(self):
         self.assertEqual(self.st(join(A('a'), [U('a', p=True)])), 'error:bad_usage_counts')
