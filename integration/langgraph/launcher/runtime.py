@@ -844,6 +844,11 @@ class Seat:
     def _apply(self, state, response):
         validate_response_shape(self.name, response)
         writes = response.get("writes") or {}
+        _ws = sorted(p for p in writes if isinstance(p, str))
+        for _a in _ws:
+            if any(_b.startswith(_a + "/") for _b in _ws):
+                raise SeatError(f"{self.name}: writes name both a file and a "
+                                "directory under it; refused before any write")
         for path in writes:
             if not self._path_allowed(path):
                 raise SeatError(
@@ -995,21 +1000,60 @@ class Seat:
         except Exception:
             return _hr_fields("capture_error")
 
+    @staticmethod
+    def canonical_rel(path):
+        """The ONE relative path form both the allow check and the write
+        use, or None. Refuses (never repairs): non-str, empty, absolute
+        (/ or \\ lead), any backslash, control chars or NUL, '.'/'..'/
+        empty segments, and a leading .git component."""
+        if not isinstance(path, str) or not path or len(path) > 1024:
+            return None
+        if path[0] in "/\\" or "\\" in path:
+            return None
+        if any(ord(c) < 32 or ord(c) == 127 for c in path):
+            return None
+        parts = path.split("/")
+        if any(x in ("", ".", "..") for x in parts) or parts[0] == ".git":
+            return None
+        return path
+
+    @staticmethod
+    def _symlink_free(repo, rel):
+        """No existing component under the repo (including the final file)
+        may be a symlink: a write through one could leave the repo. A
+        missing component is fine (it will be created as a real dir)."""
+        cur = repo
+        for part in rel.split("/"):
+            cur = os.path.join(cur, part)
+            try:
+                if os.path.islink(cur):
+                    return False
+            except OSError:
+                return False
+        real = os.path.realpath(os.path.dirname(os.path.join(repo, rel)))
+        root = os.path.realpath(repo)
+        return real == root or real.startswith(root + os.sep)
+
     def _path_allowed(self, path):
-        path = path.replace("\\", "/").lstrip("/")
-        if ".." in path.split("/"):
+        rel = self.canonical_rel(path)
+        if rel is None or not self._symlink_free(self.bus.repo, rel):
             return False
         for allowed in self.allowed_paths:
             allowed = allowed.rstrip("/")
-            if path == allowed or path.startswith(allowed + "/"):
+            if rel == allowed or rel.startswith(allowed + "/"):
                 return True
         return False
 
     @staticmethod
     def _write(repo, path, content):
-        full = os.path.join(repo, path)
+        rel = Seat.canonical_rel(path)
+        if rel is None or not Seat._symlink_free(repo, rel):
+            raise SeatError("refusing to write an unsafe path")
+        full = os.path.join(repo, rel)
         os.makedirs(os.path.dirname(full) or repo, exist_ok=True)
-        with open(full, "w") as fh:
+        fd = os.open(full, os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+                     | os.O_NOFOLLOW, 0o644)
+        with os.fdopen(fd, "w") as fh:
             fh.write(content)
 
     @staticmethod
