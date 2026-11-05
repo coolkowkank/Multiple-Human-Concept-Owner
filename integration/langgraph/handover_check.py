@@ -217,7 +217,36 @@ def state_report(root, log_dir=None):
     return out
 
 
+def fresh_verdict(test_dir, results_path):
+    """Fail closed: OK only if every *_test.py in test_dir has exactly one
+    result line with status 0, and nothing else is in the results file."""
+    expected = sorted(f for f in os.listdir(test_dir) if f.endswith("_test.py"))
+    if not expected:
+        return False, "no *_test.py files found"
+    if not os.path.isfile(results_path):
+        return False, "results file missing"
+    seen = {}
+    for ln in open(results_path).read().splitlines():
+        parts = ln.split()
+        if len(parts) != 2 or not parts[1].lstrip("-").isdigit():
+            return False, "malformed result line"
+        seen.setdefault(parts[0], []).append(int(parts[1]))
+    if set(seen) != set(expected) or any(len(v) != 1 for v in seen.values()):
+        return False, "results do not match the %d discovered test files" % len(expected)
+    bad = sorted(k for k, v in seen.items() if v[0] != 0)
+    if bad:
+        return False, "nonzero exit: " + " ".join(bad)
+    return True, "%d" % len(expected)
+
+
 def main(argv):
+    if len(argv) >= 2 and argv[1] == "verdict":
+        a = dict(zip(argv[2::2], argv[3::2]))
+        if set(a) != {"--dir", "--results"}:
+            print("verdict needs --dir and --results", file=sys.stderr); return 2
+        good, msg = fresh_verdict(a["--dir"], a["--results"])
+        print(("OK " if good else "FAIL ") + msg)
+        return 0 if good else 1
     if len(argv) < 2 or argv[1] not in ("env", "state"):
         print(__doc__)
         return 2

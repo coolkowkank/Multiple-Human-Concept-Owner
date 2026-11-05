@@ -18,7 +18,7 @@
    "at": "2026-11-05T15:02",
    "title": "Handover tooling built and tested offline",
    "status": "offline-tested",
-   "body": "Added a setup guide (HANDOVER.md), a read-only environment and state checker (21 passing checks) and a fresh-environment script. The script clones the repository, builds a new virtual environment with the pinned packages, scrubs the environment and runs all 29 test files: all exit 0 with no network request. This was tested in one sandbox only, not on another machine or with another AI operator, so the handover is not yet proven end to end. Secrets stay out of Git and nothing transfers from the previous operator's accounts; a new operator supplies their own keys. The previous operator's chat history and prompts are not exported. Private run records go over only by a separate private route, if at all. Nothing has been transferred to anyone."
+   "body": "Added a setup guide (HANDOVER.md), a read-only environment and state checker (32 passing checks) and a fresh-environment script. The script clones the repository, builds a new virtual environment with the pinned packages, scrubs the environment and runs all 29 test files: all exit 0 with no network request. This was tested in one sandbox only, not on another machine or with another AI operator, so the handover is not yet proven end to end. Secrets stay out of Git and nothing transfers from the previous operator's accounts; a new operator supplies their own keys. The previous operator's chat history and prompts are not exported. Private run records go over only by a separate private route, if at all. Nothing has been transferred to anyone."
   },
   {
    "at": "2026-11-05T15:02",

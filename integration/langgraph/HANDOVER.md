@@ -21,7 +21,7 @@ Last result recorded by the author: new clone of `live/operator-done` at d4a7485
 - Provider key: a file you create, mode 0600, owned by you, outside the repository and outside any lane. `live` reads it and sets `REQUESTY_API_KEY` for that run only. Do not export it in your shell and do not put it in a brief, a prompt, a config in the repo or a commit.
 - Runner allowance key: `RYAN_ALLOWANCE_KEY_FILE` names an absolute, owner-only (0600), regular file outside the repo. It is a local random secret used only to sign `allowance.json`, so the runner can tell an edited permit from a made one. It is not a provider key and it logs into nothing. Generate your own. Whoever can read it can sign, so treat it as a tamper and accident check, not as proof that a person approved anything.
 - Nothing from the previous operator's secret storage transfers. You supply your own provider key and your own allowance key. Moving a secret between operators happens outside this repository and outside any prompt.
-- `python3 integration/langgraph/handover_check.py env` reports which of these variables are set (names and set/unset only) and the key file's mode. It never prints a value.
+- `python3 -B integration/langgraph/handover_check.py env` reports which of these variables are set (names and set/unset only) and the key file's mode. It never prints a value.
 
 ## 3. What is not in Git, and why
 
@@ -42,10 +42,10 @@ Rules that carry over to you:
 ## 4. Private state summary (for a private handover only)
 
 ```
-python3 integration/langgraph/handover_check.py state --root <runner-root> [--log-dir <shared-log-dir>]
+python3 -B integration/langgraph/handover_check.py state --root <runner-root> [--log-dir <shared-log-dir>]
 ```
 
-Read-only. It takes no lock, creates nothing and writes nothing. It prints counts by phase, role and outcome, whether a halt stands, reserves with no result, queue item ids and statuses, assigned model ids, and sha256 of each state file. It does not print prompts, completions, finding text, key contents or environment values. It flags an unparseable ledger line and a runner root inside a git work tree. It carries a "do not publish" label: send its output only through the same private route as the state itself.
+Use `-B` so Python writes no `__pycache__` into the code directory (it never writes into the runner root). Read-only. It takes no lock, creates nothing and writes nothing. It prints counts by phase, role and outcome, whether a halt stands, reserves with no result, queue item ids and statuses, assigned model ids, and sha256 of each state file. It does not print prompts, completions, finding text, key contents or environment values. It flags an unparseable ledger line and a runner root inside a git work tree. It carries a "do not publish" label: send its output only through the same private route as the state itself.
 
 It reports what the files say. It resolves nothing: an unknown outcome stays unknown, a standing halt stays standing.
 
