@@ -1,0 +1,48 @@
+{
+ "asOf": "2026-11-05T15:10",
+ "note": "Project-only status. Newest first. This page replaces routine chat reports; it shows committed facts and does not claim live, unattended or independently verified operation.",
+ "items": [
+  {
+   "at": "2026-11-05T15:01",
+   "title": "Verifier qualification test failed",
+   "status": "failed",
+   "body": "One request was sent to the free route for the verifier model. The provider answered HTTP 404 and returned no verdict. It was not retried, no other role ran, and Ryan's review did not run. The runner is paused by its own halt record, and the test window is closed. Cause is unknown: the model is listed as free but was not callable as requested. This is not a model-quality result. The full team is not autonomous. No model or role is qualified."
+  },
+  {
+   "at": "2026-11-05T15:03",
+   "title": "Next step on the failed route",
+   "status": "in progress",
+   "body": "Read-only checks of the provider's public documentation for a usable route that meets the different-model, different-lab rule. Two other free candidates are not qualified: one has unresolved terms, the other has no evidenced output ceiling. One request remains under the current controls, which is not enough for a verifier plus Ryan's review. No new requests, limits or assignments are changed by this check."
+  },
+  {
+   "at": "2026-11-05T15:02",
+   "title": "Handover to another AI: tooling ready, offline",
+   "status": "ready for publish",
+   "body": "A new setup guide (HANDOVER.md), a read-only environment and state checker with 21 passing checks, and a fresh-environment script. The script clones the repository, builds a new virtual environment with the pinned packages, scrubs the environment and runs all 29 test files: all exit 0 with no network request. Secrets stay out of Git. Nothing transfers from the previous operator's accounts; a new operator sets up their own key. Private history stays private and is handed over separately. Not yet transferred to anyone."
+  },
+  {
+   "at": "2026-11-05T15:02",
+   "title": "Known test environment dependency",
+   "status": "noted",
+   "body": "live_entry_test.py fails 6 checks when HOME is not the account home, because the reserve preflight guard refuses a different HOME. With the right HOME it passes 57 of 57. The test was not edited; the guide states the requirement."
+  },
+  {
+   "at": "2026-11-05T14:00",
+   "title": "Still paused",
+   "status": "paused",
+   "body": "Nordea and SmartGlass work remain paused."
+  },
+  {
+   "at": "2026-11-05T15:05",
+   "title": "Current public code",
+   "status": "published",
+   "body": "Branch live/operator-done at d4a7485: https://github.com/coolkowkank/Multiple-Human-Concept-Owner/tree/live/operator-done"
+  },
+  {
+   "at": "2026-11-05T15:06",
+   "title": "Public code is not the latest execution state",
+   "status": "noted",
+   "body": "The public branch holds code and tests. The latest run records, including the failed verifier test and the paused runner, are in a private runner folder and are not in Git. A new operator reads that state with the read-only state checker, and does not reset it: a halt or unknown outcome stands."
+  }
+ ]
+}
