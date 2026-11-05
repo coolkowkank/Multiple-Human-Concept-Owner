@@ -13,9 +13,12 @@ Rules (fail closed, never infer):
 - Provider-reported counts are provider-REPORTED, not verified identity or
   billing. The local call_id is the join key. No cost data exists in these
   rows, so none is reported.
-- The audit rows carry no turn/cycle field, so there is no per-cycle
-  breakdown; the report is per seat, with the correction-round tally from
-  the link rows.
+- Grouping is per bus TURN (link-row turn_seq, a private audit field from
+  the bus state), never per "cycle": no cycle identity exists, and a reused
+  audit dir across bus restarts could repeat a turn number. Calls without a
+  link row, with turn_seq None, or whose duplicate link rows disagree are
+  reported separately as "unlinked", never assigned to a turn. Per-turn and
+  unlinked buckets add up to the seat total.
 - An unreadable or malformed file refuses that whole seat (no rows used).
 - compare takes the two AUDIT DIRECTORIES and recomputes both reports itself
   (a saved report file is never trusted). It refuses any figure unless: both
@@ -76,6 +79,27 @@ def _read_jsonl(path):
         return rows
 
 
+def _bucket():
+    return {"calls": 0, "provider_joined": 0, "mock": 0, "unknown": 0, "_p": 0, "_c": 0}
+
+
+def _add(b, row):
+    b["calls"] += 1
+    if row["status"] == "joined_provider":
+        b["provider_joined"] += 1; b["_p"] += row["prompt_tokens"]; b["_c"] += row["completion_tokens"]
+    elif row["status"] == "joined_mock":
+        b["mock"] += 1
+    else:
+        b["unknown"] += 1
+
+
+def _final(b):
+    n = b["provider_joined"]
+    b = dict(b); p, c = b.pop("_p"), b.pop("_c")
+    b.update(prompt_tokens=p if n else None, completion_tokens=c if n else None, total_tokens=(p + c) if n else None)
+    return b
+
+
 def seat_report(audit_rows, link_rows=(), usage_rows=()):
     """Pure function: one seat's report from already-read rows."""
     from launcher import usage_join
@@ -93,15 +117,34 @@ def seat_report(audit_rows, link_rows=(), usage_rows=()):
     corr, reserved, ign_links = 0, 0, 0
     seen = set()
     known = {r["call_id"] for r in joined["rows"]}
+    turn_of, conflict = {}, set()
     for l in link_rows if isinstance(link_rows, (list, tuple)) else []:
-        if not (isinstance(l, dict) and isinstance(l.get("call_id"), str)) or l["call_id"] in seen or l["call_id"] not in known:
+        if not (isinstance(l, dict) and isinstance(l.get("call_id"), str)) or l["call_id"] not in known:
             ign_links += 1
             continue
+        t = l.get("turn_seq")
+        t = t if isinstance(t, int) and not isinstance(t, bool) and 0 <= t < 10 ** 9 else None
+        if l["call_id"] in seen:
+            ign_links += 1
+            if turn_of.get(l["call_id"]) != t:
+                conflict.add(l["call_id"])      # duplicate link rows disagree: no turn for this call
+            continue
+        turn_of[l["call_id"]] = t
         seen.add(l["call_id"])
         corr += l.get("correction_round") is True
         reserved += isinstance(l.get("n"), int) and not isinstance(l.get("n"), bool)
     p, c = joined["provider_prompt_tokens"], joined["provider_completion_tokens"]
+    turns, unl = {}, _bucket()
+    for r in joined["rows"]:
+        t = turn_of.get(r["call_id"])
+        if t is None or r["call_id"] in conflict:
+            _add(unl, r)
+        else:
+            _add(turns.setdefault(t, _bucket()), r)
     return {
+        "turns": {str(t): _final(b) for t, b in sorted(turns.items())},
+        "unlinked": _final(unl),
+        "turn_link_conflicts": len(conflict),
         "calls": total, "provider_joined": prov, "mock": mock,
         "unknown": total - prov - mock,
         "status_counts": dict(sorted(statuses.items())),
@@ -152,8 +195,22 @@ def run_report(audit_dir):
     calls = sum(r["calls"] for r in ok)
     prov = sum(r["provider_joined"] for r in ok)
     have = [r for r in ok if r["total_tokens"] is not None]
+    rturns, runl = {}, _bucket()
+    for sn in sorted(out):
+        r = out[sn]
+        for t, b in r["turns"].items():
+            tb = rturns.setdefault(int(t), dict(_bucket(), seats=[]))
+            for k in ("calls", "provider_joined", "mock", "unknown"):
+                tb[k] += b[k]
+            tb["_p"] += b["prompt_tokens"] or 0; tb["_c"] += b["completion_tokens"] or 0; tb["seats"].append(sn)
+        for k in ("calls", "provider_joined", "mock", "unknown"):
+            runl[k] += r["unlinked"][k]
+        runl["_p"] += r["unlinked"]["prompt_tokens"] or 0; runl["_c"] += r["unlinked"]["completion_tokens"] or 0
     rep = {
         "schema": "usage-report/v1",
+        "turns": {str(t): dict(_final({k: v for k, v in b.items() if k != "seats"}), seats=sorted(b["seats"])) for t, b in sorted(rturns.items())},
+        "unlinked": _final(runl),
+        "turn_note": "turn = bus turn number (link-row turn_seq), not a cycle: no cycle identity exists; unlinked calls (no link row, turn_seq None or conflicting links) are never assigned to a turn",
         "seats": out, "refused_seats": refused,
         "cross_seat_collision_seats": sorted(collide),
         "calls": calls, "provider_joined": prov, "unknown_or_mock": calls - prov,
@@ -166,6 +223,8 @@ def run_report(audit_dir):
                  "counts are provider-reported, not verified; usage from an explicit <seat>.usage.jsonl is an operator-supplied "
                  "file, not authenticated provider identity; no cost data; no per-cycle breakdown (audit rows carry no cycle field)"),
     }
+    # content digest ignores seat names, so a renamed copy of the same data matches
+    rep["content_digest"] = hashlib.sha256(json.dumps(sorted(json.dumps(v, sort_keys=True) for v in out.values()), separators=(",", ":")).encode()).hexdigest()
     rep["digest"] = digest(rep)
     return rep
 
@@ -201,8 +260,9 @@ def compare(dir_a, dir_b, outcome_a, outcome_b):
     if os.path.realpath(dir_a) == os.path.realpath(dir_b):
         return {"comparable": False, "reasons": ["A and B are the same directory: not a comparison"]}
     rep_a, rep_b = run_report(dir_a), run_report(dir_b)
-    if rep_a["digest"] == rep_b["digest"]:
-        reasons.append("A and B have identical reports: same run or copied data, not a comparison")
+    if rep_a["digest"] == rep_b["digest"] or rep_a["content_digest"] == rep_b["content_digest"]:
+        reasons.append("A and B have identical content (seat names ignored): same run or copied data, not a comparison; "
+                       "a copy with edited ids is NOT detected, so this is not independent-trial validation")
     for lab, rep in (("A", rep_a), ("B", rep_b)):
         if rep["complete"] is not True:
             reasons.append(f"{lab}: coverage incomplete (unknown, mock, refused, colliding or empty); totals would not be the whole run")

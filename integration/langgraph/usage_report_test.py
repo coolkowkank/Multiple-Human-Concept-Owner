@@ -48,6 +48,51 @@ r = U.seat_report([start("a"), ret("a", 1, 1, "1"), start("b"), ret("b", 1, 1, "
                              {"call_id": "a", "n": 4, "correction_round": True}, {"call_id": "ghost", "n": 1}, "bad"])
 check("links: correction rounds and reserve numbers tallied; duplicate/unknown/bad link rows ignored and counted", (r["correction_round_calls"], r["calls_with_reserve_number"], r["ignored_link_rows"]) == (1, 1, 3))
 
+# ---- per-turn grouping (link-row turn_seq); unlinked kept separate; never a "cycle"
+A = [start("a"), ret("a", 10, 1, "1"), start("b"), ret("b", 20, 2, "2"), start("c"), ret("c", 30, 3, "3"), start("d"), ret("d"), start("e"), ret("e", 40, 4, "4")]
+L = [{"call_id": "a", "n": 1, "correction_round": False, "turn_seq": 5}, {"call_id": "b", "n": 2, "correction_round": True, "turn_seq": 5},
+     {"call_id": "c", "n": 3, "correction_round": False, "turn_seq": 6}, {"call_id": "d", "n": 4, "correction_round": False, "turn_seq": 6},
+     {"call_id": "e", "n": 5, "correction_round": False, "turn_seq": None}]
+r = U.seat_report(A, L)
+check("per-turn: calls grouped by link turn_seq, correction round shares its turn", r["turns"]["5"]["calls"] == 2 and r["turns"]["5"]["total_tokens"] == 33 and r["turns"]["6"]["calls"] == 2)
+check("per-turn: unknown call stays unknown inside its turn (turn 6 total counts only the joined call)", r["turns"]["6"]["unknown"] == 1 and r["turns"]["6"]["total_tokens"] == 33)
+check("turn_seq None goes to unlinked, not to a turn; unlinked keeps its own tokens", r["unlinked"]["calls"] == 1 and r["unlinked"]["total_tokens"] == 44 and "None" not in r["turns"])
+check("turns + unlinked add up to the seat totals", sum(b["calls"] for b in r["turns"].values()) + r["unlinked"]["calls"] == r["calls"] and sum(b["total_tokens"] or 0 for b in r["turns"].values()) + (r["unlinked"]["total_tokens"] or 0) == r["total_tokens"])
+r = U.seat_report(A)
+check("no link rows (older audit dirs): every call unlinked, no turns, nothing inferred", r["turns"] == {} and r["unlinked"]["calls"] == 5 and r["total_tokens"] == 110)
+for label, tv in [("bool", True), ("negative", -1), ("float", 1.5), ("string", "5"), ("1e9", 10 ** 9)]:
+    r = U.seat_report(A[:2], [{"call_id": "a", "turn_seq": tv}]); check(f"turn_seq {label}: unlinked, not a turn", r["turns"] == {} and r["unlinked"]["calls"] == 1)
+r = U.seat_report(A[:2], [{"call_id": "a", "turn_seq": 5}, {"call_id": "a", "turn_seq": 6}])
+check("duplicate link rows with conflicting turn_seq: unlinked + conflict counted, never picked", r["turns"] == {} and r["unlinked"]["calls"] == 1 and r["turn_link_conflicts"] == 1)
+r = U.seat_report(A[:2], [{"call_id": "a", "turn_seq": 5}, {"call_id": "a", "turn_seq": 5}])
+check("duplicate link rows that agree: turn kept, duplicate counted as ignored", r["turns"]["5"]["calls"] == 1 and r["ignored_link_rows"] == 1 and r["turn_link_conflicts"] == 0)
+r = U.seat_report(A[:2], [{"call_id": "ghost", "turn_seq": 5}]); check("link for an unknown call_id ignored", r["turns"] == {} and r["ignored_link_rows"] == 1)
+tmp2 = tempfile.mkdtemp()
+try:
+    d = os.path.join(tmp2, "t"); os.mkdir(d)
+    wr(d, "s1.audit.jsonl", [start("a"), ret("a", 10, 1, "1"), start("b"), ret("b", 5, 5, "2")]); wr(d, "s1.links.jsonl", [{"call_id": "a", "turn_seq": 7}, {"call_id": "b", "turn_seq": 9}])
+    wr(d, "s2.audit.jsonl", [start("c"), ret("c", 20, 2, "3")]); wr(d, "s2.links.jsonl", [{"call_id": "c", "turn_seq": 7}])
+    rep = U.run_report(d)
+    check("run level: turn 7 merges both seats (11+22), lists the seats; turn 9 separate", rep["turns"]["7"]["total_tokens"] == 33 and rep["turns"]["7"]["seats"] == ["s1", "s2"] and rep["turns"]["9"]["total_tokens"] == 10 and rep["unlinked"]["calls"] == 0)
+    check("run turn note says turn is not a cycle", "not a cycle" in rep["turn_note"] and "cycle" not in " ".join(rep["turns"]))
+    check("no call_id or response id leaks into the report", all(x not in json.dumps(rep) for x in ('"a"', '"b"', '"c"', "1" * 64)))
+    # collision-refused seats are excluded from turns
+    d2 = os.path.join(tmp2, "t2"); os.mkdir(d2)
+    wr(d2, "s1.audit.jsonl", [start("k"), ret("k", 1, 1, "1")]); wr(d2, "s1.links.jsonl", [{"call_id": "k", "turn_seq": 1}])
+    wr(d2, "s2.audit.jsonl", [start("k"), ret("k", 1, 1, "1")]); wr(d2, "s2.links.jsonl", [{"call_id": "k", "turn_seq": 1}])
+    rep2 = U.run_report(d2); check("collision-refused seats contribute no turns", rep2["turns"] == {} and rep2["complete"] is False)
+    # renamed copy: identical content (seat names ignored) now refused by compare
+    d3 = os.path.join(tmp2, "ren"); os.mkdir(d3)
+    wr(d3, "z.audit.jsonl", [start("a"), ret("a", 10, 1, "1"), start("b"), ret("b", 5, 5, "2")]); wr(d3, "z.links.jsonl", [{"call_id": "a", "turn_seq": 7}, {"call_id": "b", "turn_seq": 9}])
+    d4 = os.path.join(tmp2, "orig"); os.mkdir(d4)
+    wr(d4, "s.audit.jsonl", [start("a"), ret("a", 10, 1, "1"), start("b"), ret("b", 5, 5, "2")]); wr(d4, "s.links.jsonl", [{"call_id": "a", "turn_seq": 7}, {"call_id": "b", "turn_seq": 9}])
+    ra, rb = U.run_report(d3), U.run_report(d4)
+    oc = lambda r: {"task_id": "T", "accepted": True, "acceptance_evidence": "e", "report_digest": r["digest"]}
+    res = U.compare(d3, d4, oc(ra), oc(rb))
+    check("seat-renamed copy of the same data: same content_digest, compare refuses (edited ids still not detected, stated)", ra["digest"] != rb["digest"] and ra["content_digest"] == rb["content_digest"] and res["comparable"] is False and any("NOT detected" in x for x in res["reasons"]))
+finally:
+    shutil.rmtree(tmp2, ignore_errors=True)
+
 # ---- real-shape rows from the real PromptAuditAdapter (stub inner, no network)
 tmp = tempfile.mkdtemp()
 try:
