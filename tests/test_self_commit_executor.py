@@ -1101,5 +1101,102 @@ class ExecutorPushBindingCase(ExecutorFixture):
         os.environ.pop("PUSH_GATE_FILE", None)
         self.assertIn("fail-closed", ns["_push_gate_check"](self.repo))
 
+    # -- verification hardening (product adversarial probe 2026-11-05) --
+
+    def _decoy(self, sha=None):
+        git("push", self.up, f"{sha or self.h1}:refs/heads/a/refs/heads/records", cwd=self.repo)
+
+    def test_verify_ignores_suffix_decoy_no_false_ok(self):
+        # decoy a/refs/heads/records at H1 sorts before records; the real
+        # branch is deleted by a server hook right after the push lands
+        self._decoy()
+        hook = os.path.join(self.up, "hooks", "post-receive")
+        open(hook, "w").write("#!/bin/sh\ngit update-ref -d refs/heads/records\n")
+        os.chmod(hook, 0o755)
+        ns = self.load()
+        r = ns["run_tool"]("git_push", {})
+        self.assertFalse(r["ok"], r)
+        self.assertTrue(r.get("published_unverified"))
+        self.assertIn("do not retry", r["error"])
+
+    def test_verify_ignores_suffix_decoy_no_false_negative(self):
+        other = self._advance_head_get()
+        self._decoy(other)  # decoy at a different commit, real push is H1
+        git("-c", "user.name=t", "-c", "user.email=t@t", "reset", "--hard", self.h1, cwd=self.repo)
+        ns = self.load()
+        r = ns["run_tool"]("git_push", {})
+        self.assertTrue(r["ok"], r)
+        self.assertEqual(self._tip(), self.h1)
+
+    def _advance_head_get(self):
+        self._advance_head()
+        return self._head()
+
+    def test_verify_reads_pushurl_not_fetch_url(self):
+        ns = self.load()
+        git("push", self.up, f"{self.h1}:refs/heads/records", cwd=self.repo)
+        fetch = os.path.join(self.tmp, "fetch.git")
+        git("init", "--bare", fetch)
+        # fetch URL repo holds a DIFFERENT records tip, push URL repo holds H1
+        git("remote", "set-url", "origin", fetch, cwd=self.repo)
+        git("remote", "set-url", "--push", "origin", self.up, cwd=self.repo)
+        self.assertEqual(ns["_verify_pushed"](self.repo, "records", self.h1)[0], True)
+        # reverse: fetch repo has H1, push repo has another commit -> not verified
+        git("push", fetch, f"{self.h1}:refs/heads/records", cwd=self.repo)
+        git("push", "-f", self.up, "HEAD~0:refs/heads/other", cwd=self.repo)
+        git("-C", self.up, "update-ref", "refs/heads/records", "--", self.h1, cwd=self.tmp)
+        self._advance_head()
+        newtip = self._head()
+        git("push", "-f", self.up, f"{newtip}:refs/heads/records", cwd=self.repo)
+        ok, detail = ns["_verify_pushed"](self.repo, "records", self.h1)
+        self.assertFalse(ok)
+        self.assertIn("!= approved", detail)
+
+    def test_verify_checks_every_push_url(self):
+        ns = self.load()
+        git("push", self.up, f"{self.h1}:refs/heads/records", cwd=self.repo)
+        second = os.path.join(self.tmp, "second.git")
+        git("init", "--bare", second)
+        git("remote", "set-url", "--push", "origin", self.up, cwd=self.repo)
+        git("remote", "set-url", "--add", "--push", "origin", second, cwd=self.repo)
+        ok, detail = ns["_verify_pushed"](self.repo, "records", self.h1)
+        self.assertFalse(ok)  # second destination lacks the branch
+        git("push", second, f"{self.h1}:refs/heads/records", cwd=self.repo)
+        self.assertEqual(ns["_verify_pushed"](self.repo, "records", self.h1)[0], True)
+
+    def test_verify_unreadable_destination_and_missing_branch(self):
+        ns = self.load()
+        self.assertFalse(ns["_verify_pushed"](self.repo, "records", self.h1)[0])  # branch missing
+        git("remote", "set-url", "--push", "origin", os.path.join(self.tmp, "nope.git"), cwd=self.repo)
+        ok, detail = ns["_verify_pushed"](self.repo, "records", self.h1)
+        self.assertFalse(ok)
+        self.assertIn("unreadable", detail)
+
+    def test_push_reports_published_unverified_when_remote_tip_differs_or_missing(self):
+        # server hook moves/removes the branch right after the push lands:
+        # verification must fail loudly, never report ok (verify-removed mutation)
+        hook = os.path.join(self.up, "hooks", "post-receive")
+        open(hook, "w").write("#!/bin/sh\ngit update-ref -d refs/heads/records\n")
+        os.chmod(hook, 0o755)
+        ns = self.load()
+        r = ns["run_tool"]("git_push", {})
+        self.assertFalse(r["ok"], r)
+        self.assertTrue(r["published_unverified"])
+        self.assertEqual(r["approved"], self.h1)
+
+    def test_push_unreadable_push_destination_after_push_is_unverified_not_ok(self):
+        ns = self.load()
+        real = ns["_verify_pushed"]
+        git("remote", "set-url", "--push", "origin", self.up, cwd=self.repo)
+        def break_url(repo, branch, sha):
+            git("remote", "set-url", "--push", "origin", os.path.join(self.tmp, "gone.git"), cwd=repo)
+            return real(repo, branch, sha)
+        ns["_verify_pushed"] = break_url
+        r = ns["run_tool"]("git_push", {})
+        self.assertFalse(r["ok"], r)
+        self.assertIn("unreadable", r["error"])
+        self.assertTrue(r["published_unverified"])
+        self.assertEqual(self._tip(), self.h1)  # it did publish: unverified, not unpublished
+
 if __name__ == "__main__":
     unittest.main()

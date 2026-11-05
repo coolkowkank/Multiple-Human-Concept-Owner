@@ -538,6 +538,32 @@ def _push_gate_check(repo):
     """Return None when push is approved for the exact tested state, else an error string."""
     return _push_gate_check_sha(repo)[0]
 
+def _verify_pushed(repo, branch, sha):
+    """Check the exact ref on the exact push destination(s). Returns (ok, detail).
+    - destinations come from `git remote get-url --push --all origin` (honours
+      remote.origin.pushurl; several push URLs are ALL checked, none picked silently)
+    - every ls-remote line is parsed; only a refname equal to refs/heads/<branch>
+      counts (ls-remote matches by ref-name suffix, so a decoy like
+      a/refs/heads/<branch> must not be read as the branch)
+    Never retries and never reports 'not published': a failure here means
+    published-but-UNVERIFIED."""
+    u = _git(repo, "remote", "get-url", "--push", "--all", "origin")
+    urls = [x for x in u.stdout.split("\n") if x.strip()]
+    if u.returncode != 0 or not urls:
+        return False, "push destination unresolved"
+    want = f"refs/heads/{branch}"
+    for url in urls:
+        ls = _git(repo, "ls-remote", url, want)
+        if ls.returncode != 0:
+            return False, f"destination {url!r} unreadable"
+        tips = [ln.split("\t", 1) for ln in ls.stdout.splitlines() if "\t" in ln]
+        exact = [t[0] for t in tips if len(t) == 2 and t[1].strip() == want]
+        if len(exact) != 1:
+            return False, f"destination {url!r} has {len(exact)} exact {want} entries"
+        if exact[0] != sha:
+            return False, f"destination {url!r} {want} tip {exact[0]} != approved {sha}"
+    return True, f"{len(urls)} destination(s) verified"
+
 def run_tool(name, args):
     try:
         if name == "write_file":
@@ -638,10 +664,11 @@ def run_tool(name, args):
             out = (p.stdout + p.stderr).replace(KEY, "[REDACTED]")
             if p.returncode != 0:
                 return {"ok": False, "error": out[-500:]}
-            ls = subprocess.run(["git", "-C", REPO, "ls-remote", "origin", f"refs/heads/{BRANCH}"], capture_output=True, text=True)
-            tip = (ls.stdout.split() or [""])[0]
-            if ls.returncode != 0 or tip != approved:
-                return {"ok": False, "error": f"push verify failed: remote {BRANCH} tip {tip or 'unreadable'} != approved {approved}"}
+            vok, detail = _verify_pushed(REPO, BRANCH, approved)
+            if not vok:
+                return {"ok": False, "published_unverified": True, "approved": approved,
+                        "error": f"push ran but verification FAILED ({detail}); the push may have published; "
+                                 "do not retry git_push, the operator checks the remote"}
             return {"ok": True, "output": out[-500:], "pushed": approved}
         return {"ok": False, "error": f"unknown tool {name}"}
     except Exception as e:
