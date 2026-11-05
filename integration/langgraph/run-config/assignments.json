@@ -1,0 +1,15 @@
+{
+  "models": {
+    "researcher": "nvidia/nemotron-3-ultra-550b-a55b",
+    "verifier": "mistral/leanstral-1-5",
+    "ryan": "novita/ling-3.1-flash"
+  },
+  "why": {
+    "researcher": "public source-packet synthesis; listed 1M context and 64k output, reasoning-capable; provisional task fit, not qualified",
+    "verifier": "separate model lab (mistral vs nvidia) for reference checks per main model decision; exact free id, price-0 in current public listing; provisional, not qualified, never called",
+    "ryan": "reviews verified findings; separate execution from the verifier, no independence claim between them; provisional, not qualified"
+  },
+  "decided_by": "main",
+  "source_ref": "operator (main) decision 2026-11-05 03:59 EET and 04:15 EET: verifier mistral/leanstral-1-5 exact id; researcher and ryan unchanged",
+  "decided_at": "2026-11-05T02:15:29Z"
+}
