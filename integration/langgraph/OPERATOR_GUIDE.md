@@ -197,3 +197,7 @@ free-unlimited.
   the end of the graph.
 - Same-user storage: config, key file, anchor and ledger can all be changed by
   the same account. The anchor and minimum raise the bar. They are not tamper-proof.
+
+## Recorded errors and prompts
+
+When a seat's turn fails and the runtime records `TURN: <seat> error recorded (turn not taken)`, the entry stays in `.team/LOG.jsonl` for the operator, but error entries are not shown to seats in prompts (the prompt tail is the last 20 non-error entries, from one shared helper used by the seat and the audit wiring). This is what lets a queued response survive its own seat's recorded transient error; any other change to the repo since the response was queued still makes it stale and needs `respond --discard-stale`.
