@@ -1019,7 +1019,8 @@ def verify(repo: str, checkpoint_db: str, thread_id: str,
 # process's environment during the run, never printed, written or exported.
 # Lifetime budget cannot be created here (fenced_http owns it).
 
-LIVE_CFG_KEYS = {"key_file", "seats", "brief_extra_file", "stop_after"}
+LIVE_CFG_KEYS = {"key_file", "seats", "brief_extra_file", "stop_after", "preflight"}
+LIVE_PREFLIGHT_KEYS = {"anchor_file", "expected_min_reserves", "allow_fresh"}
 LIVE_SEAT_KEYS = {"model", "epoch", "budget", "max_tokens"}
 
 
@@ -1130,6 +1131,36 @@ def live_entry(repo, db, config_path, thread_id="live-1") -> int:
     stop_after = cfg.get("stop_after", 0)
     if not isinstance(stop_after, int) or isinstance(stop_after, bool) or stop_after < 0:
         raise SystemExit("refused: stop_after must be a non-negative int")
+    # read-only lifetime reserve preflight (reserve_preflight.py). It reserves
+    # nothing; Fenced still owns atomic reservation and the cap. NOT atomic
+    # across processes: run one live entry at a time (seats run serially).
+    pfc = cfg.get("preflight", {})
+    if not isinstance(pfc, dict) or set(pfc) - LIVE_PREFLIGHT_KEYS:
+        raise SystemExit("refused: preflight keys must be a subset of "
+                         f"{sorted(LIVE_PREFLIGHT_KEYS)}")
+    anchor = None
+    if pfc.get("anchor_file"):
+        if (os.path.realpath(pfc["anchor_file"]) + os.sep).startswith(lane):
+            raise SystemExit("refused: anchor_file must be outside the lane")
+        _private_regular(pfc["anchor_file"], "anchor_file")
+        with open(pfc["anchor_file"], encoding="utf-8") as fh:
+            anchor = json.load(fh)
+    emr = pfc.get("expected_min_reserves")
+    if emr is not None and (not isinstance(emr, int) or isinstance(emr, bool) or emr < 0):
+        raise SystemExit("refused: expected_min_reserves must be a non-negative int")
+    if pfc.get("allow_fresh") not in (None, True, False):
+        raise SystemExit("refused: allow_fresh must be a bool")
+    import reserve_preflight
+    planned = sum(sp["call_budget"] for sp in specs.values())
+    pf = reserve_preflight.preflight(planned, anchor=anchor,
+                                     allow_fresh=bool(pfc.get("allow_fresh")),
+                                     expected_min_reserves=emr)
+    print(f"live: reserve preflight status={pf['status']} planned={planned} "
+          f"recorded_reserves={pf['reserves_total']} remaining={pf['remaining']} "
+          f"cap={pf['cap']} (read-only; not a reservation, not atomic)", flush=True)
+    if pf["status"] != "ok_to_plan":
+        raise SystemExit("refused: reserve preflight " + pf["status"] + ": "
+                         + "; ".join(pf["problems"])[:300])
     with open(cfg["key_file"], encoding="utf-8") as fh:
         key = fh.read().strip()
     if not key:

@@ -116,7 +116,7 @@ class FencedHttpAdapter(Adapter):
         os.fsync(fh.fileno())
 
     def _open_log(self):
-        os.makedirs(HTTP_LOG_DIR, exist_ok=True)
+        os.makedirs(HTTP_LOG_DIR, mode=0o700, exist_ok=True)   # private: reserve_preflight refuses group/other-accessible dirs
         fd = os.open(self.path, os.O_RDWR | os.O_CREAT, 0o600)
         fh = os.fdopen(fd, "r+b")
         fcntl.flock(fh, fcntl.LOCK_EX)    # exclusive writer

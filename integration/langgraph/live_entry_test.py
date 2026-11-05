@@ -79,7 +79,7 @@ def lane():
 
 def cfg(**over):
     n[0] += 1
-    c = {"key_file": keyf, "brief_extra_file": rules, "stop_after": 1,
+    c = {"key_file": keyf, "brief_extra_file": rules, "stop_after": 1, "preflight": {"allow_fresh": True},
          "seats": {"coordinator": {"model": NEM, "epoch": f"b{n[0]}", "budget": 1, "max_tokens": 100},
                    "reviewer": {"model": LING, "epoch": f"r{n[0]}", "budget": 1, "max_tokens": 100}}}
     c.update(over)
@@ -153,6 +153,42 @@ try:
         except BaseException: pass
     brief = open(os.path.join(r, ".team", "brief.md")).read()
     check("re-entry does not duplicate the rules", brief.count("REPLY-RULES-MARKER") == 1)
+
+    # ---- reserve preflight integration ----
+    # (the happy-path lane above created real fenced logs under HTTP_LOG_DIR)
+    import reserve_preflight as rp
+    base = rp.preflight(0)
+    check("fenced created the log dir private (0700)", (os.stat(fenced_http.HTTP_LOG_DIR).st_mode & 0o077) == 0)
+    check("preflight sees the reserves the first run made", base["status"] == "ok_to_plan" and base["reserves_total"] >= 1)
+    anchor_f = os.path.join(cdir, "anchor.json"); open(anchor_f, "w").write(json.dumps(rp.snapshot(base))); os.chmod(anchor_f, 0o600)
+    # existing ledger + no fresh assertion: allowed
+    MODE["list"] = "ok"; r2, d2 = lane(); del POSTS[:]; del GETS[:]
+    c2 = cfg(preflight={"anchor_file": anchor_f, "expected_min_reserves": base["reserves_total"]})
+    with contextlib.redirect_stdout(io.StringIO()):
+        try: lt.live_entry(r2, d2, c2)
+        except SystemExit as e: print("EXIT", e)
+        except BaseException: pass
+    check("verified ledger + anchor + min reserves: proceeds to the listing", len(GETS) == 1)
+    # planned over the remaining cap: refused before any request
+    r3, d3 = lane(); big = {"coordinator": {"model": NEM, "epoch": "o1", "budget": 8}, "reviewer": {"model": LING, "epoch": "o2", "budget": 8}}
+    msg, clean = attempt(cfg(seats=big, preflight={"anchor_file": anchor_f}), r3, d3)
+    check("planned calls over the remaining lifetime cap refused, lane untouched, no request", msg and "over_cap" in msg and clean and not GETS)
+    # missing ledger without a fresh assertion: unestablished -> refused
+    saved = fenced_http.HTTP_LOG_DIR; fenced_http.HTTP_LOG_DIR = os.path.join(tmp, "nologs")
+    r4, d4 = lane(); msg, clean = attempt(cfg(preflight={}), r4, d4)
+    check("no ledger and no fresh assertion: unestablished, refused, no request", msg and "unestablished" in msg and clean and not GETS)
+    r4b, d4b = lane(); msg, clean = attempt(cfg(preflight={"expected_min_reserves": 7}), r4b, d4b)
+    check("expected_min_reserves with a missing ledger: refused", msg and clean and not GETS)
+    fenced_http.HTTP_LOG_DIR = saved
+    # tail truncation of a log is caught by the anchor
+    lf = os.path.join(saved, sorted(os.listdir(saved))[0]); lines = open(lf).read().splitlines(True)
+    open(lf, "w").write("".join(lines[:-1]))
+    r5, d5 = lane(); msg, clean = attempt(cfg(preflight={"anchor_file": anchor_f}), r5, d5)
+    check("truncated log vs anchor refused, no request", msg and "refuse" in msg and clean and not GETS)
+    open(lf, "w").write("".join(lines))
+    # bad preflight config values
+    r6, d6 = lane(); msg, clean = attempt(cfg(preflight={"allow_fresh": "yes"}), r6, d6); check("allow_fresh must be a bool", msg and clean)
+    r7, d7 = lane(); msg, clean = attempt(cfg(preflight={"surprise": 1}), r7, d7); check("unknown preflight key refused", msg and clean)
 finally:
     srv.shutdown(); shutil.rmtree(tmp, ignore_errors=True)
 print("\nLIVE ENTRY TESTS:", "ALL CHECKS PASSED" if ok else "FAILURES ABOVE")
