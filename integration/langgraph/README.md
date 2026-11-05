@@ -30,8 +30,12 @@ Files:
 - `controls_demo.py` - scripted operator-intervention run proving the
   four controls below.
 - `launcher/` - vendored copy of the project's own seat runtime (bus,
-  roster, adapters, CLI), pinned at base commit 46fa728. Project code,
-  unchanged; included so the documented commands run as-is.
+  roster, adapters, CLI), copied byte-exact from
+  `ryan-continuous-offline` @ 46fa7284a173c4b96a3a08c1ca8ffa22d6693391.
+  Project code, unchanged; included so the documented commands run
+  as-is. Scope note: this predates the later local allowance-window and
+  verified-revision-binding increments (not yet pushed anywhere); none
+  of those guards are integrated or claimed here.
 
 ## Execution-time safety fences
 
@@ -41,9 +45,13 @@ IMMEDIATELY before acting:
 1. Bus status must be `running` and the written turn must name this seat
    - a resumed pending seat after an operator halt is refused.
 2. The roster adapter spec must be an allowed type: `mock` (scripted,
-   local) or `queue` (operator-fed local JSONL through the project's own
-   `launcher respond` channel, stale-bound by turn/seq/head - zero
-   network). The CONSTRUCTED adapter is then checked by exact class
+   local) or `queue`. A queue seat applies OPERATOR-AUTHORED responses
+   queued through the project's own `launcher respond` channel (local
+   JSONL, stale-bound by turn/seq/head - zero network): a human's
+   content, applied by the seat under the project's binding rules. Note
+   the scope difference: the independently reviewed boundary was
+   mock-only; admitting `queue` is new in this increment and has not
+   had the same independent review. The CONSTRUCTED adapter is then checked by exact class
    identity against the preselected safe constructor for that spec (the
    imported class object itself, not a forgeable `__name__` string).
    Provider-calling adapters (http/cli/live) are refused at sync and at
@@ -136,9 +144,11 @@ real model team.
 
 ## How to run (local, no keys)
 
-Self-contained: `launcher/` is vendored here, pinned to this repo's
-main branch at commit 46fa728 (the accepted offline baseline). Only
-third-party installs needed (Python >= 3.10, tested on 3.10.12):
+Self-contained: `launcher/` is vendored here, copied byte-exact from
+this repo's `ryan-continuous-offline` branch at the accepted commit
+46fa7284a173c4b96a3a08c1ca8ffa22d6693391 (the reviewed offline baseline - not
+`main`). Only third-party installs needed (Python >= 3.10, tested on
+3.10.12):
 
 ```
 pip install langgraph==1.2.19 langgraph-checkpoint-sqlite==3.1.3
