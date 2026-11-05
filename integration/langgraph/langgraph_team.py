@@ -12,14 +12,23 @@ Division of responsibility:
 Execution-time fences (not just sync-time checks):
 - seat_node re-reads bus state and roster IMMEDIATELY before acting: the
   run must be status "running", the written turn must name this seat, and
-  the roster adapter spec must be type "mock". Then the Seat is
-  CONSTRUCTED and the constructed adapter instance must be a MockAdapter
-  before act_once runs - a roster change between sync and execution (or a
-  resumed pending seat after an operator halt/roster edit) cannot reach a
-  non-mock adapter. Refusals are recorded and route to the terminal node.
-- A halted/closed/paused team state routes to a terminal node; this graph
-  never clears a halt or flips status itself. No provider call is possible
-  from this graph: every adapter that is not MockAdapter is refused.
+  the roster adapter spec must be an allowed type. Then the Seat is
+  CONSTRUCTED and the constructed adapter's exact class identity is
+  verified against the PRESELECTED safe constructor for that spec (the
+  imported class object itself, not a forgeable __name__ string). And
+  because act_once claims the seat lease inside its transaction - moving
+  the bus to held before the adapter runs - a GuardedAdapter wrapper
+  re-validates status/turn/adapter identity at the adapter call itself,
+  after that acquire, at the real mutation boundary; a failed check
+  raises SeatError and rolls the transaction back. Refusals are recorded
+  and route to the terminal node.
+- Allowed adapter types: "mock" (scripted, local) and "queue" (operator-
+  fed local JSONL through the project's own `launcher respond` channel,
+  stale-bound by turn/seq/head - zero network). Everything else
+  (http/cli/live model adapters) is refused: no provider call is possible
+  from this graph.
+- A halted/closed/paused team state routes to a terminal/paused node;
+  this graph never clears a halt or flips status itself.
 
 Known limits (stated, not fixed here):
 - stop_after is a GRACEFUL stop at a node boundary after N seat actions.
@@ -55,12 +64,14 @@ import sqlite3
 import subprocess
 import sys
 import threading
+import time
 from typing import Annotated, TypedDict
 
 from launcher.bus import Bus
 from launcher.cli import default_roster
 from launcher.demo import _scripts
 from launcher.runtime import Seat, SeatError
+from launcher.adapters import MockAdapter, QueueAdapter
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
@@ -80,6 +91,26 @@ GATE_MONITOR = None       # optional GateMonitor
 # and the guard would reject seat commits) proving a directory is one of
 # our fresh demo repos, so init never deletes anything else.
 MARKER_SUFFIX = ".lg-demo-fresh"
+
+# Adapter types this graph will execute: scripted local mocks and the
+# project's operator queue channel (local JSONL, bound to turn/seq/head,
+# stale-refused by the runtime - the accepted live-1 "honest glue"; zero
+# network). Everything else is refused at sync AND at execution.
+# The value is the PRESELECTED safe constructor for that spec type: the
+# actual imported class object. Class identity is not forgeable the way
+# type(x).__name__ is, and only these two constructors can ever produce
+# an adapter this graph will execute - no registry lookup, no spec
+# string that could resolve to a provider-calling class.
+SAFE_CONSTRUCTORS = {"mock": MockAdapter, "queue": QueueAdapter}
+ALLOWED_ADAPTERS = set(SAFE_CONSTRUCTORS)
+
+# Operator control plane. ONE channel: .team/CONTROL.json inside the git
+# bus, mutated only through operator: commits (guard-exempt operational
+# commits, same class the project already uses for human:/operator:
+# records). Not a competing state path: every seat and every sync reads
+# the same committed bus state.
+CONTROL_PATH = ".team/CONTROL.json"
+PAUSE_MAX_WAITS = 60  # 60 x 0.5s = 30s still-paused timeout
 
 
 class GateMonitor:
@@ -110,6 +141,9 @@ class TeamState(TypedDict):
     outcome: str | None
     seat_error: str | None
     max_steps: int
+    control_mode: str
+    instruction_seq: int
+    pause_waits: int
 
 
 # ---------- repo setup ----------------------------------------------------
@@ -133,10 +167,15 @@ def _init_safe(repo: str) -> None:
         os.makedirs(repo)
 
 
-def init_repo(repo: str) -> None:
+def init_repo(repo: str, queue_seats=()) -> None:
     repo = os.path.abspath(repo)
     _init_safe(repo)
     env = dict(os.environ)
+    # Self-contained: the vendored launcher/ sits next to this file, so
+    # put that directory first on the subprocess import path. No
+    # external checkout or PYTHONPATH setup is needed.
+    here = os.path.dirname(os.path.realpath(__file__))
+    env["PYTHONPATH"] = here + os.pathsep + env.get("PYTHONPATH", "")
     argv = [sys.executable, "-m", "launcher"]
 
     def run(*args):
@@ -145,6 +184,7 @@ def init_repo(repo: str) -> None:
         if proc.returncode != 0:
             raise SystemExit(f"init step failed: {' '.join(args)}\n{proc.stderr}")
 
+    queue_seats = set(queue_seats or ())
     subprocess.run(["git", "init", "-q", repo], check=True)
     subprocess.run(["git", "-C", repo, "config", "user.name", "lg-demo"], check=True)
     subprocess.run(["git", "-C", repo, "config", "user.email", "lg@example.com"], check=True)
@@ -155,6 +195,13 @@ def init_repo(repo: str) -> None:
     scripts = _scripts()
     os.makedirs(os.path.join(repo, ".team", "queues"), exist_ok=True)
     for name in roster["seats"]:
+        if name in queue_seats:
+            # Operator-fed seat: responses arrive through the project's
+            # own `launcher respond` channel, bound to turn/seq/head and
+            # stale-refused by the runtime like any live-1 queue seat.
+            roster["seats"][name]["adapter"] = {
+                "type": "queue", "path": f".team/queues/{name}.jsonl"}
+            continue
         queue = os.path.join(repo, ".team", "queues", f"{name}.mock.jsonl")
         with open(queue, "w") as fh:
             for response in scripts[name]:
@@ -169,6 +216,9 @@ def init_repo(repo: str) -> None:
     state["turn"] = "coordinator"
     state["status"] = "running"
     bus.write_state(state)
+    with open(os.path.join(repo, CONTROL_PATH), "w") as fh:
+        json.dump({"mode": "run", "instruction_seq": 1,
+                   "note": "initial brief"}, fh, indent=2)
     bus.commit_all("human: brief agreed, first turn issued")
     # Mark only AFTER successful init: the marker says this directory is a
     # disposable fresh demo this tool created.
@@ -177,17 +227,85 @@ def init_repo(repo: str) -> None:
     print(f"init: repo ready at {repo}", flush=True)
 
 
+# ---------- operator controls (assign / pause / update / resume) ----------
+
+def read_control(repo: str) -> dict:
+    try:
+        with open(os.path.join(repo, CONTROL_PATH)) as fh:
+            c = json.load(fh)
+        return {"mode": c.get("mode", "run"),
+                "instruction_seq": c.get("instruction_seq", 1),
+                "note": c.get("note", "")}
+    except (OSError, json.JSONDecodeError):
+        return {"mode": "run", "instruction_seq": 1, "note": ""}
+
+
+def _write_control(repo: str, **changes) -> dict:
+    c = read_control(repo)
+    c.update(changes)
+    with open(os.path.join(repo, CONTROL_PATH), "w") as fh:
+        json.dump(c, fh, indent=2)
+    return c
+
+
+def operator_pause(repo: str, note="operator pause") -> None:
+    repo = os.path.abspath(repo)
+    _write_control(repo, mode="pause", note=note)
+    Bus(repo, BRANCH).commit_all(f"operator: pause - {note}")
+
+
+def operator_resume(repo: str, note="operator resume") -> None:
+    repo = os.path.abspath(repo)
+    _write_control(repo, mode="run", note=note)
+    Bus(repo, BRANCH).commit_all(f"operator: resume - {note}")
+
+
+def operator_update_instructions(repo: str, text: str,
+                                 note="instructions updated") -> int:
+    """Rewrite the brief and bump instruction_seq. This is an ordinary
+    non-queue commit, so every queued response bound to the old head is
+    stale by the project's own head-binding rule and will be refused at
+    apply time - old instructions can never be applied after an update."""
+    repo = os.path.abspath(repo)
+    with open(os.path.join(repo, ".team", "brief.md"), "w") as fh:
+        fh.write(text)
+    c = _write_control(repo, instruction_seq=read_control(repo)["instruction_seq"] + 1,
+                       note=note)
+    Bus(repo, BRANCH).commit_all(f"operator: {note}")
+    return c["instruction_seq"]
+
+
+def operator_assign(repo: str, brief: str, seat: str,
+                    note="new assignment") -> None:
+    """Assign new work: fresh brief, turn to the named seat, team back to
+    running - through the same bus commit path as the human seed."""
+    repo = os.path.abspath(repo)
+    bus = Bus(repo, BRANCH)
+    with open(os.path.join(repo, ".team", "brief.md"), "w") as fh:
+        fh.write(brief)
+    state = bus.state()
+    state["turn"] = seat
+    state["status"] = "running"
+    bus.write_state(state)
+    _write_control(repo, instruction_seq=read_control(repo)["instruction_seq"] + 1,
+                   note=note)
+    bus.commit_all(f"operator: assign to {seat} - {note}")
+
+
 # ---------- graph nodes ---------------------------------------------------
 
 def sync_node(state: TeamState) -> dict:
     bus = Bus(state["repo"], BRANCH)
     s = bus.state()
     roster = bus.roster()
+    control = read_control(state["repo"])
     return {
         "status": s.get("status"),
         "turn": s.get("turn"),
         "adapter_types": {n: spec.get("adapter", {}).get("type")
                           for n, spec in roster.get("seats", {}).items()},
+        "control_mode": control["mode"],
+        "instruction_seq": control["instruction_seq"],
     }
 
 
@@ -198,14 +316,62 @@ def route_after_sync(state: TeamState) -> str:
         return END
     if state["status"] != "running":
         return "terminal"  # halted or any non-running state: never touched
+    if state.get("control_mode") == "pause":
+        # Operator hold: wait in the paused node, checkpoint durable,
+        # until resume or the still-paused timeout.
+        return "paused" if state.get("pause_waits", 0) < PAUSE_MAX_WAITS else "terminal"
     if len(state["steps"]) >= state["max_steps"]:
         return "terminal"
     turn = state["turn"]
     if turn not in SEATS:
         return "terminal"
-    if state["adapter_types"].get(turn) != "mock":
-        return "terminal"  # live/queue/cli adapter: not authorized here
+    if state["adapter_types"].get(turn) not in ALLOWED_ADAPTERS:
+        return "terminal"  # provider-calling adapter: not authorized here
     return f"seat_{turn}"
+
+
+class GuardedAdapter:
+    """Boundary guard wrapped around the constructed adapter.
+
+    Seat.act_once() claims the seat lease INSIDE its transaction - the
+    bus moves to held - and only then invokes the adapter. Checks that
+    ran before act_once therefore have a window: an operator halt (or a
+    roster/turn move) landing between the pre-check and the actual
+    adapter call would still be acted on. This guard closes that window:
+    it re-validates at the moment of the adapter call itself, inside the
+    transaction, after the lease mutation, at the real mutation/adapter
+    boundary. A failed check raises SeatError, which aborts the
+    transaction - the held lease and every other mutation of this turn
+    roll back with it.
+    """
+
+    def __init__(self, inner, bus: Bus, seat: str):
+        self._inner = inner
+        self._bus = bus
+        self._seat = seat
+
+    def __getattr__(self, name):  # consume(), attributes: pass through
+        return getattr(self._inner, name)
+
+    def complete(self, system, prompt):
+        live = self._bus.state()
+        if live.get("status") != "running":
+            raise SeatError(
+                f"{self._seat} refused at adapter boundary: bus status "
+                f"is {live.get('status')!r}, not running")
+        if live.get("turn") != self._seat:
+            raise SeatError(
+                f"{self._seat} refused at adapter boundary: turn is "
+                f"{live.get('turn')!r}")
+        spec = self._bus.roster().get("seats", {}).get(self._seat, {})
+        spec_type = spec.get("adapter", {}).get("type")
+        if (spec_type not in SAFE_CONSTRUCTORS
+                or type(self._inner) is not SAFE_CONSTRUCTORS[spec_type]):
+            raise SeatError(
+                f"{self._seat} refused at adapter boundary: adapter "
+                f"{type(self._inner).__name__} is not the preselected "
+                f"constructor for spec {spec_type!r}")
+        return self._inner.complete(system, prompt)
 
 
 def seat_node(seat: str, state: TeamState) -> dict:
@@ -228,18 +394,24 @@ def seat_node(seat: str, state: TeamState) -> dict:
     # Fence 2: re-read the roster adapter spec at execution time, then
     # fence the CONSTRUCTED adapter instance - even a roster swapped
     # between this check and Seat construction cannot reach act_once
-    # with a non-mock adapter.
+    # with a provider-calling adapter.
     spec = bus.roster().get("seats", {}).get(seat, {})
     spec_type = spec.get("adapter", {}).get("type")
-    if spec_type != "mock":
+    if spec_type not in ALLOWED_ADAPTERS:
         return {"seat_error": f"{seat} refused at execution: roster "
-                              f"adapter is {spec_type!r}, not mock"}
+                              f"adapter is {spec_type!r}, not one of "
+                              f"{sorted(ALLOWED_ADAPTERS)}"}
     seat_obj = Seat(bus, seat)
     adapter = getattr(seat_obj, "adapter", None)
-    if adapter is None or type(adapter).__name__ != "MockAdapter":
+    if (adapter is None
+            or type(adapter) is not SAFE_CONSTRUCTORS[spec_type]):
         return {"seat_error": f"{seat} refused at execution: constructed "
                               f"adapter is {type(adapter).__name__}, not "
-                              f"MockAdapter"}
+                              f"the preselected "
+                              f"{SAFE_CONSTRUCTORS[spec_type].__name__}"}
+    # Boundary guard: re-validates status/turn/adapter AFTER the lease
+    # acquire, at the actual adapter call (see GuardedAdapter).
+    seat_obj.adapter = GuardedAdapter(adapter, bus, seat)
 
     if SEAT_GATE is not None:
         SEAT_GATE.acquire()
@@ -264,9 +436,19 @@ def seat_node(seat: str, state: TeamState) -> dict:
         ["git", "-C", repo, "rev-parse", "--short", "HEAD"],
         capture_output=True, text=True).stdout.strip()
     rec = (f"[pid {os.getpid()} tid {threading.get_ident()}] "
-           f"seat={seat} acted={acted} head={head}")
+           f"seat={seat} acted={acted} head={head} "
+           f"seq={state.get('instruction_seq')}")
     print(f"  step: {rec}", flush=True)
     return {"steps": [rec]}
+
+
+def paused_node(state: TeamState) -> dict:
+    waits = state.get("pause_waits", 0) + 1
+    if waits == 1:
+        print("  paused: operator hold in effect; waiting for resume "
+              "(checkpoint durable)", flush=True)
+    time.sleep(0.5)
+    return {"pause_waits": waits}
 
 
 def terminal_node(state: TeamState) -> dict:
@@ -274,14 +456,19 @@ def terminal_node(state: TeamState) -> dict:
         outcome = f"terminal: {state['seat_error']}"
     elif state["status"] != "running":
         outcome = f"terminal: bus status is {state['status']!r} (not touched)"
+    elif state.get("control_mode") == "pause":
+        outcome = (f"terminal: still paused after {PAUSE_MAX_WAITS} waits; "
+                   f"checkpoint durable - resume later")
     elif len(state["steps"]) >= state["max_steps"]:
         outcome = f"terminal: step cap {state['max_steps']} reached"
     elif state["turn"] not in SEATS:
         outcome = f"terminal: no seat owns turn {state['turn']!r}"
     else:
         outcome = (f"terminal: adapter for {state['turn']} is "
-                   f"{state['adapter_types'].get(state['turn'])!r}, not mock - "
-                   f"live model execution not authorized in this graph")
+                   f"{state['adapter_types'].get(state['turn'])!r} - only "
+                   f"mock (scripted) and queue (operator-fed, stale-bound) "
+                   f"seats are allowed; provider-calling/live adapters are "
+                   f"not authorized in this graph")
     print(f"  {outcome}", flush=True)
     return {"outcome": outcome}
 
@@ -292,20 +479,32 @@ def build_graph(saver: SqliteSaver):
     for seat in SEATS:
         g.add_node(f"seat_{seat}", lambda s, _seat=seat: seat_node(_seat, s))
     g.add_node("terminal", terminal_node)
+    g.add_node("paused", paused_node)
     g.add_edge(START, "sync")
     g.add_conditional_edges(
         "sync", route_after_sync,
         {**{f"seat_{s}": f"seat_{s}" for s in SEATS},
-         "terminal": "terminal", END: END})
+         "paused": "paused", "terminal": "terminal", END: END})
     for seat in SEATS:
         g.add_edge(f"seat_{seat}", "sync")
+    g.add_edge("paused", "sync")
     g.add_edge("terminal", END)
     return g.compile(checkpointer=saver)
 
 
 def _check_paths(repo: str, checkpoint_db: str) -> tuple[str, str]:
-    repo_abs = os.path.abspath(repo)
-    db_abs = os.path.abspath(checkpoint_db)
+    # Canonical paths only: a symlinked parent would let one directory
+    # alias another, bypassing both the db-outside-repo check below and
+    # the resume identity check (same repo, two lexical spellings).
+    repo_abs = os.path.realpath(repo)
+    db_abs = os.path.realpath(checkpoint_db)
+    if (os.path.abspath(repo) != repo_abs
+            or os.path.abspath(checkpoint_db) != db_abs):
+        raise SystemExit(
+            f"refused: non-canonical path (symlink or alias): "
+            f"{repo!r} resolves to {repo_abs!r}, "
+            f"{checkpoint_db!r} resolves to {db_abs!r}; run against the "
+            f"canonical location")
     if os.path.commonpath([repo_abs, db_abs]) == repo_abs:
         raise SystemExit(
             f"refused: checkpoint db {db_abs} is inside the team repo "
@@ -325,14 +524,16 @@ def run_graph(repo: str, checkpoint_db: str, stop_after: int,
         initial = {"repo": repo_abs, "checkpoint_db": db_abs,
                    "status": "", "turn": None, "adapter_types": {},
                    "steps": [], "outcome": None, "seat_error": None,
-                   "max_steps": 50}
+                   "max_steps": 50, "control_mode": "run",
+                   "instruction_seq": 1, "pause_waits": 0}
     else:
         # Identity match, fail closed: a stored thread must name the SAME
         # repo and checkpoint file the caller asked to run. Resuming a
         # different repo because a thread_id was reused is never allowed.
         stored = existing.checkpoint.get("channel_values", {})
-        if (os.path.abspath(stored.get("repo", "")) != repo_abs
-                or os.path.abspath(stored.get("checkpoint_db", "")) != db_abs):
+        if (os.path.realpath(stored.get("repo", "")) != repo_abs
+                or os.path.realpath(stored.get("checkpoint_db", ""))
+                != db_abs):
             raise SystemExit(
                 f"refused: thread {thread_id!r} is bound to repo "
                 f"{stored.get('repo')!r} / db {stored.get('checkpoint_db')!r}"
