@@ -852,9 +852,15 @@ def step(root, post, list_models, now, record):
         except Exception:
             cur, cur_model = None, None
         authority_ok = (cur or {}).get("decided_by") == OPERATOR
-        if (not authority_ok or cur_model != model or
-                input_snapshot(q, role, model, system, prompt, cur)
-                != snap):
+        try:  # re-render from the CURRENT item; fail closed
+            now_prompt = build_prompt(role, q)
+            now_system = ("You are the %s in a source-bound review "
+                          "pipeline." % role)
+            now_snap = input_snapshot(q, role, model, now_system,
+                                      now_prompt, cur)
+        except Exception:
+            now_snap = None
+        if (not authority_ok or cur_model != model or now_snap != snap):
             # Raw result stays in runs/ and the call stays consumed. It is
             # never applied. A durable halt needs explicit reconciliation,
             # so the item cannot run again automatically. A hold or

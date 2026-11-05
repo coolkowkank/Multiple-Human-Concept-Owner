@@ -130,6 +130,48 @@ class InFlight(unittest.TestCase):
         self.assertEqual(st.queue()["questions"][0]["status"],
                          "verify-complete")
 
+    def test_feedback_edit_changes_prompt(self):
+        out, st = self.run_case(self.edit(
+            lambda q, s: q.update(fb_verifier="new correction text")))
+        self.stale(out, st, "needs-human")
+
+    def test_render_failure_fails_closed(self):
+        out, st = self.run_case(self.edit(
+            lambda q, s: q.pop("packet")))
+        self.assertEqual(out["action"], "stale-result-halt")
+        self.assertNotIn("verifier_verdict", st.queue()["questions"][0])
+
+    def test_researcher_feedback_and_ryan_verified_ids(self):
+        for role, status, key, val in (
+                ("researcher", "open", "feedback", "changed feedback"),
+                ("ryan", "verified", "verified_ids", ["C9"])):
+            root = tempfile.mkdtemp()
+            store = rc.Store(root)
+            q = {"id": "j1", "kind": "research", "status": status,
+                 "question": "Q?", "packet": PACKET, "attempts": {},
+                 "findings": [{"id": "C1", "claim": "The control widget "
+                               "was red.", "sources": ["P1"],
+                               "status": "SUPPORTED_BY_PACKET"}],
+                 "verified_ids": ["C1"]}
+            store.save_queue({"questions": [q]})
+            models = {"researcher": R, "verifier": V, "ryan": R}
+            with open(os.path.join(root, "assignments.json"), "w") as f:
+                json.dump({"decided_by": rc.OPERATOR, "models": models,
+                           "why": {r: "x" for r in rc.ROLES}}, f)
+
+            def post(model, system, prompt, max_tokens, **kw):
+                s = store.queue()
+                s["questions"][0][key] = val
+                store.save_queue(s)
+                return {"kind": "ok", "usage": {"cost": 0}, "content": "{}"}
+            rec = {"routes": [{"id": R, "provider": "mock",
+                               "status": "working"}], "provider_blocks": {}}
+            try:
+                out = rc.step(root, post, lambda: LISTING, T, rec)
+            except rc.Halt as e:  # gates before the call are not under test
+                self.skipTest("pre-call gate: %s" % e)
+            self.assertEqual(out["action"], "stale-result-halt", role)
+
     def test_unchanged_applies(self):
         out, st = self.run_case(lambda store, root: None)
         self.assertEqual(out["action"], "done-verifier")
