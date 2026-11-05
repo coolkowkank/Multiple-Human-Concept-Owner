@@ -18,6 +18,7 @@ class B:
     def append_log(s, *a): s.log.append(a)
     def commit_all(s, *a): pass
     def open_gate(s, *a, **k): s.gates.append(a)
+    def roster(s): return {'seats': {'builder': {'adapter': {'type': 'mock'}}, 'human': {'adapter': {'type': 'interactive'}}}}
 def mk(procs):
     sv = Supervisor.__new__(Supervisor); sv.bus = B(); sv.stall_timeout = 900; sv._stalled_seats = set(); sv.procs = procs; sv._notified_gates = set(); return sv
 def stamp(age): return time.strftime("%%Y-%%m-%%dT%%H:%%M:%%SZ", time.gmtime(time.time() - age))

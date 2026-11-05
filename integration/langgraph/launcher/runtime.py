@@ -123,6 +123,7 @@ def _verify_env():
 
 
 import re as _re
+from . import liveness as _liveness
 _DONE_RE = _re.compile(r"DONE(?![A-Za-z0-9_])")
 
 
@@ -341,6 +342,29 @@ class Seat:
         self.adapter = build_adapter(adapter_spec)
 
     # -- lease: one active session per seat ----------------------------
+
+    def _declare(self, phase, seconds):
+        """Cooperative liveness declaration for one bounded blocking step.
+        Best-effort; a failure leaves the supervisor at 'unknown'."""
+        ident = getattr(self, "_live_ident", None)
+        if ident:
+            _liveness.write_declaration(
+                self.bus.repo, self.name, ident, self.instance_id,
+                phase, seconds, time.time())
+
+    def _undeclare(self):
+        _liveness.clear_declaration(self.bus.repo, self.name)
+
+    LIVE_GRACE = 60
+
+    def _adapter_step_seconds(self):
+        ad = self.spec.get("adapter", {}) or {}
+        t = ad.get("timeout")
+        if not isinstance(t, (int, float)) or isinstance(t, bool) or t <= 0:
+            t = 1800 if ad.get("type") == "cli" else 600
+        tries = getattr(self.adapter, "max_retries", 0)
+        tries = (tries if isinstance(tries, int) and not isinstance(tries, bool) and tries >= 0 else 0) + 1
+        return t * tries + self.LIVE_GRACE
 
     def claim_lease(self, state):
         if not self.instance_id:
@@ -683,9 +707,16 @@ class Seat:
                 f"budget ({self.TURN_COMPLETE_BUDGET}, global across "
                 "commit-race retries) - refusing uncontrolled "
                 "regeneration; the turn ends here, re-run it")
-        return self.adapter.complete(system, prompt)
+        self._declare("adapter", self._adapter_step_seconds())
+        try:
+            return self.adapter.complete(system, prompt)
+        finally:
+            self._undeclare()
 
     def _call_adapter(self, state):
+        self._live_ident = {"turn": state.get("turn"),
+                            "turn_seq": state.get("turn_seq"),
+                            "turn_since": state.get("turn_since")}
         system, task = self.build_prompt(state)
         self.correction_meta = None
         corrections = []
@@ -861,10 +892,14 @@ class Seat:
                     capture_output=True, text=True, timeout=600)
             else:
                 argv = sandboxed_verify_argv(argv)
-                proc = subprocess.run(
-                    argv, shell=False, cwd=self.bus.repo, env=_verify_env(),
-                    capture_output=True, text=True,
-                    timeout=60 if os.environ.get("LG_VERIFY_SANDBOX") else 600)
+                vt = 60 if os.environ.get("LG_VERIFY_SANDBOX") else 600
+                self._declare("verify", vt + self.LIVE_GRACE)
+                try:
+                    proc = subprocess.run(
+                        argv, shell=False, cwd=self.bus.repo, env=_verify_env(),
+                        capture_output=True, text=True, timeout=vt)
+                finally:
+                    self._undeclare()
             exit_code = proc.returncode
             tail = (proc.stdout + proc.stderr).strip().splitlines()[-5:]
         else:

@@ -20,6 +20,7 @@ import calendar
 import time
 
 from .bus import Bus
+from . import liveness
 
 
 class Supervisor:
@@ -40,6 +41,18 @@ class Supervisor:
     # (interactive human paste, assistant-mediated queue) join the same
     # bus but have no process for the supervisor to start or restart.
     EXTERNAL_TYPES = {"interactive", "queue"}
+    # Adapter types known to spend no provider requests. Anything else
+    # (http, cli, unknown, unreadable roster) is treated as SPENDING: a
+    # restart replays the adapter call and can consume a request/reserve.
+    NON_SPENDING_TYPES = {"mock", "queue", "interactive"}
+
+    def _is_spending(self, seat):
+        try:
+            spec = self.bus.roster().get("seats", {}).get(seat)
+            kind = (spec or {}).get("adapter", {}).get("type")
+        except Exception:
+            return True
+        return kind not in self.NON_SPENDING_TYPES
 
     def automated_seats(self):
         roster = self.bus.roster().get("seats", {})
@@ -109,6 +122,26 @@ class Supervisor:
         for name, proc in list(self.procs.items()):
             if proc.poll() is None:
                 continue
+            if self._is_spending(name):
+                try:
+                    st = self.bus.state()
+                    holds = st.get("turn") == name
+                except Exception:
+                    st, holds = {}, True   # unreadable state: assume it holds the turn
+                if holds:
+                    # a restart would re-enter act_once and replay the call
+                    del self.procs[name]
+                    self._stalled_seats = {(name, st.get("turn_seq"), st.get("turn_since"))}
+                    self.bus.append_log(
+                        "supervisor", "exit",
+                        f"seat {name} exited {proc.returncode} holding the "
+                        "turn; spending seat: NOT restarted")
+                    self._escalate_spending(
+                        f"spending seat {name} exited ({proc.returncode}) "
+                        "while holding the turn. Not restarted: a restart "
+                        "replays the model call. Inspect the process, the "
+                        "state and the lease (launcher lease) first.")
+                    continue
             count = self.restarts.get(name, 0)
             if count >= self.restart_limit:
                 self._escalate(
@@ -122,19 +155,26 @@ class Supervisor:
             self.bus.commit_all(f"supervisor: restart seat {name}")
             self.start_seat(name)
 
-    def _check_stall(self, state):
+    def _check_stall(self, state, now=None):
         turn = state.get("turn")
         if not turn or state.get("status") != "running":
             return
         since = state.get("turn_since")
         if not since:
             return
+        now = time.time() if now is None else now
         try:
-            # the stamp is UTC (runtime._now): timegm, never local-time mktime
+            # the stamp is UTC (runtime._now): timegm, never local mktime
             ts = calendar.timegm(time.strptime(since, "%Y-%m-%dT%H:%M:%SZ"))
         except (ValueError, TypeError, OverflowError):
             return
-        if time.time() - ts < self.stall_timeout:
+        proc = self.procs.get(turn)
+        decl = liveness.read_declaration(getattr(self, "repo", None) or "", turn)
+        verdict, reason = liveness.liveness(
+            state, decl, now, getattr(proc, "pid", None))
+        if verdict == "live":
+            return   # slow but inside its own declared bound: no claim, no action
+        if verdict == "unknown" and now - ts < self.stall_timeout:
             return
         # identity of THIS turn: a later distinct turn of the same seat has a
         # different turn_seq/turn_since and must be acted on again
@@ -142,7 +182,19 @@ class Supervisor:
         if ident in self._stalled_seats:
             return
         self._stalled_seats = {ident}
-        if turn in self.procs:
+        if self._is_spending(turn):
+            # never terminate/restart/replay a spending seat on elapsed time
+            # or uncertain liveness: escalate for an operator decision
+            self.bus.append_log(
+                "supervisor", "stall",
+                f"turn stalled on {turn} ({reason}); spending seat: NOT "
+                "terminated or restarted")
+            self._escalate_spending(
+                f"turn stalled on {turn} ({reason}). This seat spends "
+                "provider requests, so the supervisor did NOT terminate or "
+                "restart it (a restart replays the model call). Inspect the "
+                "process and the lease (launcher lease) before any restart.")
+        elif turn in self.procs:
             self.bus.append_log("supervisor", "stall",
                                 f"turn stalled on {turn}; restarting seat")
             self.bus.commit_all(f"supervisor: stall on {turn}")
@@ -151,6 +203,12 @@ class Supervisor:
             self._escalate(
                 f"turn stalled on interactive seat {turn}; "
                 "a human must nudge or re-open that session")
+
+    def _escalate_spending(self, text):
+        self.bus.open_gate("supervisor", text,
+                           options=["inspect first, then decide", "stop the team"],
+                           recommendation="inspect first; do not restart blindly")
+        self.bus.commit_all("supervisor: escalation (spending seat, no auto-restart)")
 
     def _escalate(self, text):
         self.bus.open_gate("supervisor", text,
