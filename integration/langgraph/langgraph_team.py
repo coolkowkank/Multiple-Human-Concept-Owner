@@ -230,18 +230,32 @@ def init_repo(repo: str, queue_seats=()) -> None:
 # ---------- operator controls (assign / pause / update / resume) ----------
 
 def read_control(repo: str) -> dict:
+    """The graph obeys the COMMITTED control only (git show HEAD:...),
+    never the worktree file: an operator change that failed to commit -
+    or any hand-edit left dirty in the worktree - is invisible to the
+    team. Control takes effect exactly at commit order, so a seat and an
+    operator commit racing see one coherent state.
+
+    Schema-strict and fail-CLOSED: anything but a dict with an explicit
+    known mode and an integer instruction_seq - missing file, bad JSON,
+    wrong type, unknown mode, missing/bool seq - is a HOLD, never run."""
     try:
-        with open(os.path.join(repo, CONTROL_PATH)) as fh:
-            c = json.load(fh)
-        return {"mode": c.get("mode", "run"),
-                "instruction_seq": c.get("instruction_seq", 1),
-                "note": c.get("note", "")}
-    except (OSError, json.JSONDecodeError):
-        # Fail CLOSED: a missing/unreadable/invalid control file must
-        # never default to "run" - the team holds until the operator
-        # writes a readable control file.
+        proc = subprocess.run(
+            ["git", "-C", repo, "show", f"HEAD:{CONTROL_PATH}"],
+            capture_output=True, text=True)
+        if proc.returncode != 0:
+            raise ValueError(f"no committed control: {proc.stderr.strip()}")
+        c = json.loads(proc.stdout)
+        if (not isinstance(c, dict)
+                or c.get("mode") not in ("run", "pause")
+                or not isinstance(c.get("instruction_seq"), int)
+                or isinstance(c.get("instruction_seq"), bool)):
+            raise ValueError(f"invalid control schema: {c!r}")
+        return {"mode": c["mode"], "instruction_seq": c["instruction_seq"],
+                "note": str(c.get("note", ""))}
+    except (OSError, ValueError):
         return {"mode": "pause", "instruction_seq": 1,
-                "note": "control missing/unreadable: fail-closed hold"}
+                "note": "control missing/unreadable/invalid: fail-closed hold"}
 
 
 def _write_control(repo: str, **changes) -> dict:
@@ -252,19 +266,39 @@ def _write_control(repo: str, **changes) -> dict:
     return c
 
 
+def _operator_transact(repo: str, message: str, paths, mutate):
+    """Operator commit with coherent failure semantics:
+    - precheck the index BEFORE touching the worktree (a pre-staged
+      scratch file must fail the control change BEFORE CONTROL.json is
+      dirtied, not after);
+    - on ANY failure restore the target files from HEAD, so a failed
+      control change never leaves a dirty worktree value the graph
+      could read (read_control only trusts HEAD, but other readers -
+      and the next operator call - should see a clean tree too).
+    """
+    bus = Bus(repo, BRANCH)
+    bus.assert_index_clean(message)
+    try:
+        return bus.transact_paths(message, paths, mutate)
+    except Exception:
+        subprocess.run(["git", "-C", repo, "checkout", "--"] + list(paths),
+                       check=False)
+        raise
+
+
 def operator_pause(repo: str, note="operator pause") -> None:
     # transact_paths, never commit_all: an operator commit must not sweep
     # an in-flight seat's worktree changes into the control commit.
     repo = os.path.abspath(repo)
-    Bus(repo, BRANCH).transact_paths(
-        f"operator: pause - {note}", [CONTROL_PATH],
+    _operator_transact(
+        repo, f"operator: pause - {note}", [CONTROL_PATH],
         lambda: _write_control(repo, mode="pause", note=note))
 
 
 def operator_resume(repo: str, note="operator resume") -> None:
     repo = os.path.abspath(repo)
-    Bus(repo, BRANCH).transact_paths(
-        f"operator: resume - {note}", [CONTROL_PATH],
+    _operator_transact(
+        repo, f"operator: resume - {note}", [CONTROL_PATH],
         lambda: _write_control(repo, mode="run", note=note))
 
 
@@ -284,8 +318,8 @@ def operator_update_instructions(repo: str, text: str,
             instruction_seq=read_control(repo)["instruction_seq"] + 1,
             note=note)
 
-    c = Bus(repo, BRANCH).transact_paths(
-        f"operator: {note}", [".team/brief.md", CONTROL_PATH], mutate)
+    c = _operator_transact(
+        repo, f"operator: {note}", [".team/brief.md", CONTROL_PATH], mutate)
     return c["instruction_seq"]
 
 
@@ -308,7 +342,7 @@ def operator_assign(repo: str, brief: str, seat: str,
             instruction_seq=read_control(repo)["instruction_seq"] + 1,
             note=note)
 
-    bus.transact_paths(f"operator: assign to {seat} - {note}",
+    _operator_transact(repo, f"operator: assign to {seat} - {note}",
                        [".team/brief.md", ".team/STATE.json", CONTROL_PATH],
                        mutate)
 
@@ -404,25 +438,30 @@ class GuardedAdapter:
     def __getattr__(self, name):  # consume(), attributes: pass through
         return getattr(self._inner, name)
 
-    def complete(self, system, prompt):
+    def boundary_check(self) -> None:
+        """Refuse unless the seat may act RIGHT NOW: bus running, turn
+        names this seat, operator control is run at the instruction_seq
+        this step started with, and the roster spec still resolves to
+        the preselected safe constructor. Called before the adapter
+        runs, again after it returns, and at the pre-apply hook."""
         live = self._bus.state()
         if live.get("status") != "running":
             raise SeatError(
-                f"{self._seat} refused at adapter boundary: bus status "
+                f"{self._seat} refused at seat boundary: bus status "
                 f"is {live.get('status')!r}, not running")
         if live.get("turn") != self._seat:
             raise SeatError(
-                f"{self._seat} refused at adapter boundary: turn is "
+                f"{self._seat} refused at seat boundary: turn is "
                 f"{live.get('turn')!r}")
         control = read_control(self._bus.repo)
         if control["mode"] != "run":
             raise SeatError(
-                f"{self._seat} refused at adapter boundary: operator "
+                f"{self._seat} refused at seat boundary: operator "
                 f"control mode is {control['mode']!r} "
                 f"({control['note']})")
         if control["instruction_seq"] != self._instruction_seq:
             raise SeatError(
-                f"{self._seat} refused at adapter boundary: instructions "
+                f"{self._seat} refused at seat boundary: instructions "
                 f"moved to seq {control['instruction_seq']}, this seat "
                 f"step started at seq {self._instruction_seq}")
         spec = self._bus.roster().get("seats", {}).get(self._seat, {})
@@ -430,11 +469,17 @@ class GuardedAdapter:
         if (spec_type not in SAFE_CONSTRUCTORS
                 or type(self._inner) is not SAFE_CONSTRUCTORS[spec_type]):
             raise SeatError(
-                f"{self._seat} refused at adapter boundary: adapter "
+                f"{self._seat} refused at seat boundary: adapter "
                 f"{type(self._inner).__name__} is not the preselected "
                 f"constructor for spec {spec_type!r}")
+
+    def complete(self, system, prompt):
+        self.boundary_check()
         response = self._inner.complete(system, prompt)
-        if spec_type == "queue":
+        # A pause/update/halt landing DURING the adapter call is caught
+        # here, before the response may be applied.
+        self.boundary_check()
+        if type(self._inner) is QueueAdapter:
             # Queue is an EFFECTS channel, not inherently bound: the
             # runtime's stale-binding check only fires when a _queue
             # block exists, so a raw unbound line would be applied
