@@ -1,9 +1,13 @@
-"""WP4 re-proof: one batch through the REAL launcher supervisor with
-Reviewer and QC on the same application pin, unattended, under the
-Reviewer-skip acceptance guard (accepted a1c36ce). Offline, scripted
-mock queue adapters (no provider, no model): this proves the acceptance
-FLOW and the guarded close on the exact pinned code, not any model's
-ability. Disposable lane; evidence is the lane's own git/bus history.
+"""Scripted-seat demonstration of the WP4 acceptance FLOW: one batch
+through the REAL launcher supervisor with a Reviewer and a QC seat on
+one application pin, unattended, under the Reviewer-skip acceptance
+guard (accepted a1c36ce). Offline, scripted mock queue adapters (no
+provider, no model): every seat output is predetermined, so this shows
+the pipeline carries a queued PASS to a guarded close on the exact
+pinned code. It is NOT a WP4 re-proof: nothing was independently
+reviewed or judged by a model, the Reviewer's verdict does not name the
+pin it ruled on, and no negative path ran. Disposable lane; evidence is
+the lane's own git/bus history.
 
 Checks (written before the run):
  R1 supervisor reaches done with no human input (no gates answered).
@@ -86,8 +90,9 @@ def main():
     vs = [e for e in log if e.get("kind") == "verdict" and e.get("seat") == "qc"]
     import re as _re
     m = _re.match(r"verdict PASS at head ([0-9a-f]{40})\b", vs[-1].get("body", "")) if vs else None
-    same_pin = bool(m) and g("diff", "--quiet", m.group(1), "HEAD", "--", "src", "tests") == "" \
-        and subprocess.run(["git", "-C", r, "diff", "--quiet", m.group(1), "HEAD", "--", "src", "tests"]).returncode == 0 if m else False
+    same_pin = bool(m) and subprocess.run(
+        ["git", "-C", r, "diff", "--quiet", m.group(1), "HEAD", "--", "src", "tests"]
+    ).returncode == 0 if m else False
     t = subprocess.run([sys.executable, "-B", "tests/test_app.py"], cwd=r, capture_output=True, text=True)
     res = {
       "wall_s": wall,
