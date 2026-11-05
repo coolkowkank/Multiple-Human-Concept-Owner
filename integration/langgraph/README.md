@@ -22,10 +22,16 @@ An orchestration layer that drives the project's existing team machinery
 Files:
 
 - `langgraph_team.py` - single-lane orchestrator with execution-time
-  fences (below), durable resume, graceful stop.
+  fences (below), durable resume, graceful stop, and the operator control
+  channel (assign / pause / update-instructions / resume).
 - `parallel_team.py` - parent graph running several independent lanes
   concurrently, with one shared seat gate capping simultaneous seat
   actions across all lanes, plus a deterministic no-network overlap test.
+- `controls_demo.py` - scripted operator-intervention run proving the
+  four controls below.
+- `launcher/` - vendored copy of the project's own seat runtime (bus,
+  roster, adapters, CLI), pinned at base commit 46fa728. Project code,
+  unchanged; included so the documented commands run as-is.
 
 ## Execution-time safety fences
 
@@ -34,19 +40,60 @@ IMMEDIATELY before acting:
 
 1. Bus status must be `running` and the written turn must name this seat
    - a resumed pending seat after an operator halt is refused.
-2. The roster adapter spec must be `mock`, AND the constructed adapter
-   instance must be a `MockAdapter` - a roster swapped between sync and
-   execution cannot reach a non-mock adapter. No provider call is
-   possible from this graph.
-3. Refusals (including `SeatError` from the project's own stale/lease/
+2. The roster adapter spec must be an allowed type: `mock` (scripted,
+   local) or `queue` (operator-fed local JSONL through the project's own
+   `launcher respond` channel, stale-bound by turn/seq/head - zero
+   network). The CONSTRUCTED adapter is then checked by exact class
+   identity against the preselected safe constructor for that spec (the
+   imported class object itself, not a forgeable `__name__` string).
+   Provider-calling adapters (http/cli/live) are refused at sync and at
+   execution. No provider call is possible from this graph.
+3. A `GuardedAdapter` wrapper re-validates status, turn and adapter
+   identity AT the adapter call - inside the seat transaction, after the
+   lease acquire moves the bus to held. An operator halt or roster swap
+   landing between the pre-checks and the call raises `SeatError` and
+   rolls the transaction back instead of being acted on.
+4. Refusals (including `SeatError` from the project's own stale/lease/
    verify machinery) are recorded and route to the terminal node, never
    swallowed.
-4. `run_graph` resumes a thread only if the stored repo and checkpoint
+5. Repo and checkpoint paths must be canonical: `realpath` is applied
+   and any symlink/alias spelling is refused, so the checkpoint-outside-
+  -repo and resume-identity checks cannot be bypassed by a linked
+   parent directory.
+6. `run_graph` resumes a thread only if the stored repo and checkpoint
    path exactly match the requested ones (fail closed on identity
    mismatch).
 5. `init_repo` refuses root/home/cwd, non-directories, and ANY non-empty
    directory; it never deletes data (recreating a demo is a manual
    delete).
+
+## Operator controls (assign / pause / update / resume)
+
+One channel: `.team/CONTROL.json` inside the git bus, mutated only
+through guard-exempt `operator:` commits - the same bus every seat and
+sync reads, not a competing state path.
+
+- PAUSE: control mode `pause` holds the graph in a paused node (durable
+  checkpoint, no seat acts) until RESUME restores mode `run`.
+- UPDATE INSTRUCTIONS: rewriting the brief bumps `instruction_seq` and is
+  an ordinary non-queue commit - every queued in-flight response bound
+  to the old head is then stale by the project's own head-binding rule
+  and the seat REFUSES it (recorded, queue preserved for the operator).
+  Old instructions can never be applied after an update.
+- RESUME / resolution: the operator discards stale lines and re-queues
+  through `launcher respond --discard-stale` (the project's CLI), then
+  the team completes.
+- ASSIGN: new brief + turn + status through the same operator commit
+  path; a closed team runs the new assignment.
+
+`controls_demo.py` proves all four on one lane: pause held mid-run, the
+in-flight queued response refused as stale after the instruction update,
+cycle 1 completed after operator resolution, and a second assignment
+(subtract feature) ran end to end - 10/10 checks.
+
+Caveat: these are mechanism demos on mock/queue lanes. The controls are
+NOT yet reviewed or claimed safe as a live-intervention boundary for a
+real model team.
 
 ## Demonstrated (mock, no network, no keys, no spend)
 
@@ -89,8 +136,13 @@ IMMEDIATELY before acting:
 
 ## How to run (local, no keys)
 
-Requires the project checkout on `PYTHONPATH` and `pip install langgraph
-langgraph-checkpoint-sqlite` (Python >= 3.10):
+Self-contained: `launcher/` is vendored here, pinned to this repo's
+main branch at commit 46fa728 (the accepted offline baseline). Only
+third-party installs needed (Python >= 3.10, tested on 3.10.12):
+
+```
+pip install langgraph==1.2.19 langgraph-checkpoint-sqlite==3.1.3
+```
 
 ```
 python integration/langgraph/langgraph_team.py init /tmp/demo/lane-a /tmp/demo/db-a.sqlite
@@ -98,6 +150,7 @@ python integration/langgraph/langgraph_team.py run  /tmp/demo/lane-a /tmp/demo/d
 python integration/langgraph/langgraph_team.py init /tmp/demo/lane-b /tmp/demo/db-b.sqlite
 python integration/langgraph/langgraph_team.py init /tmp/demo/lane-c /tmp/demo/db-c.sqlite
 python integration/langgraph/parallel_team.py /tmp/demo   # resumes lane-a, runs all lanes, verifies
+python integration/langgraph/controls_demo.py /tmp/lg-controls   # operator controls run
 ```
 
 Developed and tested against the project head `46fa728`. This branch adds
