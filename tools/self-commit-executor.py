@@ -506,27 +506,37 @@ def _write_gate(gate_path, repo):
         json.dump(pin, f, indent=2)
     return pin
 
-def _push_gate_check(repo):
-    """Return None when push is approved for the exact tested state, else an error string."""
+def _push_gate_check_sha(repo):
+    """Return (error, sha). On approval, sha is the exact commit the gate
+    approved (the pin head, or HEAD resolved once when the explicit
+    ALLOW_UNGATED_PUSH bypass is used). The push must publish THIS sha, not
+    whatever HEAD is later, so a concurrent writer that advances HEAD after
+    the check cannot get an unapproved commit published."""
     gate = os.environ.get("PUSH_GATE_FILE")
     if not gate:
         if os.environ.get("ALLOW_UNGATED_PUSH") == "1":
-            return None
-        return "push fail-closed: PUSH_GATE_FILE unset and ALLOW_UNGATED_PUSH!=1"
+            return None, _git(repo, "rev-parse", "HEAD").stdout.strip()
+        return "push fail-closed: PUSH_GATE_FILE unset and ALLOW_UNGATED_PUSH!=1", None
     try:
         with open(gate) as f:
             pin = json.load(f)
     except Exception:
-        return f"push fail-closed: gate {gate} absent or unreadable"
+        return f"push fail-closed: gate {gate} absent or unreadable", None
     head = _git(repo, "rev-parse", "HEAD").stdout.strip()
     if pin.get("head") != head:
         return (f"push STALE: approved head {pin.get('head')} != current {head}; "
-                "operator must re-run tests and re-approve")
+                "operator must re-run tests and re-approve"), None
     fp = _worktree_fingerprint(repo)
     if pin.get("worktree_sha256") != fp:
         return ("push STALE: worktree content changed after approval "
-                "(edit, new file, or removal); operator must re-run tests and re-approve")
-    return None
+                "(edit, new file, or removal); operator must re-run tests and re-approve"), None
+    if not head:
+        return "push fail-closed: approved head unresolved", None
+    return None, head
+
+def _push_gate_check(repo):
+    """Return None when push is approved for the exact tested state, else an error string."""
+    return _push_gate_check_sha(repo)[0]
 
 def run_tool(name, args):
     try:
@@ -616,16 +626,23 @@ def run_tool(name, args):
             # opens. Gate creation is always an operator act after running
             # the suite; the model cannot create it (path outside its
             # writable set).
-            err = _push_gate_check(REPO)
+            err, approved = _push_gate_check_sha(REPO)
             if err:
                 if err.startswith("push STALE"):
                     return {"ok": False, "error": err + "; do other work or retry git_push in a later round"}
                 return {"ok": False, "error": err + "; do other work or retry git_push in a later round"}
-            p = subprocess.run(["git", "-C", REPO, "push", "origin", f"HEAD:{BRANCH}"], capture_output=True, text=True)
+            # Publish the exact approved commit (never a later HEAD), then
+            # confirm the remote branch tip is that commit. A plain
+            # (non-forced) push, so a remote that moved is refused by git.
+            p = subprocess.run(["git", "-C", REPO, "push", "origin", f"{approved}:refs/heads/{BRANCH}"], capture_output=True, text=True)
             out = (p.stdout + p.stderr).replace(KEY, "[REDACTED]")
             if p.returncode != 0:
                 return {"ok": False, "error": out[-500:]}
-            return {"ok": True, "output": out[-500:]}
+            ls = subprocess.run(["git", "-C", REPO, "ls-remote", "origin", f"refs/heads/{BRANCH}"], capture_output=True, text=True)
+            tip = (ls.stdout.split() or [""])[0]
+            if ls.returncode != 0 or tip != approved:
+                return {"ok": False, "error": f"push verify failed: remote {BRANCH} tip {tip or 'unreadable'} != approved {approved}"}
+            return {"ok": True, "output": out[-500:], "pushed": approved}
         return {"ok": False, "error": f"unknown tool {name}"}
     except Exception as e:
         return {"ok": False, "error": f"executor error: {str(e)[:300]}"}

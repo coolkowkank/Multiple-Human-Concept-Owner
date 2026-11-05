@@ -1010,6 +1010,96 @@ class ExecutorHardeningV3Case(ExecutorFixture):
         self.assertEqual(ns["SENDS"]["n"], 0)
 
 
+class ExecutorPushBindingCase(ExecutorFixture):
+    """git_push publishes the exact gate-approved commit, not a later HEAD
+    (independent push-gate review 2026-11-05: confirmed check-to-push race).
+    Scratch LOCAL bare remote only; no network."""
+
+    def setUp(self):
+        super().setUp()
+        self.up = os.path.join(self.tmp, "up.git")
+        git("init", "--bare", self.up)
+        for d in ("docs", "tasks", "launcher", "tests"):
+            os.makedirs(os.path.join(self.repo, d), exist_ok=True)
+        open(os.path.join(self.repo, "launcher", "a.py"), "w").write("x = 1\n")
+        git("-c", "user.name=t", "-c", "user.email=t@t", "add", "-A", cwd=self.repo)
+        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-m", "c1", cwd=self.repo)
+        git("remote", "add", "origin", self.up, cwd=self.repo)
+        self.gate = os.path.join(self.tmp, "gate.json")
+        os.environ["PUSH_GATE_FILE"] = self.gate
+        os.environ.pop("ALLOW_UNGATED_PUSH", None)
+        subprocess.run([sys.executable, EXECUTOR, "--write-gate", self.gate, self.repo],
+                       check=True, capture_output=True)
+        self.h1 = self._head()
+
+    def _head(self):
+        return subprocess.run(["git", "-C", self.repo, "rev-parse", "HEAD"],
+                              capture_output=True, text=True).stdout.strip()
+
+    def _tip(self):
+        out = subprocess.run(["git", "-C", self.up, "rev-parse", "--verify", "-q", "refs/heads/records"],
+                             capture_output=True, text=True).stdout.strip()
+        return out or None
+
+    def _advance_head(self):
+        open(os.path.join(self.repo, "launcher", "b.py"), "w").write("y = 2\n")
+        git("-c", "user.name=t", "-c", "user.email=t@t", "add", "-A", cwd=self.repo)
+        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-m", "c2-unapproved", cwd=self.repo)
+
+    def test_push_publishes_approved_commit_when_head_advances_after_check(self):
+        ns = self.load()
+        orig = ns["_push_gate_check_sha"]
+        def racing(repo):
+            r = orig(repo)
+            self._advance_head()  # concurrent external writer after the check
+            return r
+        ns["_push_gate_check_sha"] = racing
+        r = ns["run_tool"]("git_push", {})
+        self.assertTrue(r["ok"], r)
+        self.assertNotEqual(self._head(), self.h1)
+        self.assertEqual(self._tip(), self.h1)
+        self.assertEqual(r["pushed"], self.h1)
+
+    def test_push_unchanged_head_publishes_approved_commit(self):
+        ns = self.load()
+        r = ns["run_tool"]("git_push", {})
+        self.assertTrue(r["ok"], r)
+        self.assertEqual(self._tip(), self.h1)
+
+    def test_push_stale_head_publishes_nothing(self):
+        ns = self.load()
+        self._advance_head()
+        r = ns["run_tool"]("git_push", {})
+        self.assertFalse(r["ok"])
+        self.assertIn("STALE", r["error"])
+        self.assertIsNone(self._tip())
+
+    def test_push_refused_when_remote_moved_not_forced(self):
+        ns = self.load()
+        other = os.path.join(self.tmp, "other")
+        git("clone", self.up, other)
+        git("checkout", "-b", "records", cwd=other)
+        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "--allow-empty", "-m", "theirs", cwd=other)
+        git("push", "origin", "records", cwd=other)
+        theirs = self._tip()
+        r = ns["run_tool"]("git_push", {})
+        self.assertFalse(r["ok"])
+        self.assertEqual(self._tip(), theirs)
+
+    def test_ungated_explicit_bypass_pushes_resolved_head_once(self):
+        os.environ.pop("PUSH_GATE_FILE", None)
+        os.environ["ALLOW_UNGATED_PUSH"] = "1"
+        ns = self.load()
+        self.assertEqual(ns["_push_gate_check_sha"](self.repo), (None, self.h1))
+        r = ns["run_tool"]("git_push", {})
+        self.assertTrue(r["ok"], r)
+        self.assertEqual(self._tip(), self.h1)
+
+    def test_gate_check_wrapper_still_returns_error_or_none(self):
+        ns = self.load()
+        self.assertIsNone(ns["_push_gate_check"](self.repo))
+        os.environ.pop("PUSH_GATE_FILE", None)
+        self.assertIn("fail-closed", ns["_push_gate_check"](self.repo))
 
 if __name__ == "__main__":
     unittest.main()
