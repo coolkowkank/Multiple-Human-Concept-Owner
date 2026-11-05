@@ -118,10 +118,13 @@ publication and freezes the root.
    authoritative root from preflight through settlement; no other
    writer, no concurrent run, and this lane makes no provider calls
    and no writes to the executor's root. This is NOT a
-   general-concurrency claim. (The same constraint supersedes the
-   "concurrent reserves are never touched" sentence in the live_lane
-   module docstring of the reviewed executable head, which stays
-   byte-exact for this run's evidence.)
+   general-concurrency claim. (The live_lane module and
+   _settle_orphaned_reserves docstrings carried a too-broad
+   "concurrently-created reserves are never touched" sentence; the
+   docstrings were narrowed to this scope after head 60b2fbb in a
+   docstring-only change - no executable statement changed. The
+   reviewed executable head 60b2fbb stays the code this run
+   executes.)
    Paused-path accounting is evidence-driven, never a blanket number:
    the reason is the allowlisted exception CLASS ONLY (exception text
    can carry secrets/raw prompt - tested with a secret-bearing
