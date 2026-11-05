@@ -1223,5 +1223,32 @@ class ExecutorPushBindingCase(ExecutorFixture):
         self.assertTrue(r["published_unknown"])
         self.assertEqual(self._tip(), theirs)
 
+    def test_verify_rejects_duplicate_exact_ref_entries_in_ls_remote_output(self):
+        ns = self.load()
+        real = ns["_git"]
+        sha = self.h1
+        def fake(repo, *a):
+            if a and a[0] == "ls-remote":
+                out = f"{sha}\trefs/heads/records\n{sha}\trefs/heads/records\n"
+                return type("R", (), {"returncode": 0, "stdout": out, "stderr": ""})()
+            return real(repo, *a)
+        ns["_git"] = fake
+        ok, detail = ns["_verify_pushed"](self.repo, "records", sha)
+        self.assertFalse(ok)
+        self.assertIn("2 exact", detail)
+
+    def test_verify_accepts_single_exact_ref_in_fake_ls_remote_output(self):
+        ns = self.load()
+        real = ns["_git"]
+        sha = self.h1
+        def fake(repo, *a):
+            if a and a[0] == "ls-remote":
+                out = f"{'0'*40}\trefs/heads/a/refs/heads/records\n{sha}\trefs/heads/records\n"
+                return type("R", (), {"returncode": 0, "stdout": out, "stderr": ""})()
+            return real(repo, *a)
+        ns["_git"] = fake
+        git("remote", "set-url", "--push", "origin", self.up, cwd=self.repo)
+        self.assertEqual(ns["_verify_pushed"](self.repo, "records", sha)[0], True)
+
 if __name__ == "__main__":
     unittest.main()
