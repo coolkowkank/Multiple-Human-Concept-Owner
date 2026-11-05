@@ -27,6 +27,7 @@ ASSIGN = {"models": {"researcher": "nvidia/nemotron-3-ultra-550b-a55b",
 R_OK = {"findings": [{"id": "C1", "claim": "a", "sources": ["P1"],
                       "status": "SUPPORTED_BY_PACKET"}], "summary": "s"}
 fails = []
+_roots = []
 
 def check(name, cond):
     print(("PASS  " if cond else "FAIL  ") + name, flush=True)
@@ -35,6 +36,7 @@ def check(name, cond):
 
 def root_with(q, assign=ASSIGN):
     d = tempfile.mkdtemp()
+    _roots.append(d)
     rc.Store(d).save_queue({"questions": [q]})
     if assign:
         with open(os.path.join(d, "assignments.json"), "w") as f:
@@ -111,6 +113,31 @@ check("S4 stale verified_rev -> needs-human",
       r["step"] is not None and r["step"].get("action") == "needs-human")
 check("S4 zero call attempts on stale revision", r["call_attempts"] == [])
 
+# G1/G2: the ACTUAL compiled LangGraph graph (not just runner_step)
+# on isolated roots - the reviewer-accepted boundary.
+d = root_with({"id": "q1", "status": "open", "attempts": {},
+               "question": "?", "packet": PACKET})
+rc.Store(d).append({"phase": "halt", "ts": rc.iso(T0 - 100),
+                    "reason": "provider halt stands"})
+app = rl.build_runner_graph(d, FRESH, RECORD, now=T0, clock=lambda: T0)
+r = app.invoke({"results": []})["results"][0]
+check("G1 graph: halt blocks step, zero attempts",
+      r["halted"] is not None and r["call_attempts"] == [])
+
+d = root_with({"id": "q1", "status": "open", "attempts": {},
+               "question": "?", "packet": PACKET})
+app = rl.build_runner_graph(d, FRESH, RECORD, now=T0, clock=lambda: T0)
+r = app.invoke({"results": []})["results"][0]
+led = rc.Store(d).ledger()
+check("G2 graph: gate-pass -> 1 refusing attempt -> reserve,result,halt",
+      len(r["call_attempts"]) == 1
+      and [e["phase"] for e in led] == ["reserved", "result", "halt"]
+      and led[1]["outcome"] == "unknown"
+      and "unknown transport" in (r["halted"] or ""))
+# No checkpointer on the runner graph: no resume claim, by design.
+
+for d in _roots + [kd]:
+    shutil.rmtree(d, ignore_errors=True)
 print("\nRUNNER LANE INTEGRATION:", "ALL CHECKS PASSED" if not fails
       else "FAILURES ABOVE")
 sys.exit(1 if fails else 0)
