@@ -184,7 +184,8 @@ real model team.
 ## Runner lane integration (offline, refusing post)
 
 `runner_lane.py` drives the ACCEPTED Ryan runner (`runner/ryan_cycle.py`,
-byte-exact tag `source-88a610a`) from inside a LangGraph node. The
+byte-exact accepted tip `3b09eea8ccacebc4e5d3131e4b58fa9cf58a0fe2`, chain
+through tag `source-88a610a`) from inside a LangGraph node. The
 provider-call injection point (`post`) is explicit and REFUSING as
 shipped: it records the attempt and returns an 'unknown' transport
 outcome without any network access, and the runner's own settle() then
@@ -209,6 +210,16 @@ reserve, and halts on the unknown outcome (ledger shows reserve +
 unknown result + halt); a bad-signature allowance window blocks before
 any call; a stale verified_rev routes Ryan to needs-human with zero
 calls. The runner graph ships with no checkpointer: no resume claim.
+
+## Live lane (integrated, awaiting review + go)
+
+`live_lane.py` is the bounded live-run driver: explicit root, preflight
+before any reserve, md5-pinned vendored runner/transport (accepted
+3b09eea), the reviewed guarded transport constructed only from the
+pinned module, settle normalization (no dangling reserve), ONE step
+through the actual compiled graph. Run config in `run-config/`. NO live
+step until independent review of the exact integrated head and main's
+go. See `LIVE_PREP.md`.
 
 ## Known limits (stated, not fixed)
 
