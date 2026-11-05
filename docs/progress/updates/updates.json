@@ -1,7 +1,13 @@
 {
- "asOf": "2026-11-05T15:10",
+ "asOf": "2026-11-05T15:18",
  "note": "Project-only status, newest first. This page replaces routine chat reports. It is edited by hand when the project changes; nothing here is a live feed, and it does not claim live, unattended or independently verified operation.",
  "items": [
+  {
+   "at": "2026-11-05T15:18",
+   "title": "Budget ledger and pacing: integration prepared, review requested",
+   "status": "awaiting review",
+   "body": "The durable budget ledger and pacing integration is at commit 61ca8c9 (https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/61ca8c9e141c326059e214a331cf2f6a7893e620), on top of module aacfe44 and base 4a95bf5. It was tested offline in a clean checkout: 256 of 256 repository tests pass, including 10 for the executor-ledger integration. An independent review has been requested but is not completed. The earlier 180-test figure at 1fcb034 is superseded. No progress credit changes and no autonomy is claimed. Nothing was rolled out and no provider was called."
+  },
   {
    "at": "2026-11-05T15:01",
    "title": "Verifier qualification test failed",
