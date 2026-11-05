@@ -842,8 +842,11 @@ def _load_grant(root):
     return "ok", body, ""
 
 
-def _shape_ok(b):
-    """'' or reason for a signed body's structure."""
+def _shape_ok(b, succession_ok=False):
+    """'' or reason for a signed body's structure. The cap+1 relaxation
+    applies ONLY when the caller has validated an actual succession
+    (succession_ok) against a real prior bind line; a body's own
+    `succeeds` field never relaxes anything by itself."""
     roles, models = b.get("roles"), b.get("models")
     base, mx = b.get("baseline"), b.get("max_counts")
     if b.get("version") != 2 or not isinstance(b.get("id"), str) \
@@ -864,14 +867,72 @@ def _shape_ok(b):
         if not isinstance(base[r], int) or isinstance(base[r], bool) \
                 or base[r] < 0:
             return "baseline counts"
+    sc = b.get("succeeds")
+    if sc is not None:
+        if not isinstance(sc, dict) or set(sc) != {"id", "digest"} or \
+                not isinstance(sc["id"], str) or not sc["id"] or \
+                not isinstance(sc["digest"], str) or len(sc["digest"]) != 64:
+            return "succeeds must be {id, digest} of the prior window"
+        if roles != ["verifier"] or set(models) != {"verifier"} or \
+                b.get("max_requests") != 1:
+            return "a successor window is exactly one verifier request"
     for r in roles:
         if mx[r] != base[r] + 1 or isinstance(mx[r], bool) or \
-                mx[r] > ROLE_CAP[r] + 1:
+                (not (sc is not None and succession_ok) and
+                 mx[r] > ROLE_CAP[r] + 1):
             return "max_counts must be baseline+1 and at most cap+1"
     if b.get("max_requests") != len(roles) or \
             len(roles) > ALLOWANCE_MAX_REQUESTS:
         return "max_requests must equal the number of window roles (<=2)"
     return ""
+
+
+def _succession_reason(led, st, b, last, L=None, fp=None):
+    """'' when the CURRENT signed grant is a valid successor of the last
+    bound window, else the reason. A successor is append-only: the prior
+    window must be terminal (allowance-stop), the new grant must name the
+    prior window's id and digest, carry a new unused id, and pin a model
+    that no earlier window request on this lineage used. History is never
+    edited; the prior bind and its stop stay in the ledger."""
+    if st != "ok" or not isinstance(b, dict):
+        return "no valid grant"
+    # the SAME work: the prior bind, the new grant and the CURRENT queue
+    # item must all agree on lineage AND claim-set fingerprint (an edited
+    # claim set cannot be re-signed around the restriction).
+    if L is None or fp is None or last.get("lineage") != L or \
+            last.get("work_fp") != fp or b.get("lineage") != L or \
+            b.get("work_fp") != fp:
+        return "successor must cover the same lineage and claim set"
+    sc = b.get("succeeds")
+    if not isinstance(sc, dict) or sc.get("id") != last.get("allowance") \
+            or sc.get("digest") != last.get("digest"):
+        return "grant does not name the last bound window"
+    if not any(e.get("phase") == "allowance-stop"
+               and e.get("allowance") == last.get("allowance") for e in led):
+        return "prior window is not terminal"
+    if any(e.get("phase") == "allowance-bind"
+           and e.get("allowance") == b.get("id") for e in led):
+        return "successor id already used"
+    bound = {e.get("allowance") for e in led
+             if e.get("phase") == "allowance-bind"}
+    prior = {e.get("model") for e in led if e.get("phase") == "reserved"
+             and e.get("allowance") in bound}
+    models = b.get("models")
+    if not isinstance(models, dict) or models.get("verifier") in prior:
+        return "successor must pin a model no earlier window used"
+    return ""
+
+
+def _is_validated_successor(binds, b, new_bind):
+    """True only when this grant is the validated successor of an actual
+    prior bind: freshly validated (new_bind), or already bound as such (the
+    last bind line names this grant's id and its succeeds id)."""
+    if not isinstance(b, dict) or not isinstance(b.get("succeeds"), dict):
+        return False
+    if new_bind:
+        return True
+    return bool(binds) and binds[-1].get("allowance") == b.get("id") and \
+        binds[-1].get("succeeds") == b["succeeds"].get("id")
 
 
 def allowance_window(root, store, q, role, used, model, now):
@@ -890,22 +951,29 @@ def allowance_window(root, store, q, role, used, model, now):
     L, fp = lineage_of(q), work_fp(q)
     binds = [e for e in led if e.get("phase") == "allowance-bind"
              and (e.get("lineage") == L or e.get("work_fp") == fp)]
+    new_bind = False
     if binds:   # durably bound: authority must still be exactly this grant
         last = binds[-1]
         if st != "ok" or b.get("id") != last.get("allowance") or \
                 grant_digest(b) != last.get("digest"):
-            return ("blocked", None, None, "bound window authority is "
-                    "absent, invalid, deleted or replaced")
+            if _succession_reason(led, st, b, last, L, fp):
+                return ("blocked", None, None, "bound window authority is "
+                        "absent, invalid, deleted or replaced")
+            new_bind = True   # valid append-only successor
     elif st != "ok":
         return "none", None, None, why
     elif b.get("lineage") != L or b.get("work_fp") != fp:
         return "none", None, None, "grant is for another lineage/claim set"
+    succ_ok = _is_validated_successor(binds, b, new_bind)
+    if isinstance(b, dict) and b.get("succeeds") is not None and not succ_ok:
+        return ("blocked", None, None, "succeeds is not backed by the "
+                "actual prior bound window")
     if binds and (b.get("lineage") != L or b.get("work_fp") != fp):
         # a bound window never widens: an OR-match only finds the
         # restriction. The edited claim set or renamed lineage is blocked.
         return ("blocked", None, None, "bound window does not cover this "
                 "lineage and claim set")
-    bad = _shape_ok(b)
+    bad = _shape_ok(b, succession_ok=succ_ok)
     if bad:
         return "blocked", None, None, "allowance malformed: " + bad
     try:
@@ -937,17 +1005,27 @@ def allowance_window(root, store, q, role, used, model, now):
             return "blocked", None, None, "lineage counts moved off baseline"
     if used.get(role, 0) >= b["max_counts"][role]:
         return "blocked", None, None, "role max count reached"
-    if not binds:   # first accepted use: bind lineage, claims and digest
-        store.append({"phase": "allowance-bind", "ts": iso(now),
-                      "allowance": aid, "lineage": L, "work_fp": fp,
-                      "digest": grant_digest(b)})
+    if not binds or new_bind:   # first accepted use: bind this grant
+        line = {"phase": "allowance-bind", "ts": iso(now),
+                "allowance": aid, "lineage": L, "work_fp": fp,
+                "digest": grant_digest(b)}
+        if new_bind:
+            line["succeeds"] = b["succeeds"]["id"]
+        store.append(line)
     return "ok", aid, grant_digest(b), ""
 
 
 def grant_digest_now(root, store, q, aid, now):
     """Digest of the CURRENT valid, unexpired, unstopped grant, or None."""
     st, b, _ = _load_grant(root)
-    if st != "ok" or b.get("id") != aid or _shape_ok(b):
+    if st != "ok" or b.get("id") != aid:
+        return None
+    sc = b.get("succeeds")
+    binds = [e for e in store.ledger() if e.get("phase") == "allowance-bind"]
+    ok_succ = isinstance(sc, dict) and any(
+        e.get("allowance") == aid and e.get("succeeds") == sc.get("id")
+        for e in binds)
+    if _shape_ok(b, succession_ok=ok_succ):
         return None
     try:
         if not (parse_iso(b["issued_at"]) <= now < parse_iso(b["expires_at"])):
