@@ -74,6 +74,7 @@ try:
     wr(d, "s2.audit.jsonl", [start("c"), ret("c", 20, 2, "3")]); wr(d, "s2.links.jsonl", [{"call_id": "c", "turn_seq": 7}])
     rep = U.run_report(d)
     check("run level: turn 7 merges both seats (11+22), lists the seats; turn 9 separate", rep["turns"]["7"]["total_tokens"] == 33 and rep["turns"]["7"]["seats"] == ["s1", "s2"] and rep["turns"]["9"]["total_tokens"] == 10 and rep["unlinked"]["calls"] == 0)
+    check("turn note warns that reused/mixed dirs and repeated turn numbers cannot be detected and merge", all(x in rep["turn_note"] for x in ("reused or mixed audit dir", "repeated across bus restarts", "merge into one bucket")))
     check("run turn note says turn is not a cycle", "not a cycle" in rep["turn_note"] and "cycle" not in " ".join(rep["turns"]))
     check("no call_id or response id leaks into the report", all(x not in json.dumps(rep) for x in ('"a"', '"b"', '"c"', "1" * 64)))
     # collision-refused seats are excluded from turns

@@ -210,7 +210,8 @@ def run_report(audit_dir):
         "schema": "usage-report/v1",
         "turns": {str(t): dict(_final({k: v for k, v in b.items() if k != "seats"}), seats=sorted(b["seats"])) for t, b in sorted(rturns.items())},
         "unlinked": _final(runl),
-        "turn_note": "turn = bus turn number (link-row turn_seq), not a cycle: no cycle identity exists; unlinked calls (no link row, turn_seq None or conflicting links) are never assigned to a turn",
+        "turn_note": "turn = bus turn number (link-row turn_seq), not a cycle: no cycle identity exists; unlinked calls (no link row, turn_seq None or conflicting links) are never assigned to a turn; "
+                     "a reused or mixed audit dir, or turn numbers repeated across bus restarts, cannot be detected and calls with the same turn number merge into one bucket",
         "seats": out, "refused_seats": refused,
         "cross_seat_collision_seats": sorted(collide),
         "calls": calls, "provider_joined": prov, "unknown_or_mock": calls - prov,
