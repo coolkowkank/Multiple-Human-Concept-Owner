@@ -37,6 +37,7 @@ TIME. It is not imported by any demo or graph yet. Preconditions:
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
 
@@ -79,18 +80,81 @@ def check_bounded_window(root: str) -> None:
             f"per-run ceiling {PER_RUN_REQUEST_CEILING}")
 
 
-def bounded_live_step(root: str, listing, record, post_factory,
-                      now=None, clock=None):
-    """One runner step with an INJECTED reviewed guarded transport,
-    only after all preconditions pass. `post_factory` must be the
-    independently reviewed guarded factory (strict echo, exact
-    endpoint, bounded errors) already closed over its allowlist and key
-    env name. Never call this in a demo or fixture."""
-    if post_factory is None:
+def _assignments(root: str) -> dict:
+    with open(os.path.join(root, "assignments.json")) as f:
+        a = json.load(f)
+    if not isinstance(a, dict) or not isinstance(a.get("models"), dict):
+        raise LivePreconditionError("assignments.json unreadable")
+    return a["models"]
+
+
+def _pre_io_recheck(root: str):
+    """Fresh-from-disk revalidation at the IMMEDIATE pre-I/O boundary,
+    AFTER the runner's reservation. The vendored runner (88a610a)
+    reserves and then posts with NO fresh halt/grant recheck in
+    between - this wrapper is what adds that property. Any failure
+    raises rc.Halt, which the runner's settle() records as a consumed
+    unknown outcome rather than silently retrying."""
+    for e in rc.Store(root).ledger():
+        if e.get("phase") == "halt":
+            raise rc.Halt("halt present at pre-I/O boundary: "
+                          + str(e.get("reason", ""))[:80])
+    if os.path.exists(os.path.join(root, "allowance.json")):
+        st, body, why = rc._load_grant(root)
+        if st != "ok":
+            raise rc.Halt(f"grant invalid at pre-I/O boundary: {why}")
+        import datetime as _dt
+        exp = _dt.datetime.fromisoformat(body["expires_at"])
+        if exp <= _dt.datetime.now(_dt.timezone.utc):
+            raise rc.Halt("grant expired at pre-I/O boundary")
+
+
+def bounded_live_step(root: str, listing, record, post_factory, *,
+                      allowlist, transport_id, now=None, clock=None):
+    """One runner step through the reviewed guarded transport, with
+    every check enforced HERE (not delegated to helper names):
+
+    - post_factory must carry the reviewed-transport identity:
+      getattr(post_factory, "REVIEWED_TRANSPORT_ID") must equal the
+      expected `transport_id` (both non-empty). An arbitrary factory is
+      refused. The factory is invoked ONLY inside rc.step - no direct
+      call surface exists in this module.
+    - every model in the committed assignments.json must be in this
+      run's exact `allowlist` of free-catalog IDs AND pass
+      check_free_route (working route, price 0/0, fresh listing).
+    - a per-process invocation counter caps actual post calls at the
+      signed window's max_requests (hard ceiling
+      PER_RUN_REQUEST_CEILING); the runner's own reserve ledger is the
+      durable count, this is the in-process backstop.
+    - _pre_io_recheck runs inside the wrapped post, immediately before
+      any socket opens.
+    Never call this in a demo or fixture."""
+    if not transport_id or getattr(post_factory, "REVIEWED_TRANSPORT_ID",
+                                   None) != transport_id:
         raise LivePreconditionError(
-            "no reviewed guarded transport injected (live held)")
+            "injected factory is not the expected reviewed transport")
+    listing_doc = listing() if callable(listing) else listing
+    for role, model in _assignments(root).items():
+        if model not in allowlist:
+            raise LivePreconditionError(
+                f"{role} model {model} not in this run's allowlist")
+        check_free_route(record, listing_doc, model)
     check_bounded_window(root)
-    return rc.step(root, post_factory(),
+
+    real_post = post_factory()
+    spent = [0]
+    cap = min(PER_RUN_REQUEST_CEILING,
+              (rc._load_grant(root)[1] or {}).get("max_requests",
+                                                  PER_RUN_REQUEST_CEILING))
+
+    def counted_guarded_post(model, system, prompt, mt, effort=None):
+        if spent[0] >= cap:
+            raise rc.Halt(f"per-process request ceiling {cap} reached")
+        _pre_io_recheck(root)
+        spent[0] += 1
+        return real_post(model, system, prompt, mt, effort)
+
+    return rc.step(root, counted_guarded_post,
                    listing if callable(listing) else (lambda: listing),
                    now if now is not None else time.time(), record,
                    clock=clock)
