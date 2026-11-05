@@ -150,10 +150,12 @@ _VERDICT_ROW_RE = _re.compile(r"^verdict (PASS|FAIL|NONE) at head ([0-9a-f]{40})
 # "PASS-ish", "PASS? unsure") is NOT a pass. Reasoning belongs in
 # summary and the verdict file, not status_line.
 _PASS_VERDICT_RE = _re.compile(
-    r"(?:QC[ \t]+)?PASS(?:[ \t]+at head [0-9a-f]{7,40})?[.!]?")
+    r"(?:QC[ \t]+)?PASS(?:[ \t]+at head ([0-9a-f]{7,40}))?[.!]?")
 # A QC turn may close with the bare word DONE only; any other QC DONE
-# text carries an opinion and must record a verdict row (below).
-_PLAIN_DONE_RE = _re.compile(r"(?:QC[ \t]+)?DONE[.!]?")
+# text carries an opinion and must record a verdict row (below). Note
+# is_done_status only recognizes a line STARTING with DONE, so there is
+# no "QC DONE" closing form.
+_PLAIN_DONE_RE = _re.compile(r"DONE[.!]?")
 _EVIDENCE_ROLES = ("reviewer", "qc", "records")
 
 
@@ -965,7 +967,15 @@ class Seat:
         # approach accepted qualified passes ("PASS with failures",
         # "PASS once fixed"). Now only the exact grammar is a PASS;
         # everything else, including any FAIL wording, records NONE.
-        outcome = "PASS" if _PASS_VERDICT_RE.fullmatch(sl) else "NONE"
+        outcome = "NONE"
+        m = _PASS_VERDICT_RE.fullmatch(sl)
+        if m:
+            # Round 4 (reviewer): an "at head <sha>" claim is binding,
+            # not decorative - it must prefix-match the actual committed
+            # head (abbreviated shas allowed), or the verdict is NONE.
+            claimed = m.group(1)
+            if claimed is None or head0.startswith(claimed):
+                outcome = "PASS"
         self.bus.append_log(self.name, "verdict",
                             f"verdict {outcome} at head {head0}: "
                             f"{(response.get('summary') or '')[:200]}")
@@ -1115,7 +1125,10 @@ class Seat:
             # other QC DONE text carries an opinion ("DONE FAIL",
             # "DONE - found a blocking bug") and must not ride that
             # earlier PASS silently (product probe, round 3): record
-            # the row so newest-verdict-wins vetoes the close.
+            # the row so newest-verdict-wins vetoes the close. Only
+            # "DONE" (optionally . or !) is the closing form - there is
+            # no "QC DONE" form, since is_done_status requires the line
+            # to start with DONE.
             self._record_qc_verdict(response)
         done_refusal = None
         if done:

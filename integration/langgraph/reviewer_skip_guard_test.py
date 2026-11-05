@@ -268,6 +268,71 @@ for i, line in enumerate(("DONE FAIL", "DONE - found a blocking bug, work is bad
           st["status"] != "done" and st["turn"] == "qc"
           and v[-1]["body"].startswith("verdict NONE at head "))
 
+def set_script(repo, bus, name, script):
+    r = bus.roster()
+    r["seats"][name]["adapter"] = {"type": "mock", "script": script}
+    with open(os.path.join(repo, ".team", "roster.json"), "w") as fh:
+        json.dump(r, fh, indent=2)
+    return Seat(bus, name)
+
+# Case R (review round 4): an "at head <sha>" claim is binding.
+repoR, busR, seatsR = mk_repo(scripts={"builder": [BUILD, DONE_CLAIM], "qc": []})
+seatsR["builder"].act_once()
+headR = subprocess.run(["git", "-C", repoR, "rev-parse", "HEAD"],
+                       capture_output=True, text=True).stdout.strip()
+# good: full sha claim matches the real head
+seatsR["qc"] = set_script(repoR, busR, "qc",
+                          [dict(QC_PASS, status_line="PASS at head " + headR)])
+seatsR["qc"].act_once()
+give_turn(busR, "builder")
+seatsR["builder"].act_once()
+st = busR.state()
+check("41. 'PASS at head <real sha>' satisfies", st["status"] == "done" and st["turn"] is None)
+
+# good: abbreviated sha (7 chars) prefix-matches
+repoS, busS, seatsS = mk_repo(scripts={"builder": [BUILD, DONE_CLAIM], "qc": []})
+seatsS["builder"].act_once()
+headS = subprocess.run(["git", "-C", repoS, "rev-parse", "HEAD"],
+                       capture_output=True, text=True).stdout.strip()
+seatsS["qc"] = set_script(repoS, busS, "qc",
+                          [dict(QC_PASS, status_line="PASS at head " + headS[:7])])
+seatsS["qc"].act_once()
+give_turn(busS, "builder")
+seatsS["builder"].act_once()
+st = busS.state()
+check("42. 'PASS at head <7-char prefix>' satisfies", st["status"] == "done" and st["turn"] is None)
+
+# bad: wrong sha records NONE, DONE refused
+repoT, busT, seatsT = mk_repo(scripts={"builder": [BUILD, DONE_CLAIM], "qc": []})
+seatsT["builder"].act_once()
+seatsT["qc"] = set_script(repoT, busT, "qc",
+                          [dict(QC_PASS, status_line="PASS at head 0000000")])
+seatsT["qc"].act_once()
+give_turn(busT, "builder")
+seatsT["builder"].act_once()
+st = busT.state()
+v = [e for e in busT.log() if e.get("kind") == "verdict"]
+check("43. 'PASS at head <wrong sha>' records NONE and refuses",
+      st["status"] != "done" and st["turn"] == "qc"
+      and v[-1]["body"].startswith("verdict NONE at head "))
+
+# bad: "QC DONE" is not a closing form at all (is_done_status needs a
+# leading DONE); the turn is refused as a null handoff without DONE.
+repoU, busU, seatsU = mk_repo(scripts={
+    "builder": [BUILD],
+    "qc": [dict(QC_PASS, handoff="builder"), dict(DONE_CLAIM, status_line="QC DONE")]})
+seatsU["builder"].act_once()
+seatsU["qc"].act_once()
+give_turn(busU, "qc")
+raised = None
+try:
+    seatsU["qc"].act_once()
+except Exception as e:
+    raised = e
+st = busU.state()
+check("44. 'QC DONE' does not close the cycle (refused as null handoff without DONE)",
+      st["status"] != "done" and raised is not None and "null handoff" in str(raised))
+
 for _r in REPOS:
     shutil.rmtree(_r, ignore_errors=True)
 print("REVIEWER-SKIP GUARD:", "ALL CHECKS PASSED" if ok else "FAILURES PRESENT")

@@ -45,7 +45,7 @@ only on evidence: the verify command re-run at the named commit. PASS
 only when every applicable acceptance criterion has proof. Never edit
 application work; verdict and reasoning only, then hand off to the
 coordinator. When you render a verdict, set status_line to exactly
-"PASS" or "QC PASS" (optionally "PASS at head <sha>"), the whole line
+"PASS" or "QC PASS" (optionally "PASS at head <sha>", which must match the real head), the whole line
 with no qualifier: anything else, including FAIL wording, records a
 non-PASS verdict. Reasoning goes in summary and the verdict file. When
 you close the team yourself, status_line is the bare word DONE.""",
