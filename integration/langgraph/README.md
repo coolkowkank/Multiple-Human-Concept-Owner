@@ -31,9 +31,12 @@ Files:
   four controls below.
 - `launcher/` - vendored copy of the project's own seat runtime (bus,
   roster, adapters, CLI), copied byte-exact from
-  `ryan-continuous-offline` @ 46fa7284a173c4b96a3a08c1ca8ffa22d6693391.
-  Project code, unchanged; included so the documented commands run
-  as-is. Scope note: this predates the later local allowance-window and
+  `ryan-continuous-offline` @ e881384dbfb99748359a19a944cb6575b4961f63
+  (the accepted chain: 46fa7284 baseline + e5ae0a0 queue-binding/argv
+  hardening + 87e4250 transact_paths clean-index/declared restoration +
+  763a01a pre_apply hook/action lock + e881384 thread-owner lock,
+  per-retry release, in-lock freshness recheck). Project code,
+  unchanged; included so the documented commands run as-is. Scope note: this predates the later local allowance-window and
   verified-revision-binding increments (not yet pushed anywhere); none
   of those guards are integrated or claimed here.
 
@@ -86,17 +89,22 @@ IMMEDIATELY before acting:
    failure, so a control commit can neither sweep an in-flight seat's
    changes nor leave a dirty control value behind.
 
-   Control semantics, stated honestly: the guard checks at THREE points
-   - before the adapter runs, after it returns, and (routed upstream,
-   not yet landed) at the seat's pre-apply boundary inside
-   `Seat.act_once`. A pause/update landing before or during an adapter
-   call is refused; the residual window between the post-call check and
-   the seat's apply/commit is microseconds but real until the upstream
-   pre-apply hook exists, and closing it needs a repo-level lock shared
-   by seat apply and operator commits (executor-owned launcher change,
-   requested). Pause NEVER cancels in-flight work - it refuses
-   application of responses that complete after it lands, and blocks
-   the next seat action.
+   Control semantics: the guard checks at FOUR points - before the
+   adapter runs, after it returns, at the seat's accepted pre-apply
+   hook INSIDE the transaction (before any write/verify/handoff), and
+   the upstream runtime itself re-reads fresh state under the shared
+   action lock after the slow adapter call, refusing a turn/turn_seq
+   that moved while the response was produced. Operator control writers
+   take the same per-repo action lock, so a control change is either
+   fully before the seat's final under-lock read or fully after its
+   commit. Accepted scope limits: the lock is advisory and covers this
+   checkout's cooperating writers only (direct git writes and other
+   clones are not isolated); a seat can hold the lock through
+   verification (up to 600s) while the writer timeout is 30s, so a
+   pause during verification surfaces as BusError, not an instant or
+   guaranteed-timed pause; push-retry is at-least-once. Pause NEVER
+   cancels in-flight work - it refuses application of responses that
+   complete after it lands, and blocks the next seat action.
 4. Refusals (including `SeatError` from the project's own stale/lease/
    verify machinery) are recorded and route to the terminal node, never
    swallowed.
@@ -212,7 +220,7 @@ calls. The runner graph ships with no checkpointer: no resume claim.
 
 Self-contained: `launcher/` is vendored here, copied byte-exact from
 this repo's `ryan-continuous-offline` branch at the accepted commit
-46fa7284a173c4b96a3a08c1ca8ffa22d6693391 (the reviewed offline baseline - not
+e881384dbfb99748359a19a944cb6575b4961f63 (the reviewed chain - not
 `main`). Only third-party installs needed (Python >= 3.10, tested on
 3.10.12):
 
