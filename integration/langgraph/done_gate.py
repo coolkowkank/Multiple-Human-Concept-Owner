@@ -322,7 +322,7 @@ def _run_checker(repo, artifact_paths, script, timeout, protect_paths):
         shutil.rmtree(d, ignore_errors=True)
 
 
-def finalize(repo, branch, config_path):
+def _finalize_core(repo, branch, config_path):
     """Operator-owned closeout at the END of a run. Default is fail closed:
     no/invalid config, checker failure or timeout = 'cycle complete, quality
     unproven'. Config (JSON, 0600, outside the lane): checker_cmd (absolute
@@ -375,6 +375,184 @@ def finalize(repo, branch, config_path):
                                  expected_operator_checker_id=cid)
     except Exception as exc:   # fail closed; never echo key material
         return dict(unproven, reason=f"operator finalization failed closed: {type(exc).__name__}: {str(exc)[:120]}")
+
+
+# ---------------------------------------------------------------------------
+# Opt-in pin-consistency REPORT (RW2). NOT an acceptance gate.
+#
+# `pinned` means only that the committed history is consistent with a named
+# reviewer turn that sits directly on the configured reviewed commit and left
+# a committed verdict file, while the checked artifact is unchanged since that
+# commit. It does NOT mean the tests passed, that the review was independent
+# (a reviewer seat name is a claim), or that the reviewer approved: the
+# verdict text is never read. terminal_done, closeout_allowed, cycle_complete
+# and the label are never touched by this report.
+# Limits: check-then-read (history can move between reads; HEAD is re-read at
+# the end and a move yields `unverifiable`), record_ok is shape only (so
+# check_commit is part of the report), and the record is runtime-observed,
+# not tested-tree proof.
+# ---------------------------------------------------------------------------
+PIN_SCHEMA = "pin-consistency/v1"
+PIN_NOTE = ("identity consistency report only: not an acceptance gate, not proof that tests passed, "
+            "not independent review, and the verdict text was not read")
+_HEX40_RE = None
+
+
+class _PinUnverifiable(Exception):
+    pass
+
+
+def _pg(repo, *args):
+    r = subprocess.run(["git", "-C", repo, *args], capture_output=True)
+    return r.returncode, r.stdout
+
+
+def _safe_rel(p):
+    return (isinstance(p, str) and p and not p.startswith("/") and ".." not in p.split("/")
+            and "\\" not in p and "\0" not in p and "\n" not in p)
+
+
+def _pin_cfg(cfg):
+    import re
+    if not isinstance(cfg, dict) or set(cfg) - {"reviewed_commit", "reviewer_seats", "verdict_path"}:
+        raise _PinUnverifiable("pin_check must be an object with only reviewed_commit, reviewer_seats, verdict_path")
+    rc, seats, vp = cfg.get("reviewed_commit"), cfg.get("reviewer_seats"), cfg.get("verdict_path")
+    if not (isinstance(rc, str) and re.fullmatch(r"[0-9a-f]{40}", rc)):
+        raise _PinUnverifiable("reviewed_commit must be a full lowercase 40-hex id")
+    seat_ok = lambda s: isinstance(s, str) and re.fullmatch(r"[A-Za-z0-9._:@-]{1,128}", s)
+    if not (isinstance(seats, list) and seats and all(seat_ok(s) for s in seats)):
+        raise _PinUnverifiable("reviewer_seats must be a non-empty list of seat names")
+    if not _safe_rel(vp) or vp.startswith(".team/"):
+        raise _PinUnverifiable("verdict_path must be a safe repo-relative path outside .team/")
+    return rc, list(seats), vp
+
+
+def pin_consistency(repo, branch, pin_cfg, artifact_paths):
+    """Return the `pin_consistency` report object. Never raises. status is
+    `pinned`, `not_pinned` (with reasons) or `unverifiable`."""
+    repo = os.path.abspath(repo)
+    out = {"schema": PIN_SCHEMA, "status": "unverifiable", "reasons": [], "not_acceptance": True, "note": PIN_NOTE}
+    try:
+        import handoff_record as hr
+        reviewed, seats, vpath = _pin_cfg(pin_cfg)
+        if not (isinstance(artifact_paths, list) and artifact_paths and all(_safe_rel(p) for p in artifact_paths)):
+            raise _PinUnverifiable("artifact_paths must be a non-empty list of safe paths")
+        out.update(reviewed_commit=reviewed, verdict_path=vpath)
+        head0 = head_sha(repo)
+        cur = _pg(repo, "rev-parse", "--abbrev-ref", "HEAD")[1].decode().strip()
+        if cur != branch:
+            raise _PinUnverifiable("HEAD is on %r, expected %r" % (cur, branch))
+        rc, _ = _pg(repo, "cat-file", "-e", reviewed + "^{commit}")
+        if rc != 0:
+            raise _PinUnverifiable("reviewed_commit is not a commit in this repository")
+        reasons = []
+        rc, _ = _pg(repo, "merge-base", "--is-ancestor", reviewed, "HEAD")
+        if rc == 1:
+            reasons.append("reviewed_commit is not an ancestor of HEAD")
+        elif rc != 0:
+            raise _PinUnverifiable("git merge-base failed")
+        rc, plog = _pg(repo, "show", "HEAD:.team/LOG.jsonl")
+        if rc != 0:
+            raise _PinUnverifiable("no committed .team/LOG.jsonl at HEAD")
+        head_lines = set(plog.split(b"\n"))
+        rc, revl = _pg(repo, "rev-list", "--parents", "HEAD")
+        if rc != 0:
+            raise _PinUnverifiable("git rev-list failed")
+        cands = []
+        for line in revl.decode().splitlines():
+            ids = line.split()
+            if len(ids) == 2 and ids[1] == reviewed:
+                subj = _pg(repo, "log", "-1", "--format=%s", ids[0])[1].decode().strip()
+                for s in seats:
+                    if subj == "TURN: %s acting" % s:
+                        cands.append((ids[0], s))
+        if not cands:
+            reasons.append("no configured reviewer turn commit sits directly on reviewed_commit")
+        elif len(cands) > 1:
+            reasons.append("ambiguous: %d reviewer turn commits sit on reviewed_commit" % len(cands))
+        elif not reasons:
+            commit, seat = cands[0]
+            out.update(reviewer_commit=commit, reviewer_seat=seat)
+            rc1, clog = _pg(repo, "show", commit + ":.team/LOG.jsonl")
+            rc2, blog = _pg(repo, "show", reviewed + ":.team/LOG.jsonl")
+            if rc1 != 0 or rc2 != 0:
+                raise _PinUnverifiable("LOG not readable at the reviewer commit or its parent")
+            if not clog.startswith(blog):
+                reasons.append("LOG is not append-only at the reviewer commit")
+            else:
+                new = [l for l in clog[len(blog):].split(b"\n") if l.strip()]
+                rows = []
+                for l in new:
+                    try:
+                        row = json.loads(l)
+                    except ValueError:
+                        reasons.append("an appended LOG line at the reviewer commit is not JSON"); continue
+                    if isinstance(row, dict) and row.get("kind") == "handoff" and row.get("seat") == seat:
+                        rows.append((row, l))
+                if len(rows) != 1:
+                    reasons.append("reviewer commit appended %d handoff rows for seat %s (need exactly 1)" % (len(rows), seat))
+                else:
+                    row, rawline = rows[0]
+                    kind, probs = hr.row_evidence(row)
+                    if kind != "record_ok":
+                        reasons.append("handoff row is %s: %s" % (kind, "; ".join(probs)))
+                    else:
+                        rec = row["record"]
+                        reasons += ["pin_check: " + p for p in hr.pin_check(reviewed, rec)]
+                        cc = hr.check_commit(repo, commit, rec)
+                        if cc["status"] != "match":
+                            reasons += ["check_commit %s: %s" % (cc["status"], "; ".join(cc["problems"]))]
+                        if rawline not in head_lines:
+                            reasons.append("the handoff row is not in the committed LOG at HEAD")
+                        o = rec["facts"]["observed"]
+                        if not o["listed"]:
+                            reasons.append("observed paths are digest-only: verdict_path cannot be established")
+                        else:
+                            hit = [e for e in o["items"] if e["path"] == vpath and e["status"] in ("A", "M")]
+                            if not hit:
+                                reasons.append("verdict_path was not added or modified in the reviewer turn")
+                            else:
+                                out["verdict_blob"] = hit[0]["blob"]
+        for p in artifact_paths:
+            a = _pg(repo, "rev-parse", reviewed + ":" + p)
+            b = _pg(repo, "rev-parse", "HEAD:" + p)
+            if a[0] != 0 or b[0] != 0:
+                reasons.append("artifact path missing at reviewed_commit or HEAD: " + p)
+            elif a[1] != b[1]:
+                reasons.append("artifact changed since reviewed_commit: " + p)
+        if out.get("verdict_blob"):
+            v = _pg(repo, "rev-parse", "HEAD:" + vpath)
+            if v[0] != 0:
+                reasons.append("verdict_path is missing at HEAD")
+            elif v[1].decode("ascii", "replace").strip() != out["verdict_blob"]:
+                reasons.append("verdict_path at HEAD differs from the blob observed in the reviewer turn")
+        if head_sha(repo) != head0:
+            raise _PinUnverifiable("HEAD moved during the check")
+        out["head"] = head0
+        out["reasons"] = reasons
+        out["status"] = "not_pinned" if reasons else "pinned"
+    except _PinUnverifiable as e:
+        out["status"], out["reasons"] = "unverifiable", [str(e)]
+    except Exception as e:   # fail closed, no echo of file content
+        out["status"], out["reasons"] = "unverifiable", ["check failed: " + type(e).__name__]
+    return out
+
+
+def finalize(repo, branch, config_path):
+    """finalize_core plus the optional operator-configured pin_consistency report.
+    With no `pin_check` in the operator config the core result is returned untouched."""
+    res = _finalize_core(repo, branch, config_path)
+    try:
+        _private_file(config_path)
+        cfg = json.load(open(config_path, encoding="utf-8"))
+        if not isinstance(cfg, dict) or "pin_check" not in cfg:
+            return res
+        pin, paths = cfg["pin_check"], cfg.get("artifact_paths")
+    except Exception:
+        return res
+    out = dict(res)
+    out["pin_consistency"] = pin_consistency(repo, branch, pin, paths)
+    return out
 
 
 def main(argv):

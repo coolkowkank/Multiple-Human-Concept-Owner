@@ -277,3 +277,13 @@ Not covered: a kill during the push itself (needs a remote, which the test does 
 
 ## Same-checkout handoff window
 Supervised seats share one worktree. A seat writes its handoff to the worktree inside the action lock and commits afterwards, so a next seat could see `turn == itself` before the commit landed and race it on the git index. A seat now takes the action lock briefly and re-reads state before its preflight. The lock waits at most 30s and then raises BusError, so a waiting seat can exit if a holder is stuck longer. Separate clones with a remote do not share the lock, and it is advisory (cooperative). See ENDURANCE_RESULT_2026-11-05.md for what the scripted mock runs did and did not show.
+
+## Optional pin-consistency report (`pin_check`)
+
+`done_gate.finalize` adds a `pin_consistency` key only if the operator-owned config has a `pin_check` object (`reviewed_commit` = full lowercase 40-hex, `reviewer_seats`, `verdict_path`) next to `artifact_paths`. Without it the result is unchanged. It is a report, not an acceptance gate: `terminal_done`, `closeout_allowed` and the label never change, verdict text is never read, and `pinned` does not mean accepted, tested or independently reviewed. A seat response must never write this config.
+
+`pinned` needs, all from committed git objects: the reviewed commit is an ancestor of HEAD; exactly one single-parent `TURN: <seat> acting` commit for a configured seat sits directly on it; exactly one handoff row from that seat with a shape-valid record that passes `pin_check` and `check_commit` and has its own verify run; that row is in HEAD's committed LOG; `verdict_path` was added or modified in that turn and HEAD still holds the same blob; the listed artifact blobs are equal at the reviewed commit and HEAD; HEAD did not move during the check. Otherwise `not_pinned` with reasons, or `unverifiable`.
+
+Limits: files outside `artifact_paths` can change and stay pinned; check-then-read is not TOCTOU-hardened; `record_ok` is shape only; a reviewer seat name is a claim; same-model review is not independent.
+
+Queue-assisted lanes: the operator's "response queued" commit sits between the reviewed commit and the reviewer turn, and a null-verify reviewer response has no own verify run. In the RW2 lane the report was therefore `not_pinned` for both. The check does not accept a queue commit in between; that would be a separate reviewed change.
