@@ -156,6 +156,13 @@ try:
         ok_sl = True
     check("symlinked audit dir refused", ok_sl)
     check("audit dir mode is 0700", (os.stat(ad).st_mode & 0o777) == 0o700)
+    # --- link rows carry the bus turn_seq (audit-side linkage, not prompt text) ---
+    lk = [json.loads(l) for l in open(os.path.join(ad, "builder.links.jsonl"))]
+    check("link rows carry an int turn_seq; the correction round shares its turn's turn_seq",
+          all(isinstance(r.get("turn_seq"), int) and not isinstance(r["turn_seq"], bool) for r in lk[:2]) and lk[0]["turn_seq"] == lk[1]["turn_seq"])
+    qk = [json.loads(l) for l in open(os.path.join(ad, "reviewer.links.jsonl"))]
+    check("different seats' turns have different turn_seq values", qk[0]["turn_seq"] != lk[0]["turn_seq"])
+    check("turn_seq never appears in any recorded prompt text", all("turn_seq" not in json.dumps(json.loads(l).get("prompt", "")) for l in open(os.path.join(ad, "builder.audit.jsonl"))))
     # --- M1: recorded error history must not break the audited seat's own prompt ---
     for i in range(25):
         bus.append_log("qc", "error", "boom %d" % i)

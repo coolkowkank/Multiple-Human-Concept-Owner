@@ -34,7 +34,15 @@ try:
     r, b, err, h, st0 = attempt(tmp, "d", dict(base, handoff="builder", status_line="handing over"))
     check("named seat: accepted, turn moves", err is None and b.state()["turn"] == "builder")
     r, b, err, h, st0 = attempt(tmp, "e", dict(base, handoff="builder", status_line="DONE early"))
-    check("DONE with a named seat: unchanged behaviour (done wins, turn null)", err is None and b.state()["status"] == "done")
+    check("DONE with a named seat: refused as ambiguous, no residue, turn stays", err and "ambiguous" in err and git(r, "rev-parse", "HEAD") == h and b.state() == st0 and not os.path.exists(os.path.join(r, ".team/NOTE.md")))
+    for form in ("DONE", "DONE.", "DONE - QC pass at head", "DONE: cycle closed", "DONE\tx"):
+        r, b, err, h, st0 = attempt(tmp, "f-" + str(abs(hash(form))), dict(base, handoff=None, status_line=form))
+        check(f"exact DONE form {form!r}: accepted and closes", err is None and b.state()["status"] == "done" and b.state()["turn"] is None)
+    for form in ("DONEZO", "DONE2", "DONE_not", "DONEBUT keep going", "done", " DONE", "NOT DONE"):
+        r, b, err, h, st0 = attempt(tmp, "g-" + str(abs(hash(form))), dict(base, handoff=None, status_line=form))
+        check(f"{form!r} is not DONE: null handoff refused, no residue", err and "no turn holder" in err and b.state() == st0)
+        r, b, err, h, st0 = attempt(tmp, "i-" + str(abs(hash(form))), dict(base, handoff="builder", status_line=form))
+        check(f"{form!r} with a named seat: continues normally, status not done", err is None and b.state()["status"] != "done" and b.state()["turn"] == "builder")
     for nm, bad in (("list", ["builder"]), ("dict", {"a": 1}), ("int", 3), ("empty string", ""), ("unknown seat", "nobody")):
         r, b, err, h, st0 = attempt(tmp, "h-" + nm.split()[0], dict(base, handoff=bad, status_line="x"))
         check(f"handoff {nm}: clean SeatError (no TypeError crash), no residue", err and "CRASH" not in err and git(r, "rev-parse", "HEAD") == h and b.state() == st0 and not os.path.exists(os.path.join(r, ".team/NOTE.md")))

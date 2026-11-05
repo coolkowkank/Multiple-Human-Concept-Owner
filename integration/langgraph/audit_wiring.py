@@ -95,6 +95,10 @@ class AuditedFenced:
     def complete(self, system, prompt):
         self._suffix = ""
         ctx = self._context(); ctx.pop("correction_suffix")
+        # Audit-side linkage only (never rendered into a prompt): the bus
+        # turn number this call belongs to, so usage can be grouped per turn.
+        ts = ctx["state"].get("turn_seq") if isinstance(ctx.get("state"), dict) else None
+        self._turn_seq = ts if isinstance(ts, int) and not isinstance(ts, bool) and ts >= 0 else None
         _, base_task, _ = render_audited_prompt(**ctx)
         meta = getattr(self._seat, "correction_meta", None)
         expected = correction_suffix(**meta) if meta else ""
@@ -131,7 +135,8 @@ class AuditedFenced:
             "event": "audit_fenced_link", "call_id": starts[0]["call_id"],
             "fenced_log": os.path.basename(path) if path else None,
             "n": after if after == before + 1 else None,
-            "correction_round": bool(self._suffix)})
+            "correction_round": bool(self._suffix),
+            "turn_seq": getattr(self, "_turn_seq", None)})
 
     def consume(self):
         return None

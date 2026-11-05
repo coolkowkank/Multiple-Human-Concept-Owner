@@ -122,6 +122,18 @@ def _verify_env():
     return env
 
 
+import re as _re
+_DONE_RE = _re.compile(r"DONE(?![A-Za-z0-9_])")
+
+
+def is_done_status(status_line):
+    """True for a status_line that starts with the word DONE (exactly
+    "DONE", or DONE followed by a non-word character such as space, ':'
+    or '-'). DONEZO, DONE2 and "DONEBUT..." are not DONE. The prompt
+    contract is "put DONE at the start of status_line"."""
+    return isinstance(status_line, str) and bool(_DONE_RE.match(status_line))
+
+
 def prompt_log_tail(bus, limit=20):
     """THE log tail every prompt renders (Seat.build_prompt and the audit
     wiring's context both call this, so they cannot drift). Runtime-written
@@ -774,7 +786,15 @@ class Seat:
         pre_status = response.get("status_line")
         if pre_status is not None and not isinstance(pre_status, str):
             raise SeatError(f"{self.name}: status_line must be a string")
-        if pre_handoff is None and not (pre_status or "").startswith("DONE"):
+        if pre_handoff is not None and is_done_status(pre_status):
+            # Ambiguous: DONE closes the cycle (no turn holder) while a
+            # named seat says "continue". Never guess which was meant.
+            raise SeatError(
+                f"{self.name}: DONE status_line with handoff {pre_handoff!r} "
+                "is ambiguous (DONE closes the cycle and drops the next "
+                "seat); use handoff null to close, or a non-DONE "
+                "status_line to continue")
+        if pre_handoff is None and not is_done_status(pre_status):
             # RW1 null-handoff incident: a null handoff without a DONE
             # status line used to leave turn=None with status "running" -
             # no seat can ever act and nobody is told. Refuse; the turn
@@ -847,7 +867,7 @@ class Seat:
         state["turn_since"] = _now()
         if response.get("status_line"):
             state["status_line"] = response["status_line"]
-        if response.get("status_line", "").startswith("DONE"):
+        if is_done_status(response.get("status_line")):
             state["status"] = "done"
             state["turn"] = None
         elif state["status"] == "forming":
