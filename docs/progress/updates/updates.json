@@ -1,5 +1,5 @@
 {
-  "asOf": "2026-11-05T17:28",
+  "asOf": "2026-11-06T00:13",
   "note": "Project-only status, newest first. This page replaces routine chat reports. It is edited by hand when the project changes; nothing here is a live feed, and it does not claim live, unattended or independently verified operation.",
   "items": [
     {
@@ -73,6 +73,18 @@
       "title": "Public code is not the latest execution state",
       "status": "noted",
       "body": "The public branch holds code and tests. The latest run records, including the failed verifier test and the paused runner, are in a private runner folder and are not in Git. A new operator reads that state with the read-only state checker, and does not reset it: a halt or unknown outcome stands."
+    },
+    {
+      "at": "2026-11-06T00:13",
+      "status": "published",
+      "title": "WP9: offline matched token comparison published on its own branch; no real savings measured",
+      "body": "Branch live/wp9-matched-compare (08732d09b9ff80b41f72a00108226c4d2e040aec, https://github.com/coolkowkank/Multiple-Human-Concept-Owner/tree/live/wp9-matched-compare) adds launcher/matched_compare.py and tests. It compares two arms of tasks over matched pairs only: a task counts when it was accepted in both arms and every call has provider-reported usage with a UUID4 call id, with no id reused across tasks or arms. Missing, mock or estimated usage is excluded, never counted as zero. If the accepted sets differ between arms the verdict is 'survivor_only', and if usable evidence covers fewer than all accepted-in-both tasks it is 'partial_coverage'; in both cases only a restricted figure is shown, never a headline saving. Three independent review rounds; the final pin was accepted as offline descriptive arithmetic. Evidence: 19 tests in the new file, 45 with the usage-join tests, author-run offline. Limits: it is not wired into any runner, the accepted flags and join reports are caller-supplied and unauthenticated (a forged status passes), it is not provider proof and not a significance test. WP9 is not complete: no matched provider-reported data from two arms exists, so no token saving has been measured."
+    },
+    {
+      "at": "2026-11-06T00:13",
+      "status": "failed",
+      "title": "Model-backed WP4 team attempt: launch fault, no deliverable, no WP4 credit",
+      "body": "A small model-backed team attempt was started to try the WP4 flow with real models. The Coordinator seat finished its handoff (provider-reported 911 + 449 tokens, cost 0, no writes), then the process was stopped during the Builder's request. No builder output, library or completed run came out of it. That one Builder request's provider-side outcome and cost are unknown, so the attempt is not claimed free or successful; it used 2 of the reserve calls (11 of 20 lifetime, 9 left). The run was a launch mistake on our side. State and records are preserved unchanged, no retry was made, and model runs stay on hold until a safe execution route is grounded and authorized. It earns no WP4 credit."
     }
   ]
 }
