@@ -467,7 +467,9 @@ class GuardedAdapter:
         All three reads (state, control, roster) are the COMMITTED
         view: an uncommitted hand-edit left in the worktree cannot
         authorize a seat action."""
-        live = _committed_json(self._bus.repo, ".team/STATE.json") or {}
+        live = _committed_json(self._bus.repo, ".team/STATE.json")
+        if not isinstance(live, dict):  # non-dict JSON: no action, clean refusal
+            live = {}
         if live.get("status") != "running":
             raise SeatError(
                 f"{self._seat} refused at seat boundary: bus status "
@@ -487,7 +489,9 @@ class GuardedAdapter:
                 f"{self._seat} refused at seat boundary: instructions "
                 f"moved to seq {control['instruction_seq']}, this seat "
                 f"step started at seq {self._instruction_seq}")
-        roster = _committed_json(self._bus.repo, ".team/roster.json") or {}
+        roster = _committed_json(self._bus.repo, ".team/roster.json")
+        if not isinstance(roster, dict):  # non-dict JSON: no action, clean refusal
+            roster = {}
         spec = roster.get("seats", {}).get(self._seat, {})
         spec_type = spec.get("adapter", {}).get("type")
         if (spec_type not in SAFE_CONSTRUCTORS
