@@ -416,3 +416,19 @@ its TTL ends, so a later budget decision could still allow the ryan step
 inside the window. Nothing here changes any constant. The source delta and its
 review are offline evidence; they qualify no runner role.
 
+Limits of the constant edits (read these with the delta above):
+- The new `QUESTION_BUDGET`, `ENVELOPE_TOTAL` and shared `HTTP_LIFETIME_CAP`
+  are project edits made by the operator side (project controls, not a user
+  approval). They are global headroom, not a reservation for one question:
+  `QUESTION_BUDGET` is a per-question maximum that applies to every question,
+  and the envelope and shared cap are counters for all questions together.
+  Raising them does not by itself permit any request; each live request still
+  needs its own gates (halt state, a signed window where one governs the
+  lineage, the free and route checks).
+- `HTTP_FREE_MODELS` is the fenced HTTP lane's allowlist. Adding
+  `novita/inclusionai/ling-3.0-tiny` admits that id for any seat that uses the
+  fenced lane, which is broader than the runner roles. Only the single live
+  entry that an operator later starts may use it, and nothing here starts one.
+- No role is qualified by this change. A small model may simply fail the
+  required format; that would be a recorded failure.
+
