@@ -182,6 +182,12 @@ def cmd_lease(args):
     if args.holder is not None and not ident.match(args.holder):
         refuse("--holder has characters outside [A-Za-z0-9._:@-]")
     bus = Bus(args.repo, args.branch)
+    cur_branch = subprocess.run(
+        ["git", "-C", bus.repo, "symbolic-ref", "--short", "-q", "HEAD"],
+        capture_output=True, text=True).stdout.strip()
+    if cur_branch != args.branch:
+        refuse(f"checked-out branch is {cur_branch or 'detached HEAD'!r}, "
+               f"not the bus branch {args.branch!r} (--branch)")
     bus.pull()   # git fetch/rebase: show mode is not a pure local read
     if args.name not in bus.roster().get("seats", {}):
         refuse(f"seat {args.name!r} not in roster")
@@ -214,10 +220,13 @@ def cmd_lease(args):
         del state["leases"][args.name]
         bus.write_state(state)
 
-    with bus.action_lock():
-        bus.transact_paths(
-            f"operator: lease released for {args.name} (holder {seen})",
-            [STATE], mutate)
+    try:
+        with bus.action_lock():
+            bus.transact_paths(
+                f"operator: lease released for {args.name} (holder {seen})",
+                [STATE], mutate)
+    except BusError as exc:
+        refuse(f"release not committed: {str(exc)[:300]}")
     print(f"released lease {args.name} (was {seen}); re-queue any queued "
           "response for this bus state")
 
