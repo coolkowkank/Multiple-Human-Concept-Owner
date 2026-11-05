@@ -579,6 +579,18 @@ def _screen_verify_command(cmd, seat: str) -> None:
             f"{_VERIFY_CMD_ALLOWED} and stay relative to the repo")
 
 
+def _adapter_type_ok(adapter, spec_type):
+    """Exact preselected constructor; for http ONLY, the opt-in audit
+    wrapper is allowed when it wraps exactly a FencedHttpAdapter."""
+    if type(adapter) is SAFE_CONSTRUCTORS[spec_type]:
+        return True
+    if spec_type == "http":
+        from audit_wiring import AuditedFenced
+        return (type(adapter) is AuditedFenced
+                and type(adapter.inner) is FencedHttpAdapter)
+    return False
+
+
 class GuardedAdapter:
     """Boundary guard wrapped around the constructed adapter.
 
@@ -675,7 +687,7 @@ class GuardedAdapter:
             raise SeatError(
                 f"{self._seat} refused at seat boundary: http spec: {why}")
         if (spec_type not in SAFE_CONSTRUCTORS
-                or type(self._inner) is not SAFE_CONSTRUCTORS[spec_type]):
+                or not _adapter_type_ok(self._inner, spec_type)):
             raise SeatError(
                 f"{self._seat} refused at seat boundary: adapter "
                 f"{type(self._inner).__name__} is not the preselected "
@@ -778,6 +790,9 @@ def seat_node(seat: str, state: TeamState) -> dict:
                               f"{SAFE_CONSTRUCTORS[spec_type].__name__}"}
     # Boundary guard: re-validates status/turn/control/adapter at the
     # actual adapter call, after the lease claim (see GuardedAdapter).
+    if spec_type == "http" and os.environ.get("LG_AUDIT_DIR"):
+        from audit_wiring import AuditedFenced
+        adapter = AuditedFenced(adapter, seat_obj, os.environ["LG_AUDIT_DIR"])
     guard = GuardedAdapter(
         adapter, bus, seat, read_control(repo)["instruction_seq"],
         context_digest=_context_digest(repo, committed_roster, seat))
