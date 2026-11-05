@@ -121,47 +121,67 @@ def _verify_env():
     return env
 
 
-def _error_record_commit_ok(repo, commit, binding):
-    """True only for the seat's OWN error-record commit (M1): exactly the
-    commit Seat.run writes after a SeatError (`TURN: <seat> error recorded
-    (turn not taken)`), touching ONLY the LOG file, adding ONLY append lines
-    that are JSON {seat: <the bound seat>, kind: "error"[, turn_seq: <the
-    bound turn_seq>]}. It carries no new input for the prompt's decision
-    (brief, roster, code, state are untouched) and records that the turn was
-    NOT taken, so a response reasoned before it is still the answer to the
-    same question. Anything else is staleness."""
+_ERROR_ENTRY_KEYS = {"ts", "seat", "kind", "body"}
+
+
+def _error_record_commit_ok(repo, commit, parent, binding):
+    """True only for the seat's OWN runtime-written error record (M1).
+
+    Authority is the CONTENT, never the commit metadata: the commit touches
+    only LOG; the new LOG blob equals the parent's LOG blob byte-for-byte
+    PLUS appended lines (no deletion, no edit, no mid-file insert); every
+    appended line is exactly one runtime-shaped entry: JSON object whose keys
+    are ts/seat/kind/body (+ optional turn_seq), seat == bound seat, kind ==
+    "error", body a short single string, turn_seq absent or the bound one.
+    The subject must also be the exact runtime string.
+
+    Why this is a no-new-input append: build_prompt() renders the LOG tail
+    WITHOUT kind=="error" entries (see Seat.build_prompt), so an error record
+    cannot change what any seat or operator reasons against, and it records
+    that the turn was NOT taken. Any other change is staleness."""
     seat = binding.get("turn")
     if not isinstance(seat, str) or not seat:
         return False
+
     def git(*a):
-        return subprocess.run(["git", "-C", repo, *a], capture_output=True,
-                              text=True)
-    if git("log", "-1", "--format=%s", commit).stdout.strip() != \
-            f"TURN: {seat} error recorded (turn not taken)":
+        return subprocess.run(["git", "-C", repo, *a], capture_output=True)
+
+    subj = git("log", "-1", "--format=%s", commit).stdout.decode(
+        "utf-8", "replace").strip()
+    if subj != f"TURN: {seat} error recorded (turn not taken)":
         return False
-    files = git("diff-tree", "--no-commit-id", "--name-only", "-r",
-                commit).stdout.split()
-    if files != [LOG]:
+    files = git("diff-tree", "--no-commit-id", "--name-only", "-r", "-z",
+                "--no-renames", commit).stdout.decode(
+        "utf-8", "replace").split("\0")
+    if [f for f in files if f] != [LOG]:
         return False
-    patch = git("show", "--format=", "-U0", commit, "--", LOG).stdout
-    added = 0
-    for line in patch.splitlines():
-        if line.startswith(("+++", "---", "@@", "diff ", "index ", "\\")):
-            continue
-        if line.startswith("-"):
-            return False          # a rewrite or deletion of history
-        if not line.startswith("+"):
-            return False
+    old = git("show", f"{parent}:{LOG}")
+    old = old.stdout if old.returncode == 0 else b""
+    new = git("show", f"{commit}:{LOG}")
+    if new.returncode != 0:
+        return False
+    new = new.stdout
+    if not new.startswith(old) or len(new) == len(old):
+        return False
+    if old and not old.endswith(b"\n"):
+        return False
+    added = new[len(old):]
+    if not added.endswith(b"\n") or len(added) > 8192:
+        return False
+    for raw in added.split(b"\n")[:-1]:
         try:
-            entry = json.loads(line[1:])
+            entry = json.loads(raw.decode("utf-8"))
         except ValueError:
             return False
-        if (not isinstance(entry, dict) or entry.get("seat") != seat
-                or entry.get("kind") != "error"
+        if (not isinstance(entry, dict)
+                or not (set(entry) - {"turn_seq"}) == _ERROR_ENTRY_KEYS
+                or entry["seat"] != seat or entry["kind"] != "error"
+                or not isinstance(entry["body"], str)
+                or len(entry["body"]) > 2000
+                or not isinstance(entry["ts"], str)
                 or entry.get("turn_seq") not in (None, binding.get("turn_seq"))):
             return False
-        added += 1
-    return added > 0
+    return True
 
 
 def head_binding_clean(repo, stamped, binding=None):
@@ -204,7 +224,7 @@ def head_binding_clean(repo, stamped, binding=None):
              "-r", commit], capture_output=True, text=True).stdout.split()
         if files and all(p.startswith(".team/queues/") for p in files):
             continue
-        if not _error_record_commit_ok(repo, commit, binding):
+        if not _error_record_commit_ok(repo, commit, parts[1], binding):
             return False
     return True
 
@@ -457,7 +477,11 @@ class Seat:
         interactive or assistant-mediated operator reasons against the
         same input a live model would get - no side-channel context."""
         brief = self._read(self.bus.repo, ".team/brief.md")
-        recent = self.bus.log(limit=20)
+        # Runtime-written error records are status, not decision input: they
+        # are kept out of the rendered context so recording one can never
+        # change what a queued response was reasoned against (M1).
+        recent = [e for e in self.bus.log()
+                  if e.get("kind") != "error"][-20:]
         system = prompts.system_prompt(self.role)
         task = prompts.task_prompt(
             self.name, self.role, brief, state, recent,

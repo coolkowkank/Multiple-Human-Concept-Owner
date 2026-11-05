@@ -256,7 +256,7 @@ go. See `LIVE_PREP.md`.
 Self-contained: `launcher/` is vendored here, copied byte-exact from
 this repo's `ryan-continuous-offline` branch at the accepted commit
 e881384dbfb99748359a19a944cb6575b4961f63 (the reviewed chain - not
-`main`). Only third-party installs needed (Python >= 3.10, tested on
+`main`). Exceptions, checked against that commit: `runtime.py` carries local changes on top (audit correction binding, verify-sandbox gate, the done-gate hook support, and the M1 head-binding recovery below); `cli.py` differs only by the M1 call-site change; `prompt_audit.py`, `usage_join.py` and `quality_gate.py` are separate vendored additions (md5-pinned). All other launcher files are byte-identical to e881384. M1: a queued response stays valid across the seat's own runtime-written error record (exact append-only content check; error records are not rendered into prompts), and stays stale for any other change. Only third-party installs needed (Python >= 3.10, tested on
 3.10.12):
 
 ```
