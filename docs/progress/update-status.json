@@ -1,10 +1,10 @@
 {
  "content_as_of": "2026-11-05T04:53:00+02:00",
- "next_check_at": "2026-11-05T08:52:44+02:00",
- "schedule_recorded_at": "2026-11-05T07:53:00+02:00",
+ "next_check_at": "2026-11-05T09:52:58+02:00",
+ "schedule_recorded_at": "2026-11-05T08:53:14+02:00",
  "schedule_expires_at": "2026-11-05T14:38:28+02:00",
  "cadence": "Hourly evidence check; publish only when something changes",
  "notice": "This is the recorded next check, not a promise that new content will be published then. Sam model execution is not confirmed by this timer. The published page cannot see an uncommitted check or a deployment waiting in GitHub.",
- "last_check_at": "2026-11-05T07:52:54+02:00",
- "check_result": "Source branches unchanged. Latest qualification remains failed HTTP400 with no verdict; five lifetime reserves consumed. No qualified route/cycle or WP credit; charts unchanged."
+ "last_check_at": "2026-11-05T08:53:07+02:00",
+ "check_result": "Published Gemma Verifier attempt failed response-shape handling; no verdict, HTTP status not recorded, usage/cost unknown. Halted, no retry; six of seven lifetime reserves consumed. No qualified cycle or WP credit."
 }
