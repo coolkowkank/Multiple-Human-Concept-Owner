@@ -1,7 +1,13 @@
 {
- "asOf": "2026-11-05T15:26",
+ "asOf": "2026-11-05T15:50",
  "note": "Project-only status, newest first. This page replaces routine chat reports. It is edited by hand when the project changes; nothing here is a live feed, and it does not claim live, unattended or independently verified operation.",
  "items": [
+  {
+   "at": "2026-11-05T15:50",
+   "title": "Push gate: race found and fixed on a review branch, reviewed offline",
+   "status": "reviewed offline",
+   "body": "An independent offline review of the push gate found a real race: the gate approved one commit, a concurrent writer then moved HEAD, and the push published the unapproved commit. A fix is on branch live/gate-push-binding at 4f77e2f (https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/4f77e2fd0c1981072af0de39675e443f17263ef8). It pushes the exact approved commit, never forced, and then checks every push destination for exactly that commit. A product-side adversarial check also found and closed two false-success cases in that check (a look-alike branch name and a separate push URL). A failed or partly failed push is reported as possibly published or unverified, never as unpublished, and is never retried. The final review found no defect in this scope. Verified offline only. Limits: the check reads the branch tip once and is not atomic; it assumes a single writer; file-system and symlink trust are unchanged; no real remote, provider or account was used. Three code lines now exist and they are separate: execution code d4a7485 (live/operator-done), handover code f92cf45 (live/handover-portability), and the ledger and gate work built on 61ca8c9 and 4f77e2f. The gate fix is not rolled into the runtime. WP6 stays partial with no credit change; the Reviewer-skip guard is still unbuilt and WP10 is untouched."
+  },
   {
    "at": "2026-11-05T15:26",
    "title": "Budget ledger and pacing: scoped review complete, no blockers",

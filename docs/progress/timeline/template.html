@@ -32,11 +32,15 @@ ol.list{list-style:none;padding:0;margin:0;display:grid;gap:2px}
 .item{display:grid;grid-template-columns:52px 28px 1fr;gap:8px;width:100%;text-align:left;font:inherit;font-size:14px;padding:10px 8px;min-height:44px;border:0;border-radius:8px;background:transparent;color:var(--ink);cursor:pointer;align-items:baseline}
 .item:hover{background:#f1f1ee}.item.sel{background:#eceae4}.item .t0,.item .n{color:var(--ink2)}
 footer{margin-top:32px;color:var(--ink2);font-size:14px}
+.plan{display:grid;gap:10px}.pcard{border:1px solid var(--hair);border-radius:12px;padding:12px 14px;background:#fff}.pcard b{font-size:16px}.pst{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:1px 8px;margin-left:8px;background:#eceae4;color:var(--ink)}.pst.blocked{background:#fde2e2;color:#8a1c1c}.pst.review{background:#fff3d6;color:#7a5200}.pcard p{margin:6px 0 0;font-size:14px}.pcard .k{color:var(--ink2)}
 </style><link rel="stylesheet" href="../nav.css"><script src="../nav.js"></script></head><body><main>
 <h1>Coordinator work timeline</h1>
 <p class="fact" id="fact"></p>
 <p>Time runs left to right. Each marker is something recorded in the project repository, placed at its commit time. Tap a marker for its status and evidence.</p>
 <div class="callout"><b>A snapshot, not a live feed</b>This page shows what was recorded up to the time above. The latest state is in the project README. A check that finds no change leaves no record, so it is not drawn. Chart publications are recorded publications only, not proof of scheduled checks. Triggered work has no schedule.</div>
+<h2 id="planh">Forward plan</h2>
+<p class="fact" id="planfact"></p>
+<div class="plan" id="plan"></div>
 <h2>View</h2>
 <div class="controls">
  <div class="row" id="days" role="group" aria-label="Day"></div>
@@ -121,4 +125,9 @@ function render(scrollMode){
  $('foot').textContent='Snapshot as of '+asOfTime+' EET on '+dayLabel(asOfDay)+'. One closed review loop is process evidence, not a standing pass, and earns no milestone credit.';
 }
 render(1);
+const PLAN=__PLAN__;
+(function(){const esc=s=>String(s);$('planfact').textContent='As of '+PLAN.asOf.replace('T',' ')+' EET. '+PLAN.note;
+ const cls=s=>s==='blocked'?'blocked':/review/.test(s)?'review':'';
+ $('plan').innerHTML='';PLAN.items.forEach(i=>{const c=h('div','pcard');const b=h('div');b.appendChild(h('b',null,i.id+' '+i.title));b.appendChild(h('span','pst '+cls(i.state),i.state));c.appendChild(b);
+  c.appendChild(h('p',null,i.detail));[['Needs first',i.after],['Unlocks',i.unlocks],['Done when',i.done_when]].forEach(([k,v])=>{const p=h('p');p.appendChild(h('span','k',k+': '));p.appendChild(document.createTextNode(v));c.appendChild(p)});$('plan').appendChild(c)})})();
 </script></body></html>
