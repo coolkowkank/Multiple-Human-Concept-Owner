@@ -31,3 +31,6 @@ Code: branch live/langgraph-http-seat, accepted head 1e013ac0b967135d60ee236f4b0
 - Independent review finding: the delivered test is one assertion, add(2, 3) == 5. Mutants such as `return 5`, `a*b-1`, `abs(a)+abs(b)` and `int(a)+int(b)` all pass it, and under `python3 -O` the bare assert is stripped. The QC PASS is therefore a smoke gate by the same model that wrote and reviewed the code, not meaningful verification. DONE here means the cycle ran end to end, not that the work met a strong quality bar.
 - A stronger gate would need independent multi-input or unittest checks (negatives, zero, floats) or an operator-held hidden mutation check. None of that was run.
 - Product audit runner (live/wp9-builder-audit-runner) is published but not wired into this graph.
+
+## Addendum 2: gate_enforced for these runs
+The DONE reached in this run was set by the runtime from one model turn, before any operator-side quality hook existed. For this run gate_enforced is false. A later operator check of the same committed add_lib files (see the product record) does not change that. Future records use integration/langgraph/done_gate.py, which writes gate_enforced true only after signed, hash-bound external evidence passed for the artifact committed at the recorded HEAD.
