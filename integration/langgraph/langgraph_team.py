@@ -280,29 +280,23 @@ def _write_control(repo: str, **changes) -> dict:
 
 
 def _operator_transact(repo: str, message: str, paths, mutate):
-    """Operator commit with coherent failure semantics:
-    - precheck the index BEFORE touching the worktree (a pre-staged
-      scratch file must fail the control change BEFORE CONTROL.json is
-      dirtied, not after);
-    - on ANY failure restore the target files from HEAD, so a failed
-      control change never leaves a dirty worktree value the graph
-      could read (read_control only trusts HEAD, but other readers -
-      and the next operator call - should see a clean tree too).
-    """
+    """Operator commit under the SAME per-repo action lock the seats
+    hold through apply+commit (accepted upstream e881384): a control
+    change is either fully before a seat's final under-lock control
+    read or fully after its commit, closing the pause-then-apply race
+    the pre-lock design could only narrow.
+
+    Uses the accepted Bus.transact_paths: clean-index precheck BEFORE
+    mutation, declared-path byte restoration on failure. Scope limits
+    (accepted, documented): the lock is advisory and covers this
+    checkout's cooperating writers only - direct git writes and OTHER
+    clones are not isolated; a seat may hold the lock through
+    verification (up to 600s) while the writer timeout is 30s, so a
+    pause during verification surfaces as BusError (not silent, not
+    instant); push-retry is at-least-once, not exactly-once."""
     bus = Bus(repo, BRANCH)
-    bus.assert_index_clean(message)
-    try:
+    with bus.action_lock():
         return bus.transact_paths(message, paths, mutate)
-    except Exception:
-        # Restore worktree AND index for exactly these paths from HEAD
-        # (the precheck guarantees HEAD is the pre-change state).
-        # Concurrency note: restoration is not race-safe against a
-        # simultaneous seat commit; the coherent fix is the upstream
-        # shared repo lock (executor-owned, already requested).
-        subprocess.run(
-            ["git", "-C", repo, "checkout", "HEAD", "--"] + list(paths),
-            check=False)
-        raise
 
 
 def operator_pause(repo: str, note="operator pause") -> None:
@@ -467,9 +461,19 @@ class GuardedAdapter:
         All three reads (state, control, roster) are the COMMITTED
         view: an uncommitted hand-edit left in the worktree cannot
         authorize a seat action."""
-        live = _committed_json(self._bus.repo, ".team/STATE.json")
-        if not isinstance(live, dict):  # non-dict JSON: no action, clean refusal
-            live = {}
+        # All three committed-view reads happen under the SAME action
+        # lock the operator writers and the seat transaction use, so
+        # state, control and roster are one coherent snapshot - never
+        # split across a racing operator commit. Re-entrant: the seat
+        # already holds this lock when the pre_apply hook calls us.
+        with self._bus.action_lock():
+            live = _committed_json(self._bus.repo, ".team/STATE.json")
+            if not isinstance(live, dict):  # non-dict: clean refusal
+                live = {}
+            control = read_control(self._bus.repo)
+            roster = _committed_json(self._bus.repo, ".team/roster.json")
+            if not isinstance(roster, dict):  # non-dict: clean refusal
+                roster = {}
         if live.get("status") != "running":
             raise SeatError(
                 f"{self._seat} refused at seat boundary: bus status "
@@ -478,7 +482,6 @@ class GuardedAdapter:
             raise SeatError(
                 f"{self._seat} refused at seat boundary: turn is "
                 f"{live.get('turn')!r}")
-        control = read_control(self._bus.repo)
         if control["mode"] != "run":
             raise SeatError(
                 f"{self._seat} refused at seat boundary: operator "
@@ -489,9 +492,6 @@ class GuardedAdapter:
                 f"{self._seat} refused at seat boundary: instructions "
                 f"moved to seq {control['instruction_seq']}, this seat "
                 f"step started at seq {self._instruction_seq}")
-        roster = _committed_json(self._bus.repo, ".team/roster.json")
-        if not isinstance(roster, dict):  # non-dict JSON: no action, clean refusal
-            roster = {}
         spec = roster.get("seats", {}).get(self._seat, {})
         spec_type = spec.get("adapter", {}).get("type")
         if (spec_type not in SAFE_CONSTRUCTORS
@@ -565,8 +565,16 @@ def seat_node(seat: str, state: TeamState) -> dict:
                               f"{SAFE_CONSTRUCTORS[spec_type].__name__}"}
     # Boundary guard: re-validates status/turn/control/adapter at the
     # actual adapter call, after the lease claim (see GuardedAdapter).
-    seat_obj.adapter = GuardedAdapter(
+    guard = GuardedAdapter(
         adapter, bus, seat, read_control(repo)["instruction_seq"])
+    seat_obj.adapter = guard
+    # Accepted upstream pre_apply hook (e881384): runs INSIDE the seat
+    # transaction - after the under-lock fresh state re-read and the
+    # queue-binding checks, BEFORE any write/verify/handoff. Raising
+    # SeatError aborts with no residue; the queue line is not consumed.
+    # This closes the residual window between the post-call check and
+    # apply/commit that the pre-hook design documented as open.
+    seat_obj.pre_apply = lambda s, st, resp: guard.boundary_check()
 
     if SEAT_GATE is not None:
         SEAT_GATE.acquire()
