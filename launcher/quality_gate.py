@@ -13,20 +13,24 @@ default runner on purpose.
 
 Thresholds below are PROPOSED defaults, not validated against real projects.
 A passing gate is evidence that these mutants were caught, not proof of
-correctness. A mutant list is bounded and deterministic.
+correctness; labels are gate_passed / operator_check_passed, never "proven".
+Reports and operator results are only believed when signed (HMAC) with an
+operator-held key the seats never see; a plain dict cannot carry a pass. A mutant list is bounded and deterministic.
 """
 from __future__ import annotations
 
 import ast
 import copy
 import hashlib
+import hmac
 import json
 
 MAX_MUTANTS = 60
 MIN_CONCLUSIVE = 5
 MIN_SCORE = 0.8
 MAX_INCONCLUSIVE_FRACTION = 0.2
-MAX_HARVESTED = 6
+MAX_HARVESTED = 12
+GATE_VERSION = 'quality-gate-v2'
 
 
 def _docstring_nodes(tree):
@@ -41,7 +45,8 @@ def _docstring_nodes(tree):
 
 
 def harvest_expected_constants(test_sources):
-    """Literal values tests compare against (int/str only, bounded, ordered)."""
+    """Literal int/float/str values tests mention (bool excluded), in first-seen
+    order. Returns (values, truncated); truncated=True if more than the cap."""
     seen, out = set(), []
     for src in test_sources:
         try:
@@ -50,11 +55,11 @@ def harvest_expected_constants(test_sources):
             continue
         for n in ast.walk(tree):
             if isinstance(n, ast.Constant) and not isinstance(n.value, bool) \
-                    and isinstance(n.value, (int, str)) and n.value not in ('',):
+                    and isinstance(n.value, (int, float, str)) and n.value != '':
                 key = (type(n.value).__name__, n.value)
                 if key not in seen:
                     seen.add(key); out.append(n.value)
-    return out[:MAX_HARVESTED]
+    return out[:MAX_HARVESTED], len(out) > MAX_HARVESTED
 
 
 _CMP = {ast.Lt: ast.LtE, ast.LtE: ast.Lt, ast.Gt: ast.GtE, ast.GtE: ast.Gt,
@@ -111,6 +116,35 @@ def generate_mutants(source, hardcode_values=()):
     return out
 
 
+def checker_id():
+    """Identity of this gate's configuration (version + thresholds)."""
+    return hashlib.sha256(json.dumps([GATE_VERSION, MAX_MUTANTS, MIN_CONCLUSIVE, MIN_SCORE,
+                                      MAX_INCONCLUSIVE_FRACTION, MAX_HARVESTED]).encode()).hexdigest()
+
+
+def _canon(obj):
+    return json.dumps(obj, sort_keys=True, separators=(',', ':')).encode()
+
+
+def sign(key, payload):
+    """Operator-side: authenticate a report/result. key is bytes held outside the seats."""
+    return {'payload': payload, 'sig': hmac.new(key, _canon(payload), hashlib.sha256).hexdigest()}
+
+
+def verify(key, signed):
+    """Return the payload if the signature is valid, else None. Never raises."""
+    try:
+        if not isinstance(key, (bytes, bytearray)) or len(key) < 16 or not isinstance(signed, dict):
+            return None
+        p, sig = signed.get('payload'), signed.get('sig')
+        if not isinstance(p, dict) or not isinstance(sig, str):
+            return None
+        want = hmac.new(bytes(key), _canon(p), hashlib.sha256).hexdigest()
+        return p if hmac.compare_digest(want, sig) else None
+    except Exception:
+        return None
+
+
 def artifact_sha256(files):
     """Hash of the exact artifact revision (sorted path + content)."""
     h = hashlib.sha256()
@@ -132,22 +166,28 @@ def _verdict(rep):
         return 'malformed'
     if any('hardcoded' in str(x.get('desc')) for x in rep.get('survivors') if isinstance(x, dict)):
         return 'failed'
+    if rep.get('harvest_truncated') is True:
+        return 'insufficient_evidence'
     if k + sv < MIN_CONCLUSIVE or (n and inc / n > MAX_INCONCLUSIVE_FRACTION):
         return 'insufficient_evidence'
     return 'passed' if k / (k + sv) >= MIN_SCORE else 'failed'
 
 
-def run_gate(source_files, test_files, run_tests, target):
+def run_gate(source_files, test_files, run_tests, target, run_tests_optimized=None, runner_id=None):
     """Mutate `target` (a key of source_files), run all tests per mutant.
 
     source_files/test_files: {path: text}. run_tests(files) -> 'pass'|'fail'|'error'
     where files is the merged dict. The baseline must pass; otherwise the gate
     is 'baseline_not_passing' and nothing is mutated.
     """
+    if target not in source_files:
+        raise ValueError('target is not one of the source files')
     files = dict(source_files); files.update(test_files)
     base = run_tests(files)
     rep = {'schema': 'quality-gate/v1', 'target': target, 'baseline': base,
-           'artifact_sha256': artifact_sha256(files),
+           'artifact_sha256': artifact_sha256(files), 'checker_id': checker_id(),
+           'runner_id': runner_id,
+           'o_policy': 'checked' if run_tests_optimized is not None else 'not_checked',
            'killed': 0, 'survived': 0, 'inconclusive': 0, 'survivors': [],
            'thresholds': {'min_score': MIN_SCORE, 'min_conclusive': MIN_CONCLUSIVE,
                           'max_inconclusive_fraction': MAX_INCONCLUSIVE_FRACTION,
@@ -155,12 +195,29 @@ def run_gate(source_files, test_files, run_tests, target):
     if base != 'pass':
         rep.update(verdict='baseline_not_passing', score=None, mutants=0)
         return rep
-    hard = harvest_expected_constants(test_files.values())
-    mutants = generate_mutants(source_files[target], hard)
+    if run_tests_optimized is not None and run_tests_optimized(files) != 'pass':
+        rep.update(verdict='baseline_not_passing', score=None, mutants=0, baseline='fail_under_O')
+        return rep
+    hard, trunc = harvest_expected_constants(test_files.values())
+    rep['harvest_truncated'] = trunc
+    try:
+        mutants = generate_mutants(source_files[target], hard)
+    except SyntaxError:
+        rep.update(verdict='malformed_target', score=None, mutants=0)
+        return rep
     rep['mutants'] = len(mutants)
     for mid, desc, text in mutants:
         f = dict(files); f[target] = text
         r = run_tests(f)
+        if r == 'fail' and run_tests_optimized is not None:
+            ro = run_tests_optimized(f)
+            if ro == 'pass':   # killed only by asserts that python -O strips
+                rep['survived'] += 1
+                rep['survivors'].append({'id': mid, 'desc': desc + ' [survives under -O]'})
+                continue
+            if ro != 'fail':
+                rep['inconclusive'] += 1
+                continue
         if r == 'fail':
             rep['killed'] += 1
         elif r == 'pass':
@@ -174,18 +231,20 @@ def run_gate(source_files, test_files, run_tests, target):
     return rep
 
 
-def evaluate_done(cycle_complete, gate_report, qc=None, current_artifact_sha256=None,
-                  operator_result=None):
-    """Terminal DONE with an explicit quality label, bound to one artifact revision.
+def evaluate_done(cycle_complete, signed_gate, qc=None, current_artifact_sha256=None,
+                  signed_operator_result=None, *, operator_key=None, expected_target=None,
+                  expected_runner_id=None, expected_operator_checker_id=None,
+                  require_o_policy=True):
+    """Terminal DONE with explicit, bounded evidence labels.
 
-    terminal_done requires cycle completion AND a quality proof bound to
-    current_artifact_sha256: either a mutation-gate report that recomputes to
-    'passed', or an operator-held check result that accepted that exact
-    revision. Stale (different revision), inconsistent or unbound evidence is
-    'unproven'; an operator rejection of the current revision is 'failed' and
-    overrides a gate pass. A QC verdict, same-model or not, never counts.
-    Reports are unauthenticated data: the caller must obtain them from its own
-    operator-side run, not from a seat's output.
+    Evidence labels are gate_passed / operator_check_passed (bounded evidence,
+    not proof). terminal_done needs cycle completion AND one such label, where
+    the evidence is HMAC-signed by operator_key, bound to current_artifact_sha256,
+    this gate's checker_id, expected_target (and expected_runner_id /
+    expected_operator_checker_id when given), and for gates an -O-checked run
+    (require_o_policy). Plain dicts, stale, mismatched or inconsistent evidence is
+    'unproven'; a valid operator rejection overrides a gate pass. QC verdicts,
+    same-model or not, never count.
     """
     reasons = []
     if cycle_complete is not True:
@@ -195,25 +254,38 @@ def evaluate_done(cycle_complete, gate_report, qc=None, current_artifact_sha256=
         reasons.append('no current artifact revision to bind quality evidence to')
         cur = None
     quality = 'unproven'
-    # operator-held check
-    op = operator_result if isinstance(operator_result, dict) else None
-    op_state = None
-    if op is not None:
-        if cur is None or op.get('artifact_sha256') != cur:
+    op_state = gate_state = None
+    if signed_operator_result is not None:
+        p = verify(operator_key, signed_operator_result)
+        if p is None:
+            reasons.append('operator result not authenticated (bad or missing signature/key)')
+        elif cur is None or p.get('artifact_sha256') != cur:
             reasons.append('operator result is for a different or unknown artifact revision')
-        elif op.get('accepted') is True:
+        elif expected_operator_checker_id is None or p.get('checker_id') != expected_operator_checker_id:
+            reasons.append('operator result is from an unexpected or unspecified checker')
+        elif p.get('accepted') is True and p.get('state') == 'accepted':
             op_state = 'accepted'
-        elif op.get('accepted') is False:
+        elif p.get('accepted') is False and p.get('state') == 'rejected':
             op_state = 'rejected'
-    gate_state = None
-    if gate_report is not None:
-        if not isinstance(gate_report, dict):
-            reasons.append('gate report malformed')
-        elif cur is None or gate_report.get('artifact_sha256') != cur:
-            reasons.append('gate report is stale: artifact revision changed or unknown')
         else:
-            v = _verdict(gate_report)
-            if v != gate_report.get('verdict'):
+            reasons.append('operator result is not a clean accept or reject')
+    if signed_gate is not None:
+        g = verify(operator_key, signed_gate)
+        if g is None:
+            reasons.append('gate report not authenticated (bad or missing signature/key)')
+        elif cur is None or g.get('artifact_sha256') != cur:
+            reasons.append('gate report is stale: artifact revision changed or unknown')
+        elif g.get('checker_id') != checker_id():
+            reasons.append('gate report is from a different gate configuration')
+        elif expected_target is None or g.get('target') != expected_target:
+            reasons.append('gate report target does not match the expected source target')
+        elif expected_runner_id is not None and g.get('runner_id') != expected_runner_id:
+            reasons.append('gate report was run by an unexpected runner')
+        elif require_o_policy and g.get('o_policy') != 'checked':
+            reasons.append('gate did not check behavior under python -O')
+        else:
+            v = _verdict(g)
+            if v != g.get('verdict'):
                 reasons.append('gate report inconsistent: verdict does not match its counts')
             elif v == 'passed':
                 gate_state = 'passed'
@@ -227,11 +299,11 @@ def evaluate_done(cycle_complete, gate_report, qc=None, current_artifact_sha256=
     elif gate_state == 'failed':
         quality = 'failed'
     elif op_state == 'accepted':
-        quality = 'proven_by_operator_check'
+        quality = 'operator_check_passed'
     elif gate_state == 'passed':
-        quality = 'proven_by_mutation_gate'
-    if quality == 'unproven' and gate_report is None and op is None:
-        reasons.append('no quality gate or operator check; QC verdict alone cannot prove quality')
+        quality = 'gate_passed'
+    if quality == 'unproven' and signed_gate is None and signed_operator_result is None:
+        reasons.append('no quality gate or operator check; QC verdict alone cannot establish quality')
     qc_note = None
     if isinstance(qc, dict):
         same = qc.get('model') is not None and qc.get('model') == qc.get('builder_model')
@@ -240,5 +312,6 @@ def evaluate_done(cycle_complete, gate_report, qc=None, current_artifact_sha256=
         if same:
             reasons.append('QC used the same model as the builder: smoke only')
     return {'cycle_complete': cycle_complete is True, 'quality': quality,
-            'terminal_done': cycle_complete is True and quality.startswith('proven_by_'),
-            'artifact_sha256': cur, 'qc': qc_note, 'reasons': reasons}
+            'terminal_done': cycle_complete is True and quality in ('gate_passed', 'operator_check_passed'),
+            'artifact_sha256': cur, 'qc': qc_note, 'reasons': reasons,
+            'note': 'bounded evidence, not proof of correctness'}
