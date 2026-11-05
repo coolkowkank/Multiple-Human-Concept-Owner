@@ -161,7 +161,9 @@ class PromptAuditAdapter:
         try:
             row = dict(event='adapter_call_returned', call_id=call_id,
                        provider_tokens=None)
-            evidence = reported_call_evidence(getattr(self.inner, 'last_call', None))
+            evidence = (reported_call_evidence(getattr(self.inner, 'last_call', None))
+                        if getattr(type(self.inner), 'REPORTS_PROVIDER_USAGE', False) is True
+                        else None)
             if evidence is not None:
                 row['reported'] = evidence
             self._record(row)

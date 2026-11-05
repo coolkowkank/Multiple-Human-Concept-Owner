@@ -183,6 +183,11 @@ class CliAdapter(Adapter):
 
 
 class HttpAdapter(Adapter):
+    # Class-level capability: only adapters that really call a provider and set
+    # last_call from its response declare this. The audit wrapper checks the
+    # CLASS, not instance data, before trusting last_call.
+    REPORTS_PROVIDER_USAGE = True
+
     """OpenAI-compatible chat completions. Works with any provider or
     local server exposing that API shape. API key from env var."""
 

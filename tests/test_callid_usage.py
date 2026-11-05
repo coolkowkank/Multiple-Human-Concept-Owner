@@ -19,6 +19,7 @@ def body(**kw):
 
 
 class Stub:
+    REPORTS_PROVIDER_USAGE = True
     def __init__(self, last): self.last_call = last
     def complete(self, s, p): return {"summary": "x", "handoff": None}
 
@@ -90,7 +91,7 @@ class T(unittest.TestCase):
         rows2 = run_audit(Stub(last))  # same provider id on a different call_id
         rep2 = join(rows + rows2, usage_from_audit(rows + rows2))
         self.assertIsNone(rep2['provider_prompt_tokens'])
-        self.assertEqual({r['status'] for r in rep2['rows']}, {'error:request_id_reused'})
+        self.assertEqual({r['status'] for r in rep2['rows']}, {'error:response_id_reused'})
 
     def test_missing_usage_yields_no_record(self):
         rows = run_audit(Stub({'origin': 'provider', 'response_id': 'cmpl-1', 'usage': None}))
@@ -106,7 +107,40 @@ class NoId(unittest.TestCase):
         rows = run_audit(Stub({'origin': 'provider', 'response_id': None, 'usage': {'prompt_tokens': 4, 'completion_tokens': 2}}))
         rep = join(rows, usage_from_audit(rows))
         self.assertEqual(rep['provider_joined'], 1)
-        self.assertIsNone(rep['rows'][0]['request_id'])
+        self.assertIsNone(rep['rows'][0]['response_id_sha256'])
         rows2 = run_audit(Stub({'origin': 'provider', 'response_id': None, 'usage': {'prompt_tokens': 1, 'completion_tokens': 1}}))
         rep2 = join(rows + rows2, usage_from_audit(rows + rows2))
         self.assertEqual(rep2['provider_prompt_tokens'], 5)
+
+
+class Boundary(unittest.TestCase):
+    def test_instance_cannot_claim_provider_origin(self):
+        class Liar:
+            def __init__(self): self.last_call = {'origin': 'provider', 'response_id': 'a', 'usage': {'prompt_tokens': 1, 'completion_tokens': 1}}
+            def complete(self, s, p): return {"summary": "x", "handoff": None}
+        self.assertNotIn('reported', run_audit(Liar())[-1])
+        l = Liar(); l.REPORTS_PROVIDER_USAGE = True  # instance attr is not the class capability
+        self.assertNotIn('reported', run_audit(l)[-1])
+
+    def test_non_dict_and_unhashable_rows_do_not_raise(self):
+        good = run_audit(Stub({'origin': 'provider', 'response_id': None, 'usage': {'prompt_tokens': 1, 'completion_tokens': 1}}))
+        junk = [None, 5, 'x', [], {'call_id': ['u']}, {'call_id': {'a': 1}}, {'event': 'adapter_call_start'}]
+        rep = join(good + junk, usage_from_audit(good + junk) + junk)
+        self.assertEqual(rep['provider_joined'], 1)
+        self.assertEqual(rep['ignored_audit_rows'], 7)
+        self.assertEqual(join('nope', None)['total_calls'], 0)
+
+    def test_count_bound_matches_wrapper(self):
+        from launcher.usage_join import join as j
+        a = [{'event': 'adapter_call_start', 'call_id': 'a', 'audit': {}}, {'event': 'adapter_call_returned', 'call_id': 'a'}]
+        for v in (10 ** 9, 10 ** 12):
+            r = j(a, [{'call_id': 'a', 'origin': 'provider', 'prompt_tokens': v, 'completion_tokens': 1}])
+            self.assertEqual(r['rows'][0]['status'], 'error:bad_usage_counts')
+
+    def test_both_sources_same_call_id_is_duplicate(self):
+        rows = run_audit(Stub({'origin': 'provider', 'response_id': None, 'usage': {'prompt_tokens': 1, 'completion_tokens': 1}}))
+        cid = rows[0]['call_id']
+        extra = [{'call_id': cid, 'origin': 'provider', 'prompt_tokens': 9, 'completion_tokens': 9}]
+        rep = join(rows, usage_from_audit(rows) + extra)
+        self.assertEqual(rep['rows'][0]['status'], 'error:duplicate_usage')
+        self.assertIsNone(rep['provider_prompt_tokens'])

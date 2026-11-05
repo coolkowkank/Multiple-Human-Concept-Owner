@@ -263,3 +263,13 @@ only exposes `last_call`; no runtime path enables this by default. No provider
 call has been made through it and no savings are measured or claimed.
 Requesty lane: sends no client request id and captures no body id, so its rows
 yield no `reported` evidence until that transport is changed (separate lane).
+
+Amendments after independent review: the join field is named
+`response_id_sha256` (sha256 of the provider-reported response id, not a vendor
+request id). The audit wrapper trusts `last_call` only when the adapter CLASS
+sets `REPORTS_PROVIDER_USAGE = True` (instance data cannot claim it). Join
+counts use the wrapper bound (plain int, 0 <= n < 1e9); non-dict or non-string
+`call_id` rows are ignored and counted, never raised on; invalid JSON lines in
+the CLI abort with a message. CLI sources: audit-derived usage is added to the
+USAGE file, and a call_id present in both gives `error:duplicate_usage`.
+All token figures are provider-REPORTED, not verified.

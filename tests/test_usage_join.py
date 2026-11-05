@@ -9,7 +9,7 @@ def A(cid, term='adapter_call_returned', est=10):
 
 
 def U(cid, origin='provider', rid='r1', p=5, c=3):
-    return {'call_id': cid, 'origin': origin, 'request_id': rid, 'prompt_tokens': p, 'completion_tokens': c}
+    return {'call_id': cid, 'origin': origin, 'response_id_sha256': rid, 'prompt_tokens': p, 'completion_tokens': c}
 
 
 class T(unittest.TestCase):
@@ -57,9 +57,9 @@ class T(unittest.TestCase):
     def test_error_terminal_still_joinable(self):
         self.assertEqual(self.st(join(A('a', 'adapter_call_error'), [U('a')])), 'joined_provider')
 
-    def test_reused_request_id_blocks_totals(self):
+    def test_reused_response_id_sha256_blocks_totals(self):
         r = join(A('a') + A('b'), [U('a'), U('b')])
-        self.assertEqual({x['status'] for x in r['rows']}, {'error:request_id_reused'})
+        self.assertEqual({x['status'] for x in r['rows']}, {'error:response_id_reused'})
         self.assertIsNone(r['provider_prompt_tokens'])
 
     def test_totals_only_provider(self):
