@@ -107,6 +107,20 @@ def e2e():
         check("usage log has one line per attempt", len(lines) == len(HITS))
         check("no key in usage log", "fake-key-not-real" not in open(ulog).read())
         check("usage log outside repo", not os.path.exists(os.path.join(tmp, "lane", "usage.jsonl")))
+        # nonzero cost response: stop fail-closed, no further request
+        shutil.rmtree(tmp); tmp = tempfile.mkdtemp()
+        ulog = os.path.join(tmp, "usage.jsonl")
+        MODE["cost"] = 0.01
+        del HITS[:]
+        try:
+            seat_run(tmp, dict(spec, usage_log=ulog, call_budget=4))
+        except BaseException as e:
+            print("  (run ended: %s)" % type(e).__name__)
+        MODE["cost"] = 0
+        check("nonzero cost: exactly one request then stop (hits %d)" % len(HITS),
+              len(HITS) == 1)
+        # missing cost field with require_zero_cost: reported as not charged only
+        # if present; absence is NOT proof of zero (documented, not asserted here)
         # tampered committed roster: other host -> zero new requests
         shutil.rmtree(tmp); tmp = tempfile.mkdtemp()
         bad = dict(spec, base_url="http://127.0.0.1:9/v1",
