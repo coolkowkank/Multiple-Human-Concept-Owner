@@ -201,3 +201,7 @@ free-unlimited.
 ## Recorded errors and prompts
 
 When a seat's turn fails and the runtime records `TURN: <seat> error recorded (turn not taken)`, the entry stays in `.team/LOG.jsonl` for the operator, but error entries are not shown to seats in prompts (the prompt tail is the last 20 non-error entries, from one shared helper used by the seat and the audit wiring). This is what lets a queued response survive its own seat's recorded transient error; any other change to the repo since the response was queued still makes it stale and needs `respond --discard-stale`.
+
+## Session leases and `launcher lease`
+
+A seat's lease is written by a completed turn and refuses a different session (new clone or machine, or a restart with a new session id) as that seat for 900 seconds. It is a liveness hint: duplicate application is stopped separately by turn/turn_seq and the transaction. To inspect: `python -m launcher lease SEAT --repo REPO --branch BRANCH`. To end the wait after you have checked the old session is really gone: `... lease SEAT --release --holder HOLDER` (HOLDER must equal the holder shown; one operator commit changing only that lease entry in STATE.json, under the repo action lock). Queued responses bound to the older head are stale after a release and must be re-queued. This is cooperative, same-checkout locking, not a distributed lock: it does not make unattended multi-machine operation safe.

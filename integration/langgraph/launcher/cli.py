@@ -9,7 +9,7 @@ import subprocess
 import sys
 
 from .adapters import MockAdapter
-from .bus import Bus
+from .bus import Bus, BusError
 from .runtime import Seat
 from .supervisor import Supervisor
 
@@ -130,6 +130,58 @@ def cmd_answer(args):
             with open(answers, "w") as fh:
                 fh.write(snapshot)
         raise
+
+
+def cmd_lease(args):
+    """Show a seat's session lease, or (operator-attested) release it.
+
+    A lease is written only by a COMPLETED turn and is a liveness hint, not
+    the correctness mechanism (turn/turn_seq + the transaction already stop a
+    duplicate apply). A successor session (new clone/machine, or a restart
+    with a new session id) is refused until the lease is older than the TTL
+    (900s). This command is the bounded operator recovery for that wait:
+    --release requires --holder HOLDER, which must equal the CURRENT holder
+    (compare-and-set: you cannot release a lease you did not inspect), runs
+    under the repo action lock, changes only STATE.json's leases entry, and
+    never touches turn, turn_seq, status, log or queues. Because STATE.json
+    changes, queued responses bound to an older head are stale and must be
+    re-queued: the head binding is not weakened."""
+    import time as _t
+    from .bus import STATE
+    bus = Bus(args.repo, args.branch)
+    bus.pull()
+    leases = bus.state().get("leases", {})
+    lease = leases.get(args.name)
+    if lease is None:
+        print(f"lease {args.name}: none")
+        if args.release:
+            sys.exit(1)
+        return
+    age = _t.time() - lease.get("claimed_at", 0)
+    print(f"lease {args.name}: holder={lease.get('holder')} "
+          f"age={int(age)}s (a different session is refused for 900s)")
+    if not args.release:
+        return
+    if args.holder != lease.get("holder"):
+        print("refused: --release needs --holder equal to the holder shown "
+              "above (compare-and-set)", file=sys.stderr)
+        sys.exit(1)
+    seen = lease.get("holder")
+
+    def mutate():
+        state = bus.state()
+        cur = state.get("leases", {}).get(args.name)
+        if cur is None or cur.get("holder") != seen:
+            raise BusError(f"lease for {args.name} changed; re-inspect")
+        del state["leases"][args.name]
+        bus.write_state(state)
+
+    with bus.action_lock():
+        bus.transact_paths(
+            f"operator: lease released for {args.name} (holder {seen})",
+            [STATE], mutate)
+    print(f"released lease {args.name} (was {seen}); re-queue any queued "
+          "response for this bus state")
 
 
 def cmd_prompt(args):
@@ -371,6 +423,13 @@ def main(argv=None):
                         "turn/seq) before appending; without it a "
                         "stale queue is an error, not a silent append")
     p.set_defaults(fn=cmd_respond)
+
+    p = sub.add_parser("lease", help="show or (operator-attested) release a seat session lease")
+    base(p)
+    p.add_argument("name")
+    p.add_argument("--release", action="store_true")
+    p.add_argument("--holder", help="the holder shown by `lease NAME`; required with --release")
+    p.set_defaults(fn=cmd_lease)
 
     p = sub.add_parser("conform", help="check .team against the evidence interface")
     p.add_argument("--repo", default=".")
