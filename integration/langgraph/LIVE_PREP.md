@@ -47,15 +47,32 @@ operation on the project, not an owner approval question.
    the named env var at call time, injected by the operator for the
    run's duration only - never stored or committed. NO live step until
    the integrated exact head passes independent review and main says
-   go. Accounting integration (reviewer requirement): the post factory
-   alone has no root/ledger/grant/expiry - a direct call bypasses the
-   reserve ledger entirely, so the transport must ONLY ever run inside
-   the integrated runner (this lane passes it exclusively into
-   rc.step), and the runner must revalidate halt/grant at the
-   immediate pre-I/O boundary AFTER reservation, plus completion
-   checks. Missing usage/cost in a response is not proof of $0 - the
-   free determination rests on vendor docs + the fresh price-0
-   listing, not on observed usage fields.
+   go. Missing usage/cost in a response is not proof of $0 - the free
+   determination rests on vendor docs + the fresh price-0 listing, not
+   on observed usage fields.
+
+   Accounting integration, ENFORCED in live_lane.bounded_live_step (not
+   delegated to helper names):
+   - Transport identity: the injected factory must carry
+     REVIEWED_TRANSPORT_ID equal to this run's expected value, else
+     refusal. The vendored rc.http_post_factory does NOT carry it and
+     is refused.
+   - The factory is invoked ONLY inside rc.step: no direct-call
+     surface exists in the module, so a bare post cannot bypass the
+     reserve ledger.
+   - Pre-I/O recheck: the vendored runner (88a610a) reserves and then
+     posts with NO fresh halt/grant recheck in between. live_lane adds
+     it: a wrapper re-reads the ledger and grant from disk immediately
+     before any socket opens (after the runner's reservation) and
+     raises Halt on any halt line, invalid or expired grant; the
+     runner's settle() records that as a consumed unknown outcome,
+     never a silent retry. Completion-side checks remain the runner's.
+   - Per-process counter caps actual post invocations at the signed
+     window's max_requests (hard ceiling PER_RUN_REQUEST_CEILING=2);
+     the runner's reserve ledger is the durable count.
+   - Run allowlist: every model in the committed assignments.json must
+     be in the run's exact free-ID allowlist AND pass check_free_route
+     (working route, price 0/0, fresh listing).
 5. Ledger: append-only. The run adds reserve/result/window lines to the
    existing ledger; nothing is rewritten. Clearing the durable halt and
    reconfiguring the self-imposed envelope are executor operations on
