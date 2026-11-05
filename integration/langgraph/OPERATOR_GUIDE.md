@@ -211,3 +211,7 @@ A seat's lease is written by a completed turn and refuses a different session (n
 ## Relay hints
 
 The relay (`launcher serve`, loopback only, bearer token) carries wake hints only; the git bus is the record and a missing hint costs latency, never correctness. A seat that loses the relay prints one line, falls back to git polling and retries the relay after 60 seconds (before, it stayed off for the life of the process). A relay restart changes its epoch and restarts sequence numbers; seats detect that and resync (before, they ignored every new hint). The server caps request bodies at 64KB, keeps the last 1000 hints and caps field lengths. Hints are not authenticated beyond the shared token and are never trusted as instructions. This does not make unattended multi-machine operation safe.
+
+## Handoff validation
+
+Before any write, a seat response is refused (SeatError, recorded, the turn stays with the seat) when: `handoff` is not null or the name of a roster seat; `status_line` is present but not a string; or `handoff` is null and `status_line` does not start with `DONE`. The last case used to leave `turn: null` with status `running`, a bus no seat could ever act on. DONE still closes only the cycle; closeout evidence is separate (see the closeout section).

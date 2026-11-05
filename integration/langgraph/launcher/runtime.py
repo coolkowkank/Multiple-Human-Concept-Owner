@@ -765,11 +765,24 @@ class Seat:
                     f"{self.name} tried to write {path} outside allowed paths "
                     f"{self.allowed_paths}")
         pre_handoff = response.get("handoff")
-        if pre_handoff is not None and pre_handoff not in \
-                self.bus.roster().get("seats", {}):
-            # validate BEFORE any write: a refusal must leave no residue
+        # validate BEFORE any write: a refusal must leave no residue
+        if pre_handoff is not None and (
+                not isinstance(pre_handoff, str)
+                or pre_handoff not in self.bus.roster().get("seats", {})):
             raise SeatError(
                 f"{self.name} handed off to unknown seat {pre_handoff!r}")
+        pre_status = response.get("status_line")
+        if pre_status is not None and not isinstance(pre_status, str):
+            raise SeatError(f"{self.name}: status_line must be a string")
+        if pre_handoff is None and not (pre_status or "").startswith("DONE"):
+            # RW1 null-handoff incident: a null handoff without a DONE
+            # status line used to leave turn=None with status "running" -
+            # no seat can ever act and nobody is told. Refuse; the turn
+            # stays with this seat.
+            raise SeatError(
+                f"{self.name}: null handoff without a DONE status_line would "
+                "leave the bus with no turn holder; name the next seat, or "
+                "set handoff to null AND start status_line with DONE")
         verify_cmd = response.get("verify_command")
         exit_code = None
         raw_legacy = self.spec.get("legacy_shell_verify", False)
