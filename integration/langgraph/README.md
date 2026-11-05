@@ -1,8 +1,10 @@
 # LangGraph team orchestration (integration in progress)
 
-**Status: work in progress. Mock (scripted) adapters only - no live model
-calls, no live named team, no paid hosting. Not merged readiness; this
-branch exists so the work is visible and reviewable.**
+**Status: work in progress, not merged readiness; branches exist so the work
+is visible and reviewable. The default demos use mock (scripted) adapters.
+Separate live/* branches record bounded free-route runs (see the LIVE_RUN_*
+files). No paid hosting. Bus `done` is the team cycle only, not a quality
+result: see "Closeout status".**
 
 ## What this is
 
@@ -270,8 +272,9 @@ python integration/langgraph/parallel_team.py /tmp/demo   # resumes lane-a, runs
 python integration/langgraph/controls_demo.py /tmp/lg-controls   # operator controls run
 ```
 
-Developed and tested against the project head `46fa728`. This branch adds
-`integration/langgraph/` only; no existing file is modified.
+Developed and tested against the project head `46fa728`. The integration lives in
+`integration/langgraph/`; later live/* branches also touch vendored
+launcher files (byte-pinned) as noted in their records.
 
 ## Closeout status (operator workflow)
 
