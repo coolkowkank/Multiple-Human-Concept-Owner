@@ -60,7 +60,7 @@ try:
     Bus.action_lock = racing
     try:
         try: lcli.cmd_lease(types.SimpleNamespace(repo=r, branch=lt.BRANCH, name="coordinator", release=True, holder="A")); res = "released"
-        except BusError: res = "refused"
+        except (BusError, SystemExit): res = "refused"
     finally: Bus.action_lock = orig
     check("CAS race: holder changed after inspect -> refused, new holder's lease intact", res == "refused" and Bus(r, lt.BRANCH).state()["leases"]["coordinator"]["holder"] == "B")
     r = mklane(tmp, "lk"); gd = git(r, "rev-parse", "--absolute-git-dir").stdout.strip()
