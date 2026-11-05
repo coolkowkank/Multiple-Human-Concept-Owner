@@ -1,16 +1,15 @@
 # Bounded live-run preparation (integrated, reviewed-transport wired - still NO live go)
 
-Owner authority (attribution: main's relay of recovered owner originals,
-2026-11-05; this lane holds no independent owner evidence): free-tier
-resources, continuous work and failover are authorized; there is NO owner
-numeric cap or halt veto - the lifetime envelope, verifier cap and the
-durable halt were self-imposed project safety controls. The owner
-boundary that stands: NO PAID CALLS. A live run must be free-only,
-bounded and ledger-preserving. Do not ask the owner to "lift" the
-self-imposed envelope; reconfiguring those controls is an executor
-operation on the project, not an owner approval question.
+Provenance note: this file is a project record, not a grant. Statements
+below about free-only operation are project working assumptions taken from
+the operator's relay of the owner's Slack instructions; they are not
+authenticated by this repository. The reserve envelope, verifier cap and
+durable halt are self-imposed project bookkeeping controls. Operating
+rule for any live call: use only a route whose no-charge status has been
+verified from a current source, keep calls bounded, and preserve the
+ledger. Paid calls are out of scope.
 
-## Integrated accepted chain (2026-11-05)
+Integrated accepted chain (2026-11-05)
 
 Upstream tip `eef61c620308dc9e086a5bc6fe08152607824e1f` (independently
 reviewed offline: 407 tests plus 95 adversarial forged-field cases; adds
@@ -51,7 +50,7 @@ BYTE-EXACT into `runner/` and md5-pinned in `live_lane.VENDORED_MD5`:
   must pin a different model.
 
 Run config: `run-config/assignments.json` is the SANITIZED public
-form of the operator assignment (main-approved 2026-11-05): researcher
+form of the operator assignment (operator-selected 2026-11-05, project record): researcher
 nvidia/nemotron-3-ultra-550b-a55b (unchanged), verifier
 google/gemma-4-31b-it (owner-directed switch after the leanstral
 route's failed first call - HTTP 400, cause undetermined, see

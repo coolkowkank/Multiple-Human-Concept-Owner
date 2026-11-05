@@ -1,9 +1,9 @@
 """Bounded live-runner driver (compiled-LangGraph shape; PREP until go).
 
-Owner authority (per main's recovered owner originals, 2026-11-05):
-free-tier continuous work is authorized; PAID CALLS ARE NOT. The
-runner's historical envelope/halt were self-imposed project controls,
-not an owner veto.
+Provenance note: a project record, not a grant. Free-only operation is
+a project working rule from the operator's relay of owner instructions
+(not authenticated by this repo). The runner's historical envelope/halt
+are self-imposed bookkeeping controls. Paid calls are out of scope.
 
 Integrated accepted chain (2026-11-05): upstream tip
 eef61c620308dc9e086a5bc6fe08152607824e1f (append-only window
@@ -16,7 +16,7 @@ main, builder+runtime), vendored BYTE-EXACT into runner/:
   - requesty_transport.py md5 974fbbfdcffd7b648d4552a063495fea
   - make_allowance.py   md5 4f3d08fe51e428089c6f62517820758c
 Run config: run-config/assignments.json is the SANITIZED public form
-of the operator assignment (main-approved 2026-11-05): verifier
+of the operator assignment (operator-selected 2026-11-05, project record): verifier
 google/gemma-4-31b-it (owner-directed switch after the leanstral
 route's failed first call), researcher Ultra unchanged, ryan unchanged
 and NOT authorized for this run - ONE verifier-only successor window,
