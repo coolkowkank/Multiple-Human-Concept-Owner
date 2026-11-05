@@ -58,8 +58,8 @@ What this driver owns (wiring + run-shape only):
      ANY exception escaping rc.step could leave a reserve without a
      result. After an unexpected exception the driver settles ONLY this
      invocation's own newly-created reserves (pre-step reserve snapshot;
-     historical or concurrent reserves are never touched) as outcome
-     unknown via the runner's own settle() (which appends the halt),
+     historical reserves are never touched) as outcome unknown via the
+     runner's own settle() (which appends the halt),
      then reports paused with EVIDENCE-DRIVEN accounting: the reason is
      the allowlisted exception class only (exception text can carry
      secrets/raw prompt), and calls/io_attempted come from the ledger -
@@ -233,11 +233,16 @@ def preflight(root, record, listing_doc, allowlist, *, key_env, clock):
 def _settle_orphaned_reserves(rc, root, exc, now, pre_rids):
     """After an unexpected exception from rc.step: settle ONLY reserves
     created by THIS invocation (absent from the pre-step snapshot) that
-    have no result line. Historical or concurrently-created reserves
-    are never touched - mutating unrelated history is worse than
-    leaving it for a human. Settlement is outcome unknown via the
-    runner's own settle() (which appends the halt and raises Halt -
-    caught here). Returns the settled rids."""
+    have no result line. Historical reserves are never touched -
+    mutating unrelated history is worse than leaving it for a human.
+    SCOPE: the snapshot diff cannot distinguish this invocation's
+    reserve from a CONCURRENTLY created one, so this guarantee holds
+    only under the accepted sole-writer, externally-quiescent
+    precondition (design A: one writer from preflight through
+    settlement, no concurrent run). NOT a general-concurrency claim.
+    Settlement is outcome unknown via the runner's own settle() (which
+    appends the halt and raises Halt - caught here). Returns the
+    settled rids."""
     store = rc.Store(root)
     settled = []
     with store.lock():
