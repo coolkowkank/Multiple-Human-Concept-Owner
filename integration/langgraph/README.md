@@ -272,3 +272,24 @@ python integration/langgraph/controls_demo.py /tmp/lg-controls   # operator cont
 
 Developed and tested against the project head `46fa728`. This branch adds
 `integration/langgraph/` only; no existing file is modified.
+
+## Closeout status (operator workflow)
+
+The runtime sets bus `done` when the team cycle ends. That is the cycle
+only, not a quality result, and nothing in the runtime enforces more.
+Closeout wording must come from:
+
+```
+python integration/langgraph/langgraph_team.py status LANE            # no record: "cycle complete, quality unproven", exit 1
+python integration/langgraph/langgraph_team.py status LANE --record R --key-file K --checker-id C --path src/app.py ...   # exit 0 only if signed operator evidence verifies
+```
+
+The operator runs their own checker outside the lane, writes its signed
+result into the record with `done_gate.operator_close`, and keeps the key
+file out of every seat's reach. The record dir must be 0700, user-owned,
+not a symlink. Evidence is bounded (hash-bound to the committed files), not
+proof of correctness.
+
+### Operator closeout check: project result summary (sanitized)
+
+An operator-held checker (private, not published) signed an accepted result for the add_lib artifact (hash 834557ccea6fcd8ba065f270733bdb497600c2c806008f44def0169b262eda92, 333 cases). It was run through `done_gate` on a clean fixture repo (branch `fixture-done`, 3 files copied byte for byte from 6edfdcc, plus a committed minimal STATE.json status done). The fixture is NOT the original runtime repo or its evidence. Result: closeout allowed, exit 0. Wrong key, subset path list, wrong checker, wrong branch, forged record, tampered artifact and replay each exited 1. `runtime_blocks_done` is false: the runtime still sets bus done on its own, and the historical 7-request cycle was not gated. This check is not retroactive enforcement and not proof of correctness. The checker, key and record paths are not published.

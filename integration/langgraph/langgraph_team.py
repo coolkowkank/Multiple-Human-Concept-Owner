@@ -946,6 +946,9 @@ def run_graph(repo: str, checkpoint_db: str, stop_after: int,
     final = app.get_state(config).values
     print(f"run[{thread_id}]: finished. status={final['status']} "
           f"outcome={final.get('outcome') or 'reached END (done)'}", flush=True)
+    print(f"run[{thread_id}]: this status is the team CYCLE only. Quality is "
+          f"unproven unless `langgraph_team.py status` allows closeout.",
+          flush=True)
 
 
 # ---------- verification ----------------------------------------------------
@@ -1002,7 +1005,27 @@ def verify(repo: str, checkpoint_db: str, thread_id: str,
     return ok
 
 
+def status_cmd(argv) -> int:
+    """Safe closeout status. Default (no operator record) = quality unproven,
+    exit 1. With --record/--key-file/--checker-id/--path it delegates to
+    done_gate (signed evidence re-verified at read time)."""
+    repo = argv[0]
+    if "--record" not in argv:
+        import json as _j
+        import done_gate
+        cc, note = done_gate._cycle_complete_at_head(os.path.abspath(repo), BRANCH)
+        print(_j.dumps({"cycle_complete": cc, "terminal_done": False,
+                        "closeout_allowed": False, "reason": "no operator record",
+                        "label": "cycle complete, quality unproven" if cc
+                        else "cycle not complete"}, sort_keys=True))
+        return 1
+    import done_gate
+    return done_gate.main(["--repo", repo, "--branch", BRANCH] + argv[1:])
+
+
 def main(argv) -> int:
+    if len(argv) > 2 and argv[1] == "status":
+        return status_cmd(argv[2:])
     phase, repo, db = argv[1], argv[2], argv[3]
     numeric = phase in ("run", "verify")
     stop_after = int(argv[4]) if numeric and len(argv) > 4 else 0

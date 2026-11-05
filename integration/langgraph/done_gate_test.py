@@ -170,5 +170,15 @@ if art:
     check("end to end (public test operator, mock-produced artifact): closeout allowed", c["closeout_allowed"] and c["terminal_done"])
     c0 = done_gate.completion_status(e2, lt.BRANCH, os.path.join(rd, "absent.json"), art, operator_key=KEY, expected_operator_checker_id=CHK)
     check("end to end without an operator record: cycle complete but closeout NOT allowed", c0["cycle_complete"] and not c0["closeout_allowed"])
+    def lt_status(*extra):
+        r = subprocess.run([sys.executable, os.path.join(HERE, "langgraph_team.py"), "status", e2, *extra], capture_output=True, text=True)
+        return r.returncode, r.stdout
+    rc0, o0 = lt_status()
+    check("langgraph_team status, no record: cycle complete, quality unproven, exit 1", rc0 == 1 and json.loads(o0)["cycle_complete"] and not json.loads(o0)["closeout_allowed"] and "quality unproven" in json.loads(o0)["label"])
+    kfe = os.path.join(tmp, "ke.bin"); open(kfe, "wb").write(KEY)
+    rc1, o1 = lt_status("--record", pe, "--key-file", kfe, "--checker-id", CHK, "--path", "src/app.py")
+    check("langgraph_team status with signed record: exit 0 and allowed", rc1 == 0 and json.loads(o1)["closeout_allowed"])
+    rc2, _ = lt_status("--record", pe, "--key-file", kf2, "--checker-id", CHK, "--path", "src/app.py")
+    check("langgraph_team status with wrong key: exit 1", rc2 == 1)
 shutil.rmtree(tmp, ignore_errors=True)
 print("\nOPERATOR DONE HOOK:", "ALL CHECKS PASSED" if ok else "FAILURES ABOVE"); raise SystemExit(0 if ok else 1)
