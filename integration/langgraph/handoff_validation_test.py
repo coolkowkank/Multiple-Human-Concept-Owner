@@ -49,6 +49,16 @@ try:
     for nm, bad in (("int", 5), ("list", ["DONE"]), ("dict", {})):
         r, b, err, h, st0 = attempt(tmp, "s-" + nm, dict(base, handoff="builder", status_line=bad))
         check(f"status_line {nm}: clean SeatError before any write", err and "CRASH" not in err and "status_line" in err and git(r, "rev-parse", "HEAD") == h and not os.path.exists(os.path.join(r, ".team/NOTE.md")))
+    bad = {"gate str": {"gate": "why"}, "gate list": {"gate": ["q"]}, "gate no question": {"gate": {"options": ["a"]}},
+           "gate question int": {"gate": {"question": 5}}, "gate options str": {"gate": {"question": "q", "options": "ab"}},
+           "summary int": {"summary": 5}, "summary empty": {"summary": "  "}, "summary missing": {"summary": None},
+           "writes list": {"writes": ["a"]}, "writes value int": {"writes": {".team/NOTE.md": 5}}, "writes str": {"writes": "x"}}
+    for nm, over in bad.items():
+        r, b, err, h, st0 = attempt(tmp, "z-" + nm.replace(" ", "_"), dict(base, handoff="builder", status_line="s", **over))
+        check(f"malformed {nm}: clean SeatError before any write, no residue (used to crash after writing for gate/writes types)",
+              err and "CRASH" not in err and git(r, "rev-parse", "HEAD") == h and b.state() == st0 and not os.path.exists(os.path.join(r, ".team/NOTE.md")))
+    r, b, err, h, st0 = attempt(tmp, "z-good", dict(base, handoff="builder", status_line="s", gate={"question": "ok?", "options": ["y", "n"], "recommendation": "y"}))
+    check("well-formed gate still accepted", err is None and len(b.pending_gates()) == 1)
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 print("\nHANDOFF VALIDATION:", "ALL CHECKS PASSED" if ok else "FAILURES ABOVE")

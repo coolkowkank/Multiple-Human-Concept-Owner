@@ -134,6 +134,37 @@ def is_done_status(status_line):
     return isinstance(status_line, str) and bool(_DONE_RE.match(status_line))
 
 
+def validate_response_shape(name, response):
+    """Refuse a malformed response BEFORE any write (RW1: incomplete or
+    wrongly typed handoff fields used to crash after files were written,
+    leaving residue with the turn still held). Pure: no I/O."""
+    summary = response.get("summary")
+    if not isinstance(summary, str) or not summary.strip() or len(summary) > 4000:
+        raise SeatError(f"{name}: summary must be a non-empty string "
+                        "(at most 4000 chars); an incomplete handoff is refused")
+    writes = response.get("writes")
+    if writes is not None:
+        if not isinstance(writes, dict):
+            raise SeatError(f"{name}: writes must be an object of path to content")
+        for path, content in writes.items():
+            if not isinstance(path, str) or not isinstance(content, str):
+                raise SeatError(f"{name}: writes entries must be string path "
+                                "to string content")
+    gate = response.get("gate")
+    if gate:
+        if not isinstance(gate, dict):
+            raise SeatError(f"{name}: gate must be an object or null")
+        if not isinstance(gate.get("question"), str) or not gate["question"].strip():
+            raise SeatError(f"{name}: gate needs a non-empty string question")
+        opts = gate.get("options")
+        if opts is not None and not (isinstance(opts, list)
+                                     and all(isinstance(o, str) for o in opts)):
+            raise SeatError(f"{name}: gate options must be a list of strings")
+        rec = gate.get("recommendation")
+        if rec is not None and not isinstance(rec, str):
+            raise SeatError(f"{name}: gate recommendation must be a string")
+
+
 def prompt_log_tail(bus, limit=20):
     """THE log tail every prompt renders (Seat.build_prompt and the audit
     wiring's context both call this, so they cannot drift). Runtime-written
@@ -770,6 +801,7 @@ class Seat:
                 "Move scratch outside the repo (or under .team/) first.")
 
     def _apply(self, state, response):
+        validate_response_shape(self.name, response)
         writes = response.get("writes") or {}
         for path in writes:
             if not self._path_allowed(path):
