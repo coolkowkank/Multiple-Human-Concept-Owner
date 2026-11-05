@@ -76,8 +76,8 @@ IMMEDIATELY before acting:
    The control file fails CLOSED: anything but an explicit dict with a
    known mode and integer instruction_seq - missing file, bad JSON,
    wrong type, unknown mode, missing/bool seq - means hold, never run.
-   The graph reads control from the COMMITTED state (`git show HEAD:`),
-   never the worktree: an uncommitted or failed control change is
+   The graph reads control, team state and roster from the COMMITTED
+   state (`git show HEAD:`), never the worktree: an uncommitted or failed control change is
    invisible; control takes effect exactly at commit order. Operator
    commits stage exactly their own paths (`transact_paths`), precheck a
    clean index BEFORE mutating, and restore the worktree from HEAD on
@@ -150,6 +150,33 @@ real model team.
   swapped non-mock roster, on thread/repo identity mismatch, on a
   checkpoint path inside the repo, and init refused on unsafe paths.
 
+## Runner lane integration (offline, refusing post)
+
+`runner_lane.py` drives the ACCEPTED Ryan runner (`runner/ryan_cycle.py`,
+byte-exact tag `source-88a610a`) from inside a LangGraph node. The
+provider-call injection point (`post`) is explicit and REFUSING as
+shipped: it records the attempt and returns an 'unknown' transport
+outcome without any network access, and the runner's own settle() then
+consumes the reserve and halts - so even if a gate mistakenly passed,
+no call can escape and the attempt is visibly consumed, never retried
+silently.
+
+The runner's own guard chain fires for real BEFORE that point: durable
+provider halt, lifetime qualification envelope, per-question/lineage
+caps, route and free-listing gates, the signed allowance window with
+durable lineage+claim binding (01a495f), and the verified-revision
+binding (88a610a). A live post is not provided anywhere in this
+integration. Wiring one needs halt clearance, a signed allowance grant
+with an owner-held key file, and a current route record - separate
+owner decisions, none taken, none of which this branch makes.
+
+`runner_lane_demo.py` proves the lane on disposable fixture roots, 9/9:
+halt blocks the step with zero attempts; a gate-passing attempt is
+recorded by the refusing post, consumed as a reserve, and halts on the
+unknown outcome (ledger shows reserve + unknown result + halt); a
+bad-signature allowance window blocks before any call; a stale
+verified_rev routes Ryan to needs-human with zero calls.
+
 ## Known limits (stated, not fixed)
 
 - Graceful stop is a node-boundary stop, not crash simulation and not
@@ -158,9 +185,10 @@ real model team.
   is what makes replay safe, not LangGraph.
 - The seat gate is process-local and optional and caps seat ACTIONS; a
   seat action can make several adapter calls, so it is NOT a provider
-  budget or request-concurrency control. No RequestBudget, allowance
-  window or completion guard is wired in; the Ryan runner and allowance
-  mechanism are untouched.
+  budget or request-concurrency control. The runner's own guard chain
+  (allowance window, verified_rev, envelope, completion) runs in the
+  runner lane below, but only with the REFUSING post - no provider call
+  is possible from this branch.
 - Resume evidence is a narrow new-process sqlite demo, not live
   readiness. Team-state durability is the git bus; LangGraph checkpoints
   cover orchestration state only.
