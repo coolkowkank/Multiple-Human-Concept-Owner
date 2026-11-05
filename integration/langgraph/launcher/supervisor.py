@@ -148,20 +148,29 @@ class Supervisor:
         return first
 
     def _reap_and_restart(self):
+        # ONE snapshot of every exit status for this poll, taken before any
+        # per-seat handling: a seat that exited 75 anywhere in this poll
+        # latches the block BEFORE another exited seat's handling can write
+        # (a commit would sweep the torn control state). Order independent.
+        snap = {}
         for name, proc in list(self.procs.items()):
-            if proc.poll() is None:
-                continue
-            if proc.returncode == EXIT_TORN_STATE:
+            if proc.poll() is not None:
+                snap[name] = proc.returncode
+        for name, rc in snap.items():
+            if rc == EXIT_TORN_STATE:
                 del self.procs[name]
                 self._note_blocked(name, "refused to start on uncommitted "
                                    "coordination state (exit %d)" % EXIT_TORN_STATE)
+        for name, rc in snap.items():
+            proc = self.procs.get(name)
+            if proc is None:
                 continue
             if self._torn_blocked:
                 # another seat already found torn control state: any bus write
                 # here (log/gate/commit) would sweep it, so do not touch the bus
                 del self.procs[name]
                 self._note_blocked(name, "exited %s while control state is "
-                                   "torn" % proc.returncode)
+                                   "torn" % rc)
                 continue
             if self._is_spending(name):
                 # Conservative policy: a spending seat that exited is NEVER
@@ -177,10 +186,10 @@ class Supervisor:
                 if holds:   # the stall path must not raise a second gate
                     self._stalled_seats = {(name, st.get("turn_seq"), st.get("turn_since"))}
                 self._safe_log("exit",
-                    f"seat {name} exited {proc.returncode}; spending seat: "
+                    f"seat {name} exited {rc}; spending seat: "
                     "NOT restarted")
                 self._escalate_spending(
-                    f"spending seat {name} exited ({proc.returncode}). Not "
+                    f"spending seat {name} exited ({rc}). Not "
                     "restarted automatically: a restart can replay a model "
                     "call and spend a request. Inspect the process, the "
                     "state and the lease (launcher lease), then decide.")
@@ -193,7 +202,7 @@ class Supervisor:
                 continue
             self.restarts[name] = count + 1
             self.bus.append_log("supervisor", "restart",
-                                f"seat {name} exited {proc.returncode}; "
+                                f"seat {name} exited {rc}; "
                                 f"restart {count + 1}")
             self.bus.commit_all(f"supervisor: restart seat {name}")
             self.start_seat(name)

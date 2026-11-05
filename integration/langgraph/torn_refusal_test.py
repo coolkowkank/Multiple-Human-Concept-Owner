@@ -68,6 +68,38 @@ try:
     try: s._preflight_dirt_check(); cleared = True
     except Exception as ex: cleared = False
     check("control dirt that clears during the bounded recheck is not refused", cleared)
+
+    # 5. same-poll ordering (fakes, no processes): a 75 exit anywhere in the poll blocks
+    #    every write, whichever seat the reap loop reaches first
+    from launcher.supervisor import Supervisor
+    class FP:
+        def __init__(s, rc): s.rc = rc; s.returncode = rc; s.pid = 1
+        def poll(s): return s.rc
+        def terminate(s): pass
+    class FB:
+        def __init__(s, kinds): s.w = []; s.kinds = kinds
+        def append_log(s, *a): s.w.append(("log",) + a)
+        def commit_all(s, m): s.w.append(("commit", m))
+        def open_gate(s, *a, **k): s.w.append(("gate",))
+        def roster(s): return {"seats": {k: {"adapter": {"type": v}} for k, v in s.kinds.items()}}
+        def state(s): return {"turn": "x", "status": "running"}
+    def mksup(kinds, procs):
+        sv = Supervisor.__new__(Supervisor); sv.bus = FB(kinds); sv.repo = tmp
+        sv.stall_timeout = 900; sv._stalled_seats = set(); sv.procs = procs; sv._notified_gates = set()
+        sv.restarts = {}; sv.restart_limit = 5; sv.started = []; sv.start_seat = lambda n: sv.started.append(n)
+        return sv
+    import io, contextlib
+    for other_kind in ("mock", "http"):
+        for order in (("a", "b"), ("b", "a")):
+            procs = {"a": FP(1), "b": FP(EXIT_TORN_STATE)}
+            procs = {k: procs[k] for k in order}      # 'a' = the other seat (exit 1), 'b' = the seat that exited 75
+            sv = mksup({"a": other_kind, "b": "mock"}, procs)
+            with contextlib.redirect_stdout(io.StringIO()) as out: sv._reap_and_restart()
+            check(f"other seat ({other_kind}, exit 1) + a 75 seat, order {order}: no restart, no log/commit/gate, both dropped, console only",
+                  sv.started == [] and sv.bus.w == [] and not sv.procs and out.getvalue().count("[blocked]") == 2)
+    sv = mksup({"a": "mock"}, {"a": FP(1)})
+    with contextlib.redirect_stdout(io.StringIO()): sv._reap_and_restart()
+    check("control: with no 75 exit the same mock exit still restarts normally", sv.started == ["a"] and len(sv.bus.w) == 2)
 finally:
     for p in PROCS:
         if p.poll() is None:
