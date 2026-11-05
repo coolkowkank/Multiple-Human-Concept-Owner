@@ -20,7 +20,7 @@ CRITERIA = [
  "C2 STATE status done; handoff rows are exactly the expected seat order (5N+1 turns), turn_seq +1 per turn",
  "C3 functional output: per-batch module, test, review, qc verdict and archive files exist, and the final cumulative test passes when re-run",
  "C4 worktree clean, no error rows, no gates, no stale lg-live declaration, one lease holder per seat",
- "C5 clean mode: zero restart rows. kill mode: exactly one restart row for builder, the batch-2 builder handoff appears once, and C1-C4 still hold",
+ "C5 clean mode: zero restart rows. kill mode: exactly one restart row for builder, total builder handoff rows equal N (the replayed batch-2 turn produced one handoff, not two), and C1-C4 still hold",
 ]
 SEATS = ["coordinator", "builder", "reviewer", "qc", "records"]
 
@@ -118,14 +118,14 @@ def main():
            "C4_stale_decl": [f for f in os.listdir(os.path.join(r, ".git")) if f.startswith("lg-live-")],
            "C4_leases": {k: v.get("holder") for k, v in leases.items()},
            "restart_rows": [(e.get("seat"), e.get("body")) for e in restarts],
-           "builder_handoffs_batch2": sum(1 for e in hs if e.get("seat") == "builder") - 0,
+           "builder_handoffs_total": sum(1 for e in hs if e.get("seat") == "builder") - 0,
            "commits": int(g("rev-list", "--count", "HEAD").strip()),
            "log_bytes": os.path.getsize(os.path.join(r, ".team/LOG.jsonl")),
            "supervisor_out_tail": so.strip().splitlines()[-3:], "lane": r}
     ok = (res["C1_supervisor_done"] and res["C2_status"] == "done" and res["C2_order_ok"] and res["C2_seq_plus1"] is True
           and files_ok and final_ok and res["C4_clean_tree"] and not errs and not res["C4_gates"] and not res["C4_stale_decl"])
     if a.mode == "clean": ok = ok and not restarts
-    else: ok = ok and killed is not None and len(restarts) == 1 and restarts[0].get("seat") == "supervisor" and "builder" in (restarts[0].get("body") or "") and res["builder_handoffs_batch2"] == n
+    else: ok = ok and killed is not None and len(restarts) == 1 and restarts[0].get("seat") == "supervisor" and "builder" in (restarts[0].get("body") or "") and res["builder_handoffs_total"] == n
     res["SUCCESS"] = bool(ok)
     print(json.dumps(res, indent=1)); sys.exit(0 if ok else 1)
 
