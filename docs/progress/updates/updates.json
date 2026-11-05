@@ -1,7 +1,12 @@
 {
-  "asOf": "2026-11-05T17:06",
+  "asOf": "2026-11-05T17:15",
   "note": "Project-only status, newest first. This page replaces routine chat reports. It is edited by hand when the project changes; nothing here is a live feed, and it does not claim live, unattended or independently verified operation.",
   "items": [
+    {
+      "at": "2026-11-05T17:15",
+      "title": "Reviewer-skip acceptance guard accepted and published on the execution line",
+      "body": "The Reviewer-skip acceptance guard needed by WP4 and WP10 is accepted after three review rounds and published as the reviewed code on the execution line: live/operator-done fast-forwarded 5e140fc to a1c36ce (https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/a1c36ced14708b3c032d580ea83d6dcc32d547f0), 4 commits, identical tree to the reviewed pin, no merge, no force, no activation. What the guard does: a DONE claim closes only with a fresh QC PASS verdict in the bus - the whole-line bare 'PASS'/'QC PASS' form, optionally 'at head <sha>' bound to the real head; without one the turn routes to a QC seat, or parks on a human gate when the roster has none. A QC turn may close on its own earlier PASS only with the bare word DONE; any other QC DONE text records a vetoing verdict. Evidence, stated with its scope: 44 focused guard checks pass, the full 32-file offline suite passes serially, and the self-checking demo closes end to end - all author-run in one sandbox, offline. An independent reviewer probed each round offline and ACCEPTed this pin scoped to the guard (own-writes refusal, rename/space-safe freshness, newest-verdict-wins, whole-line PASS grammar, QC DONE veto, binding head claim); a parallel product probe found no distinct defect on the final delta. Neither reviewer ran the suite; the scripted endurance example passed at the previous round's code and was not rerun on the final pin (its verdict lines carry no head claim, so the round-4 change cannot affect it). Limits carried: verdict rows are cooperative .team records - they show a QC-role seat's turn recorded the row, not identity beyond the roster role claim; QC self-close on an earlier fresh PASS is a stated policy; freshness is the ancestor-plus-evidence-paths rule, a deliberate narrowing of the spec's 'current head' text; with no QC seat the DONE claim parks on a human gate and the operator sets a turn by hand. This is not a WP10 completion and not an autonomy claim. Next: the WP4 re-proof with Reviewer and QC on this pin, run through the actual existing launcher workflow."
+    },
     {
       "at": "2026-11-05T17:06",
       "title": "Next step chosen: Reviewer-skip acceptance guard (WP4/WP10), third draft in review",
