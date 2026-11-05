@@ -127,6 +127,7 @@ def operator_close(repo, branch, artifact_paths, signed_operator_result, *,
         "quality": ev.get("quality"), "terminal_done": ev.get("terminal_done") is True,
         "reasons": ev.get("reasons", []),
         "expected_operator_checker_id": expected_operator_checker_id,
+        "signed_operator_result": signed_operator_result,
         "operator_terminal_check_passed": enforced and ev.get("terminal_done") is True,
         "note": "bounded operator evidence, not proof of correctness; "
                 "a checker for one function is not general quality",
@@ -147,31 +148,79 @@ def operator_close(repo, branch, artifact_paths, signed_operator_result, *,
     return rec
 
 
-def completion_status(repo, branch, record_path):
-    """What user-facing closeout must use. Returns cycle_complete and
-    terminal_done SEPARATELY; closeout_allowed is true only when a record
-    exists whose head equals the current HEAD, whose artifact hash still
-    matches the committed files, and which passed the operator terminal
-    check. Anything missing, stale or unreadable is not allowed."""
-    cc, note = _cycle_complete_at_head(os.path.abspath(repo), branch)
+def _private_parent(path):
+    d = os.path.dirname(os.path.abspath(path))
+    if os.path.islink(d):
+        return "record directory is a symlink"
+    st = os.lstat(d)
+    if st.st_uid != os.getuid() or (st.st_mode & 0o077):
+        return "record directory must be owned by this user with mode 0700"
+    return None
+
+
+def completion_status(repo, branch, record_path, artifact_paths, *,
+                      operator_key, expected_operator_checker_id):
+    """What user-facing closeout must use. The record's own flags are NEVER
+    trusted: the stored signed operator result is re-verified here with the
+    operator key and re-evaluated by evaluate_done against the artifact hash
+    recomputed now from the committed files. artifact_paths comes from the
+    CALLER (operator config) and must equal the record's list, so a record
+    cannot choose a smaller file set. Missing/bad key, bad signature, other
+    HEAD, other checker, other paths, replay on a changed artifact: not allowed.
+    cycle_complete and terminal_done are returned separately."""
+    repo = os.path.abspath(repo)
+    cc, note = _cycle_complete_at_head(repo, branch)
     out = {"cycle_complete": cc, "terminal_done": False, "closeout_allowed": False,
            "label": "cycle complete, quality unproven" if cc else "cycle not complete",
            "reason": note}
     try:
+        _verify_pin()
+        bad = _private_parent(record_path)
+        if bad:
+            out["reason"] = bad; return out
+        if os.path.islink(record_path):
+            out["reason"] = "record is a symlink"; return out
         with open(record_path, encoding="utf-8") as fh:
             rec = json.load(fh)
         if rec.get("schema") != RECORD_SCHEMA:
             raise ValueError("unknown record schema")
-        if rec.get("head") != head_sha(os.path.abspath(repo)):
+        if sorted(artifact_paths or []) != rec.get("artifact_paths"):
+            out["reason"] = "artifact path list differs from the record"; return out
+        if rec.get("head") != head_sha(repo):
             out["reason"] = "record is for a different HEAD"; return out
-        _, sha = current_artifact(os.path.abspath(repo), rec.get("artifact_paths") or [])
-        if sha != rec.get("artifact_sha256"):
-            out["reason"] = "artifact changed since the record"; return out
-        if cc and rec.get("terminal_done") is True and rec.get("operator_terminal_check_passed") is True:
-            out.update(terminal_done=True, closeout_allowed=True,
-                       label="operator terminal check passed (bounded evidence, not proof)", reason=None)
+        _, sha = current_artifact(repo, artifact_paths)
+        ev = evaluate_done(cc, None, None, sha, rec.get("signed_operator_result"),
+                           operator_key=operator_key,
+                           expected_operator_checker_id=expected_operator_checker_id)
+        if ev.get("terminal_done") is True:
+            out.update(terminal_done=True, closeout_allowed=True, reason=None,
+                       label="operator terminal check passed (bounded evidence, not proof)")
         else:
-            out["reason"] = "record does not show a passed terminal check"
+            out["reason"] = "; ".join(ev.get("reasons") or ["evidence not accepted"])
     except (OSError, ValueError):
         out["reason"] = out["reason"] or "no usable operator record"
     return out
+
+
+def main(argv):
+    """Public closeout entry point: prints JSON, exit 0 only if closeout is
+    allowed. The key is read from a file (never argv/env); keep it outside
+    the lane and every seat's reach."""
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--repo", required=True); ap.add_argument("--branch", required=True)
+    ap.add_argument("--record", required=True); ap.add_argument("--key-file", required=True)
+    ap.add_argument("--checker-id", required=True)
+    ap.add_argument("--path", action="append", required=True)
+    a = ap.parse_args(argv)
+    key = open(a.key_file, "rb").read().strip()
+    st = completion_status(a.repo, a.branch, a.record, a.path, operator_key=key,
+                           expected_operator_checker_id=a.checker_id)
+    print(json.dumps(st, sort_keys=True))
+    return 0 if st["closeout_allowed"] else 1
+
+
+if __name__ == "__main__":
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    raise SystemExit(main(sys.argv[1:]))

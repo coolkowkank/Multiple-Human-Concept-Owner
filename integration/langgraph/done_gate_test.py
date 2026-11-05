@@ -100,15 +100,75 @@ try:
     done_gate.operator_close(repo, lt.BRANCH, PATHS, res(repo), operator_key=KEY, expected_operator_checker_id=CHK, record_path=lnk); sl = False
 except FileExistsError: sl = True
 check("planted symlink at record path refused, victim untouched", sl and open(target).read() == "keep")
-# --- completion_status
-repo = mk("done"); p = os.path.join(tmp, "cs.json"); done_gate.operator_close(repo, lt.BRANCH, PATHS, res(repo), operator_key=KEY, expected_operator_checker_id=CHK, record_path=p)
-cs = done_gate.completion_status(repo, lt.BRANCH, p)
-check("completion_status: terminal passed -> closeout allowed", cs["cycle_complete"] and cs["terminal_done"] and cs["closeout_allowed"])
-cs = done_gate.completion_status(repo, lt.BRANCH, os.path.join(tmp, "none.json"))
-check("completion_status: no record -> cycle complete, closeout NOT allowed", cs["cycle_complete"] and not cs["closeout_allowed"] and "unproven" in cs["label"])
-repo2 = mk("done"); p2 = os.path.join(tmp, "cs2.json"); done_gate.operator_close(repo2, lt.BRANCH, PATHS, None, operator_key=KEY, expected_operator_checker_id=CHK, record_path=p2)
-check("completion_status: record of an unproven result -> not allowed", not done_gate.completion_status(repo2, lt.BRANCH, p2)["closeout_allowed"])
-open(repo + "/src/app.py", "w").write("def add(a, b):\n    return 5\n"); git(repo, "add", "-A"); git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "operator: changed")
-check("completion_status: artifact or HEAD moved after the record -> not allowed", not done_gate.completion_status(repo, lt.BRANCH, p)["closeout_allowed"])
+# --- completion_status (re-verifies signed evidence at read time)
+rd = os.path.join(tmp, "recs"); os.mkdir(rd, 0o700)
+def cs_for(repo, signed, **kw):
+    p = os.path.join(rd, "r" + secrets.token_hex(3) + ".json")
+    done_gate.operator_close(repo, lt.BRANCH, PATHS, signed, operator_key=KEY, expected_operator_checker_id=CHK, record_path=p)
+    return p
+def cs(repo, p, key=KEY, chk=CHK, paths=PATHS):
+    return done_gate.completion_status(repo, lt.BRANCH, p, paths, operator_key=key, expected_operator_checker_id=chk)
+repo = mk("done"); p = cs_for(repo, res(repo)); c = cs(repo, p)
+check("status: genuine signed evidence -> closeout allowed", c["cycle_complete"] and c["terminal_done"] and c["closeout_allowed"])
+check("status: no record -> cycle complete, closeout NOT allowed",
+      not cs(repo, os.path.join(rd, "none.json"))["closeout_allowed"] and "unproven" in cs(repo, os.path.join(rd, "none.json"))["label"])
+check("status: missing/short/wrong key -> not allowed", not cs(repo, p, key=None)["closeout_allowed"] and not cs(repo, p, key=b"short")["closeout_allowed"] and not cs(repo, p, key=secrets.token_bytes(32))["closeout_allowed"])
+check("status: wrong expected checker -> not allowed", not cs(repo, p, chk="e" * 64)["closeout_allowed"])
+# forged record: plaintext flags true, no valid signed evidence
+f = json.load(open(p)); f["signed_operator_result"] = {"kind": "operator-check-result/v1", "payload": f["signed_operator_result"]["payload"], "sig": "0" * 64}
+fp = os.path.join(rd, "forged.json"); json.dump(f, open(fp, "w"))
+check("forged record (flags true, bad signature) -> not allowed", not cs(repo, fp)["closeout_allowed"])
+f2 = json.load(open(p)); f2["signed_operator_result"] = None
+fp2 = os.path.join(rd, "forged2.json"); json.dump(f2, open(fp2, "w"))
+check("record with flags true but no evidence -> not allowed", f2["terminal_done"] is True and not cs(repo, fp2)["closeout_allowed"])
+# subset: record names fewer files than the operator config
+check("caller path list differs from record (subset/superset) -> not allowed", not cs(repo, p, paths=["src/app.py", "src/extra.py"])["closeout_allowed"])
+f3 = json.load(open(p)); f3["artifact_paths"] = []
+fp3 = os.path.join(rd, "subset.json"); json.dump(f3, open(fp3, "w"))
+check("record edited to a smaller file set -> not allowed", not cs(repo, fp3)["closeout_allowed"])
+# replay of valid evidence on a changed artifact
+repo9 = mk("done"); s9 = res(repo9); p9 = cs_for(repo9, s9)
+open(repo9 + "/src/app.py", "w").write("def add(a, b):\n    return 5\n"); git(repo9, "add", "-A"); git(repo9, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "operator: changed")
+check("replayed evidence after the artifact/HEAD moved -> not allowed", not cs(repo9, p9)["closeout_allowed"])
+# evidence from another lane replayed into this record
+repoB = mk("done"); open(repoB + "/src/app.py", "w").write("def add(a, b):\n    return a + b  # other\n")
+git(repoB, "add", "-A"); git(repoB, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "operator: other"); sB = res(repoB)
+pB = cs_for(repo, sB)
+check("signed evidence for a DIFFERENT artifact (other bytes) placed in this lane's record -> not allowed (identical bytes would be accepted by design: the evidence binds the artifact hash)", not cs(repo, pB)["closeout_allowed"])
+# unsigned (unproven) record
+repo2 = mk("done"); p2 = cs_for(repo2, None)
+check("record of an unproven result -> not allowed", not cs(repo2, p2)["closeout_allowed"])
+# record dir permissions / symlink
+os.chmod(rd, 0o755); check("record dir not 0700 -> not allowed", not cs(repo, p)["closeout_allowed"]); os.chmod(rd, 0o700)
+lk = os.path.join(rd, "link.json"); os.symlink(p, lk)
+check("record that is a symlink -> not allowed", not cs(repo, lk)["closeout_allowed"])
+# public entry point (CLI): exit 0 only when allowed, key from a file
+kf = os.path.join(tmp, "k.bin"); open(kf, "wb").write(KEY)
+def cli(rec, repo_=repo, kfile=kf):
+    r = subprocess.run([sys.executable, os.path.join(HERE, "done_gate.py"), "--repo", repo_, "--branch", lt.BRANCH, "--record", rec,
+                        "--key-file", kfile, "--checker-id", CHK, "--path", "src/app.py"], capture_output=True, text=True)
+    return r.returncode, r.stdout
+rc, out = cli(p)
+check("CLI entry point: genuine -> exit 0 and closeout_allowed true", rc == 0 and json.loads(out)["closeout_allowed"] is True and KEY.hex() not in out)
+check("CLI entry point: forged record -> exit 1", cli(fp)[0] == 1)
+kf2 = os.path.join(tmp, "k2.bin"); open(kf2, "wb").write(secrets.token_bytes(32))
+check("CLI entry point: wrong key file -> exit 1", cli(p, kfile=kf2)[0] == 1)
+# end to end with the real mock team cycle (no provider): produced artifact, then a PUBLIC test operator check
+e2 = tempfile.mkdtemp(dir=tmp); lt.init_repo(e2); lt.run_graph(e2, os.path.join(tmp, "e2.sqlite"), 0, "e2e")
+st = Bus(e2, lt.BRANCH).state()
+art = [x for x in ("src/app.py",) if os.path.exists(os.path.join(e2, x))]
+check("mock team cycle reached done with a produced src/app.py (cycle_complete only)", st.get("status") == "done" and art == ["src/app.py"])
+if art:
+    files = done_gate.committed_files(e2, art)
+    ns = {}; exec(compile(files["src/app.py"], "app", "exec"), ns)   # test operator: trusted mock code only
+    accepted = all(ns["add"](a, b) == a + b for a, b in [(0, 0), (-5, 2), (10**9, 7), (3, -3)])
+    sig = sign_operator(KEY, {"hash_scheme": HASH_SCHEME, "artifact_sha256": artifact_sha256(files), "accepted": accepted,
+                              "state": "accepted" if accepted else "rejected", "checker_id": CHK})
+    pe = os.path.join(rd, "e2e.json")
+    done_gate.operator_close(e2, lt.BRANCH, art, sig, operator_key=KEY, expected_operator_checker_id=CHK, record_path=pe)
+    c = done_gate.completion_status(e2, lt.BRANCH, pe, art, operator_key=KEY, expected_operator_checker_id=CHK)
+    check("end to end (public test operator, mock-produced artifact): closeout allowed", c["closeout_allowed"] and c["terminal_done"])
+    c0 = done_gate.completion_status(e2, lt.BRANCH, os.path.join(rd, "absent.json"), art, operator_key=KEY, expected_operator_checker_id=CHK)
+    check("end to end without an operator record: cycle complete but closeout NOT allowed", c0["cycle_complete"] and not c0["closeout_allowed"])
 shutil.rmtree(tmp, ignore_errors=True)
 print("\nOPERATOR DONE HOOK:", "ALL CHECKS PASSED" if ok else "FAILURES ABOVE"); raise SystemExit(0 if ok else 1)
