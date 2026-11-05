@@ -20,12 +20,61 @@ import time
 import uuid
 
 from . import prompts
-from .adapters import AdapterError, build_adapter
+from .adapters import AdapterError, QueueAdapter, build_adapter
 from .bus import Bus, BusError, LOG
 
 
 class SeatError(Exception):
     pass
+
+
+VERIFY_EXECUTABLES = ("python3", "python", "pytest", "test", "true", "false")
+_VERIFY_BAD_CHARS = set(";&|`$<>\n\r(){}*?~\\\"'!#")
+
+
+def verify_argv(cmd):
+    """Strict argv for a seat's verify_command, or SeatError. No shell:
+    no pipes, redirects, expansions or chaining. Executable from a short
+    list; python only as `python <relative .py>` or `-m unittest|pytest`
+    (never -c); no absolute paths, `..`, or `~`. This narrows the shape of
+    the command. It is NOT a sandbox: verify still runs code the seat
+    wrote, with the operator's privileges (secrets are withheld from the
+    environment, see _verify_env)."""
+    import shlex
+    if not isinstance(cmd, str) or not cmd.strip():
+        raise SeatError("verify_command must be a non-empty string")
+    if any(c in _VERIFY_BAD_CHARS for c in cmd):
+        raise SeatError("verify_command refused: shell syntax is not "
+                        "allowed (no pipes, redirects, expansion, quoting)")
+    try:
+        argv = shlex.split(cmd)
+    except ValueError as exc:
+        raise SeatError(f"verify_command refused: {exc}")
+    if not argv or argv[0] not in VERIFY_EXECUTABLES:
+        raise SeatError("verify_command refused: executable must be one "
+                        f"of {list(VERIFY_EXECUTABLES)}")
+    for a in argv[1:]:
+        if a.startswith("/") or a.startswith("~") or \
+                ".." in a.replace("\\", "/").split("/"):
+            raise SeatError("verify_command refused: absolute, home or "
+                            "parent-relative path argument")
+    if argv[0] in ("python3", "python"):
+        ok = (len(argv) >= 2 and argv[1].endswith(".py")
+              and not argv[1].startswith("-")) or \
+             (len(argv) >= 3 and argv[1] == "-m"
+              and argv[2] in ("unittest", "pytest"))
+        if not ok:
+            raise SeatError("verify_command refused: python only as "
+                            "`python <relative.py>` or `-m unittest|pytest`")
+    return argv
+
+
+def _verify_env():
+    """Minimal environment: no API keys or tokens reach verify code."""
+    keep = ("PATH", "LANG", "LC_ALL", "TMPDIR")
+    env = {k: os.environ[k] for k in keep if k in os.environ}
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    return env
 
 
 def head_binding_clean(repo, stamped):
@@ -130,14 +179,56 @@ class Seat:
         if state.get("turn") != self.name:
             return False
 
+        locks = []
+
         def mutate():
+            # A lost push race re-invokes mutate (retry). Release any
+            # lock kept from the previous attempt so the slow adapter
+            # call below never runs while holding the action lock. A
+            # retry REPLAYS the adapter call and its effects: the
+            # contract is at-least-once, never exactly-once.
+            while locks:
+                locks.pop().__exit__(None, None, None)
             state = self.bus.state()
             if state.get("turn") != self.name:
                 return False
             self._preflight_dirt_check()
             self.claim_lease(state)
             response = self._call_adapter(state)
+            # Take the repo action lock AFTER the (slow) model call and
+            # hold it through apply + commit (released by act_once), so
+            # control writers wait only for this short window. Then
+            # RE-READ state INSIDE the lock: a compliant control writer
+            # may have moved turn/seq/head while we waited. All
+            # freshness and binding checks below use this fresh state.
+            if not locks:
+                lk = self.bus.action_lock()
+                lk.__enter__()
+                locks.append(lk)
+            fresh = self.bus.state()
+            if (fresh.get("turn") != self.name
+                    or fresh.get("turn_seq") != state.get("turn_seq")):
+                raise SeatError(
+                    f"{self.name}: turn moved while the response was "
+                    f"produced (turn={fresh.get('turn')!r} "
+                    f"seq={fresh.get('turn_seq')} vs "
+                    f"seq={state.get('turn_seq')}); refusing to apply a "
+                    "stale response")
+            # keep OUR lease claim (made on the pre-call state); every
+            # other field comes from the fresh, lock-protected read
+            fresh.setdefault("leases", {})[self.name] = \
+                state["leases"][self.name]
+            state = fresh
             binding = response.pop("_queue", None)
+            if isinstance(self.adapter, QueueAdapter) and not isinstance(
+                    binding, dict):
+                # A queued line reasoned outside this process MUST carry
+                # the stamp `launcher respond` writes. An unbound line
+                # (hand-edited or raw) is never applied.
+                raise SeatError(
+                    f"queued response for {self.name} has no _queue "
+                    "binding; refusing an unbound line - re-queue with "
+                    "`launcher respond`")
             if binding is not None:
                 # `launcher respond` stamps the turn/turn_seq/head the
                 # response was reasoned against. Applying it after the
@@ -164,13 +255,25 @@ class Seat:
                         f"seq={state.get('turn_seq')} - re-render with "
                         "`launcher prompt` and re-queue with "
                         "`launcher respond` (it can --discard-stale)")
+            hook = getattr(self, "pre_apply", None)
+            if hook is not None:
+                # Contract: called inside the transaction, after the
+                # binding checks and BEFORE any write/verify/handoff.
+                # hook(seat, state, response) must return None to
+                # proceed; raising SeatError aborts with no residue.
+                # The queue line is not consumed on abort.
+                hook(self, state, response)
             self._apply(state, response)
             consume = getattr(self.adapter, "consume", None)
             if consume:
                 consume()
             return True
 
-        return self.bus.transact(f"TURN: {self.name} acting", mutate)
+        try:
+            return self.bus.transact(f"TURN: {self.name} acting", mutate)
+        finally:
+            while locks:
+                locks.pop().__exit__(None, None, None)
 
     def run(self, max_passes=None):
         passes = 0
@@ -483,15 +586,37 @@ class Seat:
                 raise SeatError(
                     f"{self.name} tried to write {path} outside allowed paths "
                     f"{self.allowed_paths}")
+        pre_handoff = response.get("handoff")
+        if pre_handoff is not None and pre_handoff not in \
+                self.bus.roster().get("seats", {}):
+            # validate BEFORE any write: a refusal must leave no residue
+            raise SeatError(
+                f"{self.name} handed off to unknown seat {pre_handoff!r}")
         verify_cmd = response.get("verify_command")
         exit_code = None
+        raw_legacy = self.spec.get("legacy_shell_verify", False)
+        if not (type(raw_legacy) is bool or raw_legacy is None):
+            # only the literal JSON booleans are accepted; "false", 1,
+            # "yes" etc. must never be read as shell permission
+            raise SeatError(
+                f"{self.name}: legacy_shell_verify must be a literal "
+                f"boolean, got {raw_legacy!r}")
+        legacy = raw_legacy is True
+        argv = None
+        if verify_cmd and not legacy:
+            argv = verify_argv(verify_cmd)   # refuse BEFORE any write
         if verify_cmd:
             # Apply writes first so the verify command sees the batch.
             for path, content in writes.items():
                 self._write(self.bus.repo, path, content)
-            proc = subprocess.run(
-                verify_cmd, shell=True, cwd=self.bus.repo,
-                capture_output=True, text=True, timeout=600)
+            if legacy:   # explicit per-seat opt-in to the old shell path
+                proc = subprocess.run(
+                    verify_cmd, shell=True, cwd=self.bus.repo,
+                    capture_output=True, text=True, timeout=600)
+            else:
+                proc = subprocess.run(
+                    argv, shell=False, cwd=self.bus.repo, env=_verify_env(),
+                    capture_output=True, text=True, timeout=600)
             exit_code = proc.returncode
             tail = (proc.stdout + proc.stderr).strip().splitlines()[-5:]
         else:
