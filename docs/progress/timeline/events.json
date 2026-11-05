@@ -1,5 +1,5 @@
 {
- "asOf": "2026-11-04T20:57",
+ "asOf": "2026-11-05T04:53",
  "timezone": "Europe/Helsinki",
  "note": "Recorded events use commit times. Planned items are not events. A check that finds no change leaves no record.",
  "events": [
@@ -1840,6 +1840,66 @@
     {
      "label": "Commit 66a12f4",
      "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/66a12f4"
+    }
+   ]
+  },
+  {
+   "id": "review-66a12f4-2103",
+   "day": "2026-11-04",
+   "time": "21:03",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Eva source-schema fix accepted offline",
+   "status": "279full/83focused independently passed. Integration implemented/mock-tested; still blocked qualified model/live verification. No completed Eva check or credit. Whole normalized claim-set fingerprint only, not semantic identity.",
+   "evidence": [
+    {
+     "label": "Published source",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/66a12f45edd552e769949ad5fd19f2f523a00a50"
+    }
+   ]
+  },
+  {
+   "id": "nov5-46fa728",
+   "day": "2026-11-05",
+   "time": "02:54",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Ryan stale-result hardening published",
+   "status": "Independent291full/12focused offline acceptance. No live qualification or progress credit.",
+   "evidence": [
+    {
+     "label": "Published source",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/46fa7284a173c4b96a3a08c1ca8ffa22d6693391"
+    }
+   ]
+  },
+  {
+   "id": "nov5-live-leanstral",
+   "day": "2026-11-05",
+   "time": "04:35",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Compiled-graph Verifier qualification failed",
+   "status": "ONE leanstral request through d97ccc07 returnedHTTP400,no verdict/no usable cost,causeunknown. Halt/window stop,no retry. Lifetime4->5. Frozen root75ee635. Not whole-team or24x7 proof.",
+   "evidence": [
+    {
+     "label": "Published source",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/langgraph-orchestration/integration/langgraph/LIVE_RUN_2026-11-05.md"
+    }
+   ]
+  },
+  {
+   "id": "nov5-route-note",
+   "day": "2026-11-05",
+   "time": "04:42",
+   "kind": "trigger",
+   "lane": "Team and docs",
+   "title": "Failed-first-call route note published",
+   "status": "Documentation only, not enforcement by itself. Loaded route record must carry failed-first-call to block runtime use. Route-notes change separate from frozen root; no provider clearance.",
+   "evidence": [
+    {
+     "label": "Published source",
+     "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/langgraph-orchestration/integration/langgraph/ROUTE_NOTE_leanstral_2026-11-05.md"
     }
    ]
   }

@@ -61,7 +61,7 @@ def render(here, updated):
     labels(COR,"Telkomsel - Coordinator","@instinct-telkomsel","Plans, assigns work, tracks progress","Model: not project-configured")
     labels(BLD,"Alex - Builder","@coolkowkank-bot",("gpt-oss-120b (plan unverified)","Gq"),"Shared bot; new route load paused")
     labels(REV,"Bill - Independent reviewer","@instinct-christina","Reviews the Builder's pinned commits","Model: not project-configured")
-    labels(EVA,"Eva - Evidence verifier","Uses @coolkowkank","shared research token",("Gemma 4 31B, historical trial","Rq"),"BLOCKED: cooldown + integration pending")
+    labels(EVA,"Eva - Evidence verifier","Uses @coolkowkank","shared research token",("Gemma 4 31B, historical trial","Rq"),"BLOCKED: qualified model + live verification")
     labels(RES,"Nora - Researcher","Uses @coolkowkank","shared research token",("Nemotron-3 Ultra 550B (free)","Rq"),"synthesis; citations reviewed")
     labels(RYN,"Ryan - Team Resources","provisional model assignment","Ling 3.1 Flash","UNQUALIFIED / PAUSED; not running","Research + policy; no model assignment authority")
     labels(AST,"Sam - Coordinator Assistant","assigned; status drafts only",("Model: gemma-4-31b-it (free)","Rq"),"Coordinator reviews every draft","Publication stays coordination-run")

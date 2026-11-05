@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04T20:57:00+02:00",
+ "as_of": "2026-11-05T04:53:00+02:00",
  "timezone": "EET (UTC+2), same as commit timestamps",
  "rules": "Weighted milestone progress, not independently verified completion. Milestone done = 100% of weight (tests pass or an independent review passed). Partial = 50%. In progress / not started = 0%. Weights are judgment calls. Commits alone never count.",
  "packages": [
@@ -267,7 +267,7 @@
     "assignment": "Review of the E4 replay and the RW3/RW1 notes",
     "last": "2026-11-04T15:37",
     "ref": "3aff4c6",
-    "what": "Historical review2 retained. Offline integration source-schema fix66a12f4 pending independent acceptance, Gemma cooldown unchanged; no new Eva model review.",
+    "what": "66a12f4 source-schema fix independently accepted279full/83focused. Offline integration implemented/mock-tested; still blocked on qualified assigned model/live verification. No actual completed Eva check.",
     "state": "Blocked",
     "source": "Current parent evidence and ryan-continuous-offline; not Eva model authorship",
     "exec": "Not running; no qualified model route"
@@ -315,10 +315,10 @@
    {
     "member": "Ryan's Verifier",
     "assignment": "Dedicated Researcher and Verifier support requested; model assignments unresolved",
-    "last": "2026-11-04T20:23",
-    "ref": "f5dd8da",
-    "what": "Two actual Ling attempts: empty content then non-JSON. No verdict or Ryan review; role cap2 exhausted,4total reserves.",
-    "state": "Paused / unqualified",
+    "last": "2026-11-05T04:35",
+    "ref": "7535c74",
+    "what": "ONE leanstral qualification request through compiled graph returnedHTTP400, no verdict or usable cost. Halted,no retry. Lifetime5consumed; no qualified route/cycle.",
+    "state": "Paused / qualification failed",
     "source": "team-launcher 001448b",
     "exec": "Not running"
    }
@@ -601,7 +601,7 @@
    "id": "AJ2",
    "name": "Ryan continuous setup and incident",
    "owner": "Project operator; Ryan models not configured",
-   "state": "PAUSED; draft unverified, 2 failed Verifier attempts",
+   "state": "Live qualification failed; PAUSED, no verdict",
    "markers": [
     {
      "at": "2026-11-04T19:40",
@@ -634,12 +634,20 @@
     {
      "at": "2026-11-04T20:23",
      "label": "Verifier non-JSON retry; halted"
+    },
+    {
+     "at": "2026-11-05T02:54",
+     "label": "Stale-result fix published, accepted offline"
+    },
+    {
+     "at": "2026-11-05T04:35",
+     "label": "Compiled-graph Verifier HTTP400; halted"
     }
    ],
-   "evidence": "Independent offline runner review passed233full/37focused at95b68b1. First live allocation had one consumed reserve and unknown transport, no assignments or completed cycle, no usage/cost returned. Diagnostic and operator-owned manual assignment follow-up2f0e722 remains under review. Ryan cannot select, assign or change models. Researcher reference verification before Ryan review remains required. Superseding19:54 assignment ebc123e: Researcher nvidia/nemotron-3-ultra-550b-a55b, Verifier and Ryan novita/ling-3.1-flash, separate executions, no independence claim between Verifier/Ryan. All provisional/unqualified/paused, original unknown halt unchanged. Latest0268393 transport delta NOT accepted: independent review found structural finish-reason/usage-key leaks and malformed/all-result cost-gate blockers. Author fixing; no diagnostic call/clearance. ACTUAL diagnostics:870e86a one Researcher draft, provider-reported cost0 but incorrectC6 (16% is rerun variation, not model swap).6e58f24 first Verifier HTTP200 empty at1536 output ceiling, no verdict. f5dd8da retry HTTP200 non-JSON at1536 ceiling, mechanical format failure, no verdict.4lifetime reserves/6; Verifier role cap2 exhausted. PAUSED, no Ryan review or qualified cycle. Offline66a12f4 strict source/lineage changes pending independent acceptance; no provider clearance.",
+   "evidence": "Independent offline runner review passed233full/37focused at95b68b1. First live allocation had one consumed reserve and unknown transport, no assignments or completed cycle, no usage/cost returned. Diagnostic and operator-owned manual assignment follow-up2f0e722 remains under review. Ryan cannot select, assign or change models. Researcher reference verification before Ryan review remains required. Superseding19:54 assignment ebc123e: Researcher nvidia/nemotron-3-ultra-550b-a55b, Verifier and Ryan novita/ling-3.1-flash, separate executions, no independence claim between Verifier/Ryan. All provisional/unqualified/paused, original unknown halt unchanged. Latest0268393 transport delta NOT accepted: independent review found structural finish-reason/usage-key leaks and malformed/all-result cost-gate blockers. Author fixing; no diagnostic call/clearance. ACTUAL diagnostics:870e86a one Researcher draft, provider-reported cost0 but incorrectC6 (16% is rerun variation, not model swap).6e58f24 first Verifier HTTP200 empty at1536 output ceiling, no verdict. f5dd8da retry HTTP200 non-JSON at1536 ceiling, mechanical format failure, no verdict.4lifetime reserves/6; Verifier role cap2 exhausted. PAUSED, no Ryan review or qualified cycle. Offline66a12f4 strict source/lineage changes pending independent acceptance; no provider clearance. UPDATE Nov5:46fa728 in-flight stale-result fix independently accepted291full/12focused. Integrated d97ccc07 compiled-graph ONE leanstral Verifier request04:35EET returnedHTTP400,no verdict/no usable usage-cost, causeunknown; halted/window stopped/no retry. Lifetime4->5 consumed. Current LangGraph7535c74 vendored launcher e881384; runner/transport/allowance3b09eea and model_resources88a610a. Not whole-team/24x7/autonomy proof. Route failed-first-call note is documentation only; enforcement requires the loaded route record. No clearance or score credit.",
    "dependencies": "Provider route remains paused; no retry or model qualification implied. Research question on model choice under fixed harness queued; no result yet.",
    "links_to": "Supplemental individual job; no extra milestone credit",
-   "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/ryan-continuous-offline/docs/team/ryan/incident-1.md",
+   "url": "https://github.com/coolkowkank/Multiple-Human-Concept-Owner/blob/langgraph-orchestration/integration/langgraph/LIVE_RUN_2026-11-05.md",
    "approved": "Status only; no provider call or retry authority"
   },
   {
