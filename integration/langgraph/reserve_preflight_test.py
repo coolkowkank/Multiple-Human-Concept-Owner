@@ -130,6 +130,21 @@ for bad in ("null", "[]", '"x"', "", "{}"):
     af = os.path.join(newdir(), "a.json"); open(af, "w").write(bad)
     check("CLI anchor file %r refuses" % bad,
           rp.main(["--planned", "1", "--log-dir", d, "--cap", "8", "--anchor-file", af]) == 1)
+good_snap = rp.snapshot(rp.preflight(1, log_dir=d, cap=8))
+for name, bad in (("files {}", {"schema": rp.SCHEMA, "files": {}}), ("files null", {"schema": rp.SCHEMA, "files": None}),
+                  ("files []", {"schema": rp.SCHEMA, "files": []}), ("no files key", {"schema": rp.SCHEMA}),
+                  ("entry lines 0", {"schema": rp.SCHEMA, "files": {M: {"lines": 0, "tip_sha256": "0" * 64}}}),
+                  ("entry bad tip", {"schema": rp.SCHEMA, "files": {M: {"lines": 2, "tip_sha256": "zz"}}}),
+                  ("entry bool lines", {"schema": rp.SCHEMA, "files": {M: {"lines": True, "tip_sha256": "0" * 64}}})):
+    af = os.path.join(newdir(), "a.json"); json.dump(bad, open(af, "w"))
+    check("CLI valid-schema anchor with %s refuses" % name,
+          rp.main(["--planned", "1", "--log-dir", d, "--cap", "8", "--anchor-file", af]) == 1
+          and rp.preflight(1, log_dir=d, cap=8, anchor=bad)["status"] == "refuse")
+# control: a well-formed anchor over a LONGER ledger than the current one is a truncation and must refuse
+dt = newdir(); write(dt, M, seq(1))
+af = os.path.join(newdir(), "a.json"); json.dump(good_snap, open(af, "w"))
+check("CLI well-formed anchor, truncated ledger refuses", rp.main(["--planned", "1", "--log-dir", dt, "--cap", "8", "--anchor-file", af]) == 1)
+check("CLI well-formed anchor, matching ledger passes", rp.main(["--planned", "1", "--log-dir", d, "--cap", "8", "--anchor-file", af]) == 0)
 check("CLI missing anchor file refuses",
       rp.main(["--planned", "1", "--log-dir", d, "--cap", "8", "--anchor-file", d + "/nope.json"]) == 1)
 af = os.path.join(newdir(), "a.json"); json.dump(rp.snapshot(rp.preflight(1, log_dir=d, cap=8)), open(af, "w"))

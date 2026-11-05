@@ -226,16 +226,20 @@ def preflight(planned_calls, *, log_dir=None, cap=None, anchor=None, allow_fresh
             out["problems"].append("fewer reserves than the operator expects (%d < %d): deletion or truncation"
                                    % (total, expected_min_reserves))
         if anchor is not None:
-            if not isinstance(anchor, dict) or anchor.get("schema") != SCHEMA:
-                out["problems"].append("anchor is not a reserve-preflight/v1 snapshot")
+            af = anchor.get("files") if isinstance(anchor, dict) else None
+            if not isinstance(anchor, dict) or anchor.get("schema") != SCHEMA \
+                    or not isinstance(af, dict) or not af:
+                out["problems"].append("anchor is not a reserve-preflight/v1 snapshot with a non-empty files object")
+            elif not all(isinstance(a, dict) and isinstance(a.get("lines"), int) and not isinstance(a.get("lines"), bool)
+                         and a["lines"] >= 1 and isinstance(a.get("tip_sha256"), str)
+                         and re.fullmatch(r"[0-9a-f]{64}", a["tip_sha256"]) for a in af.values()):
+                out["problems"].append("anchor has a malformed file entry (needs lines >= 1 and a sha256 tip)")
             else:
                 by = {x["file"]: x for x in out["files"]}
-                for fn, a in (anchor.get("files") or {}).items():
+                for fn, a in af.items():
                     cur = by.get(fn)
                     if cur is None:
                         out["problems"].append("anchored log missing now: " + fn); continue
-                    if not (isinstance(a, dict) and isinstance(a.get("lines"), int)):
-                        out["problems"].append("bad anchor entry: " + fn); continue
                     if cur["lines"] < a["lines"]:
                         out["problems"].append("log shorter than anchor (tail truncation): " + fn); continue
                     # re-scan to compare the hash AT the anchored line count
