@@ -195,8 +195,8 @@ bad_chk = os.path.join(cdir, "bad.py"); open(bad_chk, "w").write("import sys; sy
 fkey = os.path.join(cdir, "key.bin"); open(fkey, "wb").write(KEY); os.chmod(fkey, 0o600)
 def mkcfg(name, script=chk, **kw):
     rd2 = os.path.join(cdir, name + "-rec"); os.makedirs(rd2, exist_ok=True); os.chmod(rd2, 0o700)
-    c = {"checker_cmd": [sys.executable, script], "checker_id": CHK, "artifact_paths": ["src/app.py"],
-         "key_file": fkey, "record_dir": rd2, "timeout": 30}; c.update(kw)
+    c = {"checker_script": script, "checker_id": done_gate.checker_id_of(script), "artifact_paths": ["src/app.py"],
+         "key_file": fkey, "record_dir": rd2, "timeout": 15}; c.update(kw)
     cp = os.path.join(cdir, name + ".json"); open(cp, "w").write(json.dumps(c)); os.chmod(cp, 0o600)
     return cp, rd2
 def newlane():
@@ -230,7 +230,51 @@ check("run phase with operator config ends with closeout allowed (offline mock c
 l8 = tempfile.mkdtemp(dir=tmp); subprocess.run([sys.executable, os.path.join(HERE, "langgraph_team.py"), "init", l8, os.path.join(tmp, "l8.sqlite")], check=True, capture_output=True)
 env8 = {k: v for k, v in os.environ.items() if k != "LG_OPERATOR_CONFIG"}
 r8 = subprocess.run([sys.executable, os.path.join(HERE, "langgraph_team.py"), "run", l8, os.path.join(tmp, "l8.sqlite"), "0", "r8"], capture_output=True, text=True, env=env8)
-check("run phase without operator config: cycle done, closeout unproven", r8.returncode == 0 and '"closeout_allowed": false' in r8.stdout and "quality unproven" in r8.stdout)
+check("run phase without operator config: cycle done, closeout unproven", r8.returncode == 3 and '"closeout_allowed": false' in r8.stdout and "quality unproven" in r8.stdout)
+
+# --- sandbox enforcement, checker binding, output caps, exit semantics ---
+def script(name, body):
+    sp = os.path.join(cdir, name); open(sp, "w").write(body); return sp
+evil = script("evil.py", "import json\nk = open(%r, 'rb').read()\nprint(json.dumps({'accepted': True}))\n" % fkey)
+l9 = newlane(); cp9, rd9 = mkcfg("evil", script=evil)
+check("finalize: checker that tries to read the operator key inside the sandbox fails (unproven, no record)", not done_gate.finalize(l9, lt.BRANCH, cp9)["closeout_allowed"] and os.listdir(rd9) == [])
+net = script("net.py", "import socket, json\ns = socket.socket(); s.settimeout(2); s.connect(('1.1.1.1', 53))\nprint(json.dumps({'accepted': True}))\n")
+l10 = newlane(); cp10, rd10 = mkcfg("net", script=net)
+check("finalize: checker that tries the network fails closed", not done_gate.finalize(l10, lt.BRANCH, cp10)["closeout_allowed"] and os.listdir(rd10) == [])
+big = script("big.py", "import sys\nsys.stdout.write('x' * 300000)\n")
+l11 = newlane(); cp11, rd11 = mkcfg("big", script=big)
+check("finalize: oversized checker output is cut off (unproven, no record)", not done_gate.finalize(l11, lt.BRANCH, cp11)["closeout_allowed"] and os.listdir(rd11) == [])
+hang = script("hang.py", "import time\ntime.sleep(300)\n")
+l12 = newlane(); cp12, rd12 = mkcfg("hang", script=hang, timeout=5)
+import time as _t; _t0 = _t.time(); s12 = done_gate.finalize(l12, lt.BRANCH, cp12)
+check("finalize: hanging checker is killed at the timeout (unproven, no record)", not s12["closeout_allowed"] and os.listdir(rd12) == [] and _t.time() - _t0 < 30)
+dup = script("dup.py", "print('{\"accepted\": false, \"accepted\": true}')\n")
+l13 = newlane(); cp13, rd13 = mkcfg("dup", script=dup)
+check("finalize: duplicate-key / extra-key checker output refused", not done_gate.finalize(l13, lt.BRANCH, cp13)["closeout_allowed"] and os.listdir(rd13) == [])
+extra = script("extra.py", "print('{\"accepted\": true, \"state\": \"accepted\"}')\n")
+l14 = newlane(); cp14, rd14 = mkcfg("extra", script=extra)
+check("finalize: output with extra keys refused", not done_gate.finalize(l14, lt.BRANCH, cp14)["closeout_allowed"] and os.listdir(rd14) == [])
+cp15, rd15 = mkcfg("idmis", checker_id="a" * 64); l15 = newlane()
+check("finalize: checker_id not equal to the script's hash -> refused before any run", not done_gate.finalize(l15, lt.BRANCH, cp15)["closeout_allowed"] and os.listdir(rd15) == [])
+# checker bytes changed after a record exists: the old record must not carry trust
+cp16, rd16 = mkcfg("swap", script=script("swap.py", open(chk).read())); l16 = newlane()
+check("finalize: swap checker, first run allowed", done_gate.finalize(l16, lt.BRANCH, cp16)["closeout_allowed"])
+open(os.path.join(cdir, "swap.py"), "a").write("\n# changed\n")
+check("finalize: checker bytes changed, config id stale -> refused even though a record exists", not done_gate.finalize(l16, lt.BRANCH, cp16)["closeout_allowed"])
+cfgn = json.load(open(cp16)); cfgn["checker_id"] = done_gate.checker_id_of(os.path.join(cdir, "swap.py"))
+open(cp16, "w").write(json.dumps(cfgn))
+check("finalize: even with the id updated, the old record (other checker id) is not trusted", not done_gate.finalize(l16, lt.BRANCH, cp16)["closeout_allowed"])
+# exit semantics and passthrough
+envn = {k: v for k, v in os.environ.items() if k not in ("LG_OPERATOR_CONFIG", "LG_ALLOW_UNPROVEN")}
+ln = tempfile.mkdtemp(dir=tmp); subprocess.run([sys.executable, os.path.join(HERE, "langgraph_team.py"), "init", ln, os.path.join(tmp, "ln.sqlite")], check=True, capture_output=True)
+rn = subprocess.run([sys.executable, os.path.join(HERE, "langgraph_team.py"), "run", ln, os.path.join(tmp, "ln.sqlite"), "0", "rn"], capture_output=True, text=True, env=envn)
+check("run phase, no config: exit 3 (cycle ended, quality unproven)", rn.returncode == 3 and "quality unproven" in rn.stdout)
+lm = tempfile.mkdtemp(dir=tmp); subprocess.run([sys.executable, os.path.join(HERE, "langgraph_team.py"), "init", lm, os.path.join(tmp, "lm.sqlite")], check=True, capture_output=True)
+envm = dict(envn); envm["LG_ALLOW_UNPROVEN"] = "1"
+rm_ = subprocess.run([sys.executable, os.path.join(HERE, "langgraph_team.py"), "run", lm, os.path.join(tmp, "lm.sqlite"), "0", "rm"], capture_output=True, text=True, env=envm)
+check("run phase, no config, LG_ALLOW_UNPROVEN=1: exit 0 but still prints unproven", rm_.returncode == 0 and '"closeout_allowed": false' in rm_.stdout)
+rb = subprocess.run([sys.executable, os.path.join(HERE, "langgraph_team.py"), "status", ln, "--branch", "other", "--record", "x", "--key-file", "y", "--checker-id", "z", "--path", "a"], capture_output=True, text=True)
+check("status: repeated --branch refused", rb.returncode == 2)
 os.environ.pop("LG_OPERATOR_CONFIG"); os.environ.pop("SOME_API_KEY")
 shutil.rmtree(tmp, ignore_errors=True)
 print("\nOPERATOR DONE HOOK:", "ALL CHECKS PASSED" if ok else "FAILURES ABOVE"); raise SystemExit(0 if ok else 1)

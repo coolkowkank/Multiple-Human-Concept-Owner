@@ -210,26 +210,113 @@ def _private_file(path):
         raise ValueError(f"{os.path.basename(path)}: must be a regular file owned by the operator with mode 0600")
 
 
-def _run_checker(repo, artifact_paths, cmd, timeout):
-    """Run the operator's checker on a clean export of the COMMITTED files.
-    Child gets a scrubbed env (no keys, no seat env) and never sees the signing
-    key; it prints {"accepted": true|false}. NOT a hardened sandbox: it is a
-    plain subprocess under the operator's user with a timeout and output cap."""
+CHECKER_ID_TAG = b"lg-sandboxed-checker/v1\n"
+PROBE = (
+    "import os, socket, json\n"
+    "r = {}\n"
+    "def blocked(path):\n"
+    "    try: open(path, 'rb'); return False\n"
+    "    except OSError: return True\n"
+    "r['paths'] = all(blocked(p) for p in json.loads(os.environ['PROBE_PATHS']) )\n"
+    "s = socket.socket(); s.settimeout(2)\n"
+    "try: s.connect(('1.1.1.1', 53)); r['net'] = False\n"
+    "except OSError: r['net'] = True\n"
+    "r['no_home'] = not os.path.exists('/home')\n"
+    "print(json.dumps(r))\n")
+
+
+def checker_id_of(script):
+    import hashlib
+    return hashlib.sha256(CHECKER_ID_TAG + open(script, "rb").read()).hexdigest()
+
+
+def _sandbox_cmd(export_dir, script, timeout):
+    # bwrap + prlimit; only /usr, the export (ro, as /work), the checker script
+    # (ro) and an empty /tmp are visible. No operator dir, key, config, record
+    # dir, home or network. Same user, not a kernel-bug boundary.
+    return ["/usr/bin/env", "-i", "PATH=/usr/bin:/bin", "prlimit", "--cpu=%d" % max(5, min(timeout, 60)),
+            "--as=1073741824", "--nproc=64", "--fsize=4194304", "--",
+            "bwrap", "--unshare-all", "--die-with-parent", "--new-session",
+            "--ro-bind", "/usr", "/usr", "--symlink", "usr/lib", "/lib",
+            "--symlink", "usr/lib64", "/lib64", "--symlink", "usr/bin", "/bin",
+            "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
+            "--ro-bind", export_dir, "/work", "--ro-bind", script, "/chk/checker.py",
+            "--chdir", "/work", "/usr/bin/python3", "-E", "-s", "-B", "/chk/checker.py", "/work"]
+
+
+def _bounded_run(cmd, timeout, env, cap_out=65536, cap_err=16384):
+    """Streaming read with hard caps; kills the process group on overflow or timeout."""
+    import select, signal, time
+    pr = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, env=env, start_new_session=True)
+    out, err = b"", b""
+    deadline = time.monotonic() + timeout
+    fds = {pr.stdout.fileno(): "o", pr.stderr.fileno(): "e"}
+    try:
+        while fds:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                raise ValueError("checker timed out")
+            for fd in select.select(list(fds), [], [], min(left, 0.5))[0]:
+                chunk = os.read(fd, 8192)
+                if not chunk:
+                    fds.pop(fd); continue
+                if fds[fd] == "o":
+                    out += chunk
+                    if len(out) > cap_out: raise ValueError("checker stdout over cap")
+                else:
+                    err += chunk
+                    if len(err) > cap_err: raise ValueError("checker stderr over cap")
+        pr.wait(timeout=max(0.1, deadline - time.monotonic()))
+    except BaseException:
+        try: os.killpg(pr.pid, signal.SIGKILL)
+        except OSError: pass
+        pr.wait()
+        raise
+    return pr.returncode, out
+
+
+def _no_dups(pairs):
+    d = {}
+    for k, v in pairs:
+        if k in d: raise ValueError("duplicate JSON key")
+        d[k] = v
+    return d
+
+
+def _run_checker(repo, artifact_paths, script, timeout, protect_paths):
+    """Run the operator's checker script on a clean export of the COMMITTED
+    files INSIDE bwrap (enforced here, not declared). A probe first proves
+    in the same sandbox that the key/config/record paths are unreadable and the
+    network is down; any doubt refuses. The checker prints exactly
+    {"accepted": true|false}; the parent signs. Same-user bwrap, not a
+    hardened boundary against kernel bugs."""
     import tempfile, shutil
+    if not os.path.exists("/usr/bin/bwrap"):
+        raise ValueError("bwrap not available: refusing to run a checker unsandboxed")
     files = committed_files(repo, artifact_paths)
     d = tempfile.mkdtemp(prefix="lg-export-"); os.chmod(d, 0o700)
+    pf = os.path.join(d, ".probe.py")
     try:
         for rel, content in files.items():
             dst = os.path.join(d, rel); os.makedirs(os.path.dirname(dst), exist_ok=True)
             with open(dst, "w", encoding="utf-8") as fh: fh.write(content)
-        pr = subprocess.run(list(cmd) + [d], cwd=d, stdin=subprocess.DEVNULL,
-                            capture_output=True, timeout=timeout,
-                            env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"})
-        if pr.returncode != 0:
-            raise ValueError(f"checker exited {pr.returncode}")
-        out = json.loads(pr.stdout[:65536].decode("utf-8"))
-        if not isinstance(out, dict) or not isinstance(out.get("accepted"), bool):
-            raise ValueError("checker output not {accepted: bool}")
+        with open(pf, "w") as fh: fh.write(PROBE)
+        # probe: same sandbox, probe script as the checker; paths passed by bwrap-free env is
+        # not possible (env -i), so embed them in the probe source instead
+        with open(pf, "w") as fh:
+            fh.write(PROBE.replace("os.environ['PROBE_PATHS']", repr(json.dumps(list(protect_paths)))))
+        rc, o = _bounded_run(_sandbox_cmd(d, pf, 20), 25, {"PATH": "/usr/bin:/bin"})
+        pj = json.loads(o.decode("utf-8"), object_pairs_hook=_no_dups) if rc == 0 else {}
+        if pj.get("paths") is not True or pj.get("net") is not True or pj.get("no_home") is not True:
+            raise ValueError("sandbox probe failed: refusing to run the checker")
+        os.unlink(pf)
+        rc, o = _bounded_run(_sandbox_cmd(d, script, timeout), timeout + 5, {"PATH": "/usr/bin:/bin"})
+        if rc != 0:
+            raise ValueError(f"checker exited {rc}")
+        out = json.loads(o.decode("utf-8"), object_pairs_hook=_no_dups)
+        if not isinstance(out, dict) or set(out) != {"accepted"} or not isinstance(out["accepted"], bool):
+            raise ValueError("checker output not exactly {accepted: bool}")
         return out["accepted"]
     finally:
         shutil.rmtree(d, ignore_errors=True)
@@ -252,17 +339,19 @@ def finalize(repo, branch, config_path):
             return dict(unproven, reason="no operator config")
         _private_file(config_path)
         cfg = json.load(open(config_path, encoding="utf-8"))
-        cmd, cid, paths = cfg["checker_cmd"], cfg["checker_id"], cfg["artifact_paths"]
-        if not (isinstance(cmd, list) and cmd and all(isinstance(x, str) for x in cmd)
-                and os.path.isabs(cmd[0]) and isinstance(cid, str) and cid
+        script, cid, paths = cfg["checker_script"], cfg["checker_id"], cfg["artifact_paths"]
+        if not (isinstance(script, str) and os.path.isabs(script) and os.path.isfile(script)
+                and not os.path.islink(script) and isinstance(cid, str) and cid
                 and isinstance(paths, list) and paths):
             raise ValueError("bad config fields")
+        if checker_id_of(script) != cid:
+            raise ValueError("checker_id does not match the checker script bytes")
         lane = os.path.realpath(repo) + os.sep
-        for pth in (config_path, cfg["key_file"], cfg["record_dir"], cmd[0]):
+        for pth in (config_path, cfg["key_file"], cfg["record_dir"], script):
             if (os.path.realpath(pth) + os.sep).startswith(lane) or os.path.realpath(pth) == lane[:-1]:
                 raise ValueError("config, key, record dir and checker must be outside the lane")
         _private_file(cfg["key_file"])
-        key = open(cfg["key_file"], "rb").read().strip()
+        key = open(cfg["key_file"], "rb").read()   # exact bytes, no stripping
         if len(key) < 16:
             raise ValueError("key too short")
         bad = _private_parent(os.path.join(cfg["record_dir"], "x"))
@@ -273,7 +362,8 @@ def finalize(repo, branch, config_path):
         if not cc:
             return dict(unproven, reason="cycle not complete; checker not run")
         if not os.path.lexists(rec_path):
-            accepted = _run_checker(repo, paths, cmd, min(int(cfg.get("timeout", 60)), 300))
+            accepted = _run_checker(repo, paths, script, min(int(cfg.get("timeout", 60)), 300),
+                                    [config_path, cfg["key_file"], os.path.join(cfg["record_dir"], "x"), os.path.dirname(os.path.abspath(config_path))])
             _, sha = current_artifact(repo, paths)
             sig = sign_operator(key, {"hash_scheme": HASH_SCHEME, "artifact_sha256": sha,
                                       "accepted": accepted,
@@ -298,7 +388,7 @@ def main(argv):
     ap.add_argument("--checker-id", required=True)
     ap.add_argument("--path", action="append", required=True)
     a = ap.parse_args(argv)
-    key = open(a.key_file, "rb").read().strip()
+    key = open(a.key_file, "rb").read()   # exact bytes, no stripping (raw keys may end in whitespace bytes)
     st = completion_status(a.repo, a.branch, a.record, a.path, operator_key=key,
                            expected_operator_checker_id=a.checker_id)
     print(json.dumps(st, sort_keys=True))

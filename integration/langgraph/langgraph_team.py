@@ -1020,6 +1020,9 @@ def status_cmd(argv) -> int:
                         else "cycle not complete"}, sort_keys=True))
         return 1
     import done_gate
+    if any(a.split("=")[0] in ("--repo", "--branch") for a in argv[1:]):
+        print("status: --repo/--branch are fixed by the launcher", file=sys.stderr)
+        return 2
     return done_gate.main(["--repo", repo, "--branch", BRANCH] + argv[1:])
 
 
@@ -1052,7 +1055,9 @@ def main(argv) -> int:
         if not (stop_after and Bus(os.path.abspath(repo), BRANCH).state().get("status") != "done"):
             st = done_gate.finalize(repo, BRANCH, os.environ.get("LG_OPERATOR_CONFIG"))
             print("closeout: " + _j.dumps(st, sort_keys=True), flush=True)
-            return 0 if st["closeout_allowed"] or not os.environ.get("LG_OPERATOR_CONFIG") else 1
+            if st["closeout_allowed"] or os.environ.get("LG_ALLOW_UNPROVEN") == "1":
+                return 0
+            return 3   # cycle ended but closeout is NOT allowed (quality unproven)
         return 0
     if phase == "verify":
         return 0 if verify(repo, db, thread_id, expect_resume=True) else 1
