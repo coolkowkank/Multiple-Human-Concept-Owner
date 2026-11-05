@@ -1,5 +1,6 @@
 # Provenance: first draft model-authored (nvidia/nemotron-3-ultra-550b-a55b via
-# Requesty free route, provider-reported usage, not verified). Edited by the
+# Requesty free route; one call, provider-reported usage 2306 prompt / 3224
+# completion / 5530 total, cost 0, not verified). Edited by the
 # product worker after independent review: the original asserted unbounded huge
 # ints and raising on non-dict rows against f4576df; those now assert the
 # corrected behavior (bound 10**9, rows ignored and counted).

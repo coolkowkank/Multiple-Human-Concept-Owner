@@ -261,8 +261,14 @@ absence does not block counting reported usage. A repeated id across calls
 blocks totals. Mock rows never produce provider totals. Wiring in `HttpAdapter`
 only exposes `last_call`; no runtime path enables this by default. No provider
 call has been made through it and no savings are measured or claimed.
-Requesty lane: sends no client request id and captures no body id, so its rows
-yield no `reported` evidence until that transport is changed (separate lane).
+Requesty lane gap (precise): the Ryan-lane Requesty transport already returns
+sanitized provider-reported `usage` in its own result and ledger (keyed by its
+ledger rid), and sends no client request id and captures no body id. What is
+unresolved is the product wrapper interface: that transport is not an
+`HttpAdapter`, so it does not set `last_call` or the class capability, and its
+usage does not reach `PromptAuditAdapter` `reported` evidence or the call_id
+join. Absence of a provider id is not absence of usage; connecting the two is a
+separate, unreviewed change.
 
 Amendments after independent review: the join field is named
 `response_id_sha256` (sha256 of the provider-reported response id, not a vendor
