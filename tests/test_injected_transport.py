@@ -72,3 +72,45 @@ class T(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class RyanShaped(unittest.TestCase):
+    OKR = {'kind': 'ok', 'content': OK, 'finish_reason': 'stop', 'usage_flag': None, 'cost_signal': 'zero'}
+
+    def test_exceptions_propagate_unaltered_and_clear_evidence(self):
+        class Halt(BaseException):
+            pass
+        for exc in (Halt('stop'), RuntimeError('boom'), KeyboardInterrupt()):
+            def f(s, p, exc=exc): raise exc
+            a = InjectedTransportAdapter(f)
+            a.last_call = {'stale': 1}
+            with self.assertRaises(type(exc)) as cx:
+                a.complete('s', 'p')
+            self.assertIs(cx.exception, exc)
+            self.assertIsNone(a.last_call)
+
+    def test_float_and_partial_usage_unknown_not_zero(self):
+        for usage in ({'prompt_tokens': 3.0, 'completion_tokens': 2, 'cost': 0},
+                      {'prompt_tokens': 3, 'cost': 0, 'total_tokens': 3},
+                      {'total_tokens': 5, 'prompt_tokens_details': {'cached_tokens': 1}}):
+            a = InjectedTransportAdapter(tr(dict(self.OKR, usage=usage)))
+            a.complete('s', 'p')
+            e = reported_call_evidence(a.last_call)
+            self.assertNotIn('reported_usage', e)
+            rows = run_audit(InjectedTransportAdapter(tr(dict(self.OKR, usage=usage))))
+            self.assertIsNone(join(rows, usage_from_audit(rows))['provider_prompt_tokens'])
+
+    def test_full_ryan_ok_usage_counts_only_int_split(self):
+        usage = {'prompt_tokens': 7, 'completion_tokens': 4, 'total_tokens': 11, 'cost': 0,
+                 'completion_tokens_details': {'reasoning_tokens': 2}}
+        rows = run_audit(InjectedTransportAdapter(tr(dict(self.OKR, usage=usage))))
+        rep = join(rows, usage_from_audit(rows))
+        self.assertEqual((rep['provider_prompt_tokens'], rep['provider_completion_tokens']), (7, 4))
+
+    def test_http_and_unknown_kinds_yield_no_evidence(self):
+        for r in ({'kind': 'http', 'code': 402, 'usage': None, 'cost_signal': None},
+                  {'kind': 'unknown', 'usage': None, 'content': '', 'cost_signal': 'invalid', 'diag': {}}):
+            a = InjectedTransportAdapter(tr(r))
+            with self.assertRaises(AdapterError):
+                a.complete('s', 'p')
+            self.assertIsNone(a.last_call)
