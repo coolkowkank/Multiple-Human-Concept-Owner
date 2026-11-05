@@ -279,3 +279,14 @@ counts use the wrapper bound (plain int, 0 <= n < 1e9); non-dict or non-string
 the CLI abort with a message. CLI sources: audit-derived usage is added to the
 USAGE file, and a call_id present in both gives `error:duplicate_usage`.
 All token figures are provider-REPORTED, not verified.
+
+## WP9 Builder audit runner: recovery rules (offline, unwired)
+
+`launcher/builder_audit.py` takes an exclusive `<record>.reserve` file before
+its one call. The reserve is never deleted automatically and never reset by the
+runner. If a run crashes after reserving, or the record write fails after a call,
+a human must inspect the audit file, decide whether a call was made and
+whether it was paid, and record that decision before removing the reserve.
+Removing it without that check can double-spend a capped call. A corrupt audit
+file stops the runner before any reserve or call. Provenance is `fake` (totals
+always unknown) or `provider_unverified` (reported usage, not verified).
