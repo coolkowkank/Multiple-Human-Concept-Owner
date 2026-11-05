@@ -12,17 +12,26 @@ operation on the project, not an owner approval question.
 
 ## Integrated accepted chain (2026-11-05)
 
-Upstream tip `3b09eea8ccacebc4e5d3131e4b58fa9cf58a0fe2` (independently
-reviewed, accepted by main: bounded transport/boundary, 385 independent
-+ adversarial + production stale-listing-0-send tests) is vendored
+Upstream tip `ab79bf970e3a8b18007c26c742e56bda35bf1d3a` (independently
+reviewed, accepted by main: 402 tests including changed-claims builder
+refusal and an honest A1->A2 single runtime pass; bounded
+transport/boundary from the earlier accepted chain) is vendored
 BYTE-EXACT into `runner/` and md5-pinned in `live_lane.VENDORED_MD5`:
 
-- `ryan_cycle.py` (ecc7bbb21c62b9aceccf95ba41deec5b) - envelope 7
-  (4 historic + at most 3 new; historic ledger never reset), verifier
-  max_tokens 4096, pre-I/O boundary under store.lock (halt/stop, own
-  reserve line, operator assignment, rendered-input snapshot, grant,
-  price-0, listing freshness at the actual clock; refusal = result
-  outcome not_sent + halt, reserve stays consumed).
+- `ryan_cycle.py` (74e848eec01ad9b97aaa62649d6789c2) - envelope 7
+  (historic reserves are never reset; after the leanstral attempt the
+  executor root holds 5, so the gemma run is at most the 6th of 7),
+  verifier max_tokens 4096, pre-I/O boundary under store.lock
+  (halt/stop, own reserve line, operator assignment, rendered-input
+  snapshot, grant, price-0, listing freshness at the actual clock;
+  refusal = result outcome not_sent + halt, reserve stays consumed),
+  and APPEND-ONLY window succession: a successor grant must name the
+  stopped prior window by id+digest, cover the SAME lineage and
+  claim-set fingerprint (an edited claim set cannot be re-signed
+  around the restriction), use a fresh unused id, pin a model no
+  earlier lineage window used, and is strictly verifier-only
+  max_requests 1; the cap+1 relaxation applies only to a validated
+  actual succession, never to a body's own "succeeds" claim.
 - `model_resources.py` (148d1e609f466332ebb1d6ce85ccf40d) - unchanged
   from the previously accepted chain.
 - `requesty_transport.py` (701321b3a753b82365575b0b40f2acfd) - the
@@ -33,31 +42,33 @@ BYTE-EXACT into `runner/` and md5-pinned in `live_lane.VENDORED_MD5`:
   bounded reads on every error path, max-3 attempts per factory counted
   BEFORE I/O, and cost-zero accounting: an absent or invalid cost
   signal is cost-unverified and surfaces as unknown, never ok.
-- `make_allowance.py` (8587d6e2d5ffd5b86446baa68a7a89ab) - offline
-  bookkeeping builder for ONE signed window; refuses when the item is
-  not at the Verifier step, the TTL exceeds the runner max, or a window
-  is already bound to the lineage/work-fingerprint (a bound window is
-  never replaced).
+- `make_allowance.py` (4f3d08fe51e428089c6f62517820758c) - offline
+  bookkeeping builder; runs the runtime's own succession validator
+  against the actual last bind line BEFORE signing, so it cannot sign
+  a window the runtime would refuse; a successor is verifier-only and
+  must pin a different model.
 
-Run config: `run-config/assignments.json` carries the exact
-assignment content of the local assignment head
-`49f189dd59843f66dc3719871e0750b5fa0ba5c0` (the web editor normalized
-the final newline; the JSON content is identical) - main's delta,
-2026-11-05: researcher nvidia/nemotron-3-ultra-550b-a55b
-(unchanged), verifier mistral/leanstral-1-5 (exact free id, price-0 in
-the fresh public listing; viability unproven - the bounded run is the
-test), ryan novita/ling-3.1-flash (unchanged, NOT authorized for this
-run).
+Run config: `run-config/assignments.json` is the SANITIZED public
+form of the operator assignment (main-approved 2026-11-05): researcher
+nvidia/nemotron-3-ultra-550b-a55b (unchanged), verifier
+google/gemma-4-31b-it (owner-directed switch after the leanstral
+route's failed first call - HTTP 400, cause undetermined, see
+LIVE_RUN_2026-11-05.md and ROUTE_NOTE_leanstral_2026-11-05.md), ryan
+novita/ling-3.1-flash (unchanged, NOT authorized). The private
+original's source_ref carried internal delegation traces; the
+published source_ref is reduced to user-project facts, and this file
+does NOT claim byte-identity with the private original.
 
 ## The bounded run shape (what main authorized preparing)
 
-ONE verifier-only window (max_requests 1, TTL <= 60 min) on the
-existing claim-set lineage research-model-vs-harness-v2: the drafted
-Ultra item C1-C6/P1-P9 continues (verifier already used 2 of its
-ordinary attempts, baseline pinned in the window). NO Researcher
-re-call, NO new lineage, NO Ryan role. The existing bound window
-mechanism prevents a second window; nothing here redesigns that. No
-retry and no halt-clearing until main's go after the run.
+ONE verifier-only SUCCESSOR window (max_requests 1, TTL <= 60 min) on
+the existing claim-set lineage research-model-vs-harness-v2: the
+drafted Ultra item C1-C6/P1-P9 continues. The successor names the
+stopped leanstral window by id+digest, keeps the same lineage and
+claim-set fingerprint, and pins gemma (a model no earlier lineage
+window used). NO Researcher re-call, NO new lineage, NO Ryan role. No
+retry and no halt-clearing until main's go after the run. The prior
+window and its stop stay in the ledger; history is never edited.
 
 Execution ownership (main, 2026-11-05): the EXECUTOR runs ONE driver
 pass of this exact integrated code against its own authoritative
@@ -132,6 +143,10 @@ ledger debits, enforced by the runner - not anything in-process here.
 
 - Builder bookkeeping is offline/quiescent; its allowance.json write is
   NOT crash-atomic (single-writer use; no crash-atomicity claim).
+- A terminal stop of any kind (failure or completion) is what makes a
+  window replaceable by a successor; the succession rules above are
+  the only path, and the question budget (5) and lifetime envelope (7)
+  are unchanged.
 - Socket timeout only - no strict total deadline.
 - Listing age is checked, not refetched; the checked-then-send residual
   remains (state can change between the boundary check and the send).
