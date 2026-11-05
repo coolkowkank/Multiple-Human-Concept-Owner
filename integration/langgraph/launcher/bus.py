@@ -16,9 +16,12 @@ breaking when they were conventions instead of mechanism.
 
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import json
 import os
 import subprocess
+import threading
 import time
 
 BUS_DIR = ".team"
@@ -141,10 +144,19 @@ class Bus:
 
     def transact_paths(self, message, paths, mutate):
         """transact() with explicit staging: commit exactly `paths`."""
+        # Clean-index precheck BEFORE any mutation: a refusal leaves
+        # nothing dirty. Failure restoration touches ONLY `paths`.
+        self.assert_index_clean(f"transact {list(paths)}")
         for attempt in range(self.retries):
             self.pull()
-            result = mutate()
-            if not self.commit_paths(message, paths):
+            snap = self._snapshot_paths(paths)
+            try:
+                result = mutate()
+                committed = self.commit_paths(message, paths)
+            except BaseException:
+                self._restore_paths(paths, snap)
+                raise
+            if not committed:
                 return result
             try:
                 self.push()
@@ -156,6 +168,77 @@ class Bus:
                 if attempt == self.retries - 1:
                     raise BusError(f"lost {self.retries} commit races on {self.branch}")
         return result
+
+    @contextlib.contextmanager
+    def action_lock(self, timeout=30.0):
+        """Per-REPO exclusive advisory lock (flock on a file inside
+        .git, so it is never committed and independent repos never
+        contend). Control writers (pause/update/reassign) and a seat's
+        validate->apply->commit window take the same lock, so a control
+        change is either fully before the seat's final control read or
+        fully after its commit. Re-entrant within one Bus object.
+        Times out with BusError rather than blocking forever."""
+        if not hasattr(self, "_tlock"):
+            self._tlock = threading.RLock()
+            self._lock_depth = 0
+        # Thread-level: re-entrant ONLY for the owning thread; any other
+        # thread using this same Bus object must contend (with timeout).
+        if not self._tlock.acquire(timeout=timeout):
+            raise BusError("action lock busy: timed out (thread)")
+        try:
+            if self._lock_depth > 0:      # we own it: same-thread reentry
+                self._lock_depth += 1
+                try:
+                    yield
+                finally:
+                    self._lock_depth -= 1
+                return
+            gitdir = _git(self.repo, "rev-parse",
+                          "--absolute-git-dir").stdout.strip()
+            fh = open(os.path.join(gitdir, "team-action.lock"), "a+")
+            deadline = time.time() + timeout
+            try:
+                while True:
+                    try:
+                        fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        break
+                    except OSError:
+                        if time.time() >= deadline:
+                            raise BusError("action lock busy: timed out")
+                        time.sleep(0.05)
+                self._lock_depth = 1
+                try:
+                    yield
+                finally:
+                    self._lock_depth = 0
+            finally:
+                fh.close()   # releases the flock
+        finally:
+            self._tlock.release()
+
+    def _snapshot_paths(self, paths):
+        snap = {}
+        for rel in paths:
+            full = os.path.join(self.repo, rel)
+            if os.path.isfile(full):
+                with open(full, "rb") as fh:
+                    snap[rel] = fh.read()
+            else:
+                snap[rel] = None
+        return snap
+
+    def _restore_paths(self, paths, snap):
+        """Restore only the declared paths to their pre-mutate bytes
+        (or absence); unstage them. Other files are never touched."""
+        _git(self.repo, "reset", "-q", "--", *paths, check=False)
+        for rel, data in snap.items():
+            full = os.path.join(self.repo, rel)
+            if data is None:
+                if os.path.isfile(full):
+                    os.remove(full)
+            else:
+                with open(full, "wb") as fh:
+                    fh.write(data)
 
     def transact(self, message, mutate):
         """Pull, mutate working tree, commit, push; retry on races.
