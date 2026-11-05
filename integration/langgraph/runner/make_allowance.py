@@ -31,10 +31,19 @@ def build(root, qid, aid, ttl_min, verifier, ryan=None, now=None):
         raise SystemExit("item is not at the Verifier step")
     L, fp = rc.lineage_of(q), rc.work_fp(q)
     led = store.ledger()
-    if any(e.get("phase") == "allowance-bind"
-           and (e.get("lineage") == L or e.get("work_fp") == fp)
-           for e in led):
-        raise SystemExit("a window is already bound to this lineage")
+    binds = [e for e in led if e.get("phase") == "allowance-bind"
+             and (e.get("lineage") == L or e.get("work_fp") == fp)]
+    succeeds = None
+    if binds:   # a bound window is never replaced; only SUCCEEDED
+        last = binds[-1]
+        if not any(e.get("phase") == "allowance-stop"
+                   and e.get("allowance") == last.get("allowance")
+                   for e in led):
+            raise SystemExit("a window is already bound and not terminal")
+        if any(e.get("phase") == "allowance-bind"
+               and e.get("allowance") == aid for e in led):
+            raise SystemExit("successor needs a new window id")
+        succeeds = {"id": last["allowance"], "digest": last["digest"]}
     if not (isinstance(ttl_min, int) and 0 < ttl_min * 60
             <= rc.ALLOWANCE_MAX_TTL_S):
         raise SystemExit("ttl out of range")
@@ -50,7 +59,21 @@ def build(root, qid, aid, ttl_min, verifier, ryan=None, now=None):
             "max_requests": len(roles),
             "issued_at": rc.iso(now),
             "expires_at": rc.iso(now + ttl_min * 60)}
-    bad = rc._shape_ok(body)
+    if succeeds:
+        if ryan:
+            raise SystemExit("a successor window is verifier-only")
+        body["succeeds"] = succeeds
+        bound = {e.get("allowance") for e in led
+                 if e.get("phase") == "allowance-bind"}
+        prior = {e.get("model") for e in led if e.get("phase") == "reserved"
+                 and e.get("allowance") in bound}
+        if verifier in prior:
+            raise SystemExit("successor must pin a different model")
+    if succeeds:   # the runtime's own validator, before anything is signed
+        why = rc._succession_reason(led, "ok", body, binds[-1], L, fp)
+        if why:
+            raise SystemExit("not a valid successor: " + why)
+    bad = rc._shape_ok(body, succession_ok=bool(succeeds))
     if bad:
         raise SystemExit("body invalid: " + bad)
     key, why = rc._allowance_key()
