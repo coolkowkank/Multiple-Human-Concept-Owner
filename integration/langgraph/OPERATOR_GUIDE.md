@@ -34,8 +34,8 @@ account home (a moved ledger path looks identical to a deleted ledger).
 
 ## Commands
 
-Arguments are positional. There is no usage message: a missing argument ends in
-a Python traceback (see "Rough edges").
+Arguments are positional. Missing arguments print a one-line usage message and
+exit 2.
 
 | Command | What it does | Exit |
 |---|---|---|
@@ -123,11 +123,14 @@ older 0755 dir must be `chmod 700`ed; contents untouched).
   flag only, never in the config) asserts that this is a first run. It is
   ignored when `anchor_file` or a non-zero `expected_min_reserves` is set.
 - `preflight.expected_min_reserves`: refuse if fewer reserves are recorded.
-  Zero counts as NOT set. Set it to the last known total.
+  A non-integer or negative value refuses. Zero is an integer but disables the
+  minimum, so set it to the last verified total.
 - `preflight.anchor_file`: a `reserve_preflight.snapshot()` JSON stored outside the
   log dir, in a private (0700) directory you own, mode 0600, which must already
   exist before `live` runs. It catches tail truncation and rewritten history.
-  There is no command that creates the first one. This script writes it only from
+  `live` refuses before any request or roster write unless the file loads as a
+  `reserve-preflight/v1` snapshot object with files (null, blank, non-object,
+  `{}`, wrong schema, unreadable or missing all refuse). There is no command that creates the first one. This script writes it only from
   a verified ledger, exits without writing otherwise, creates the file 0600 and
   refuses to overwrite an existing file. Run it from `integration/langgraph`
   with the real account HOME:
@@ -161,10 +164,10 @@ not proof). After that run, create the anchor with the script above and set
 `expected_min_reserves` to the printed total. On an account that already spent
 requests, always configure both `anchor_file` and `expected_min_reserves`.
 
-The example config's `expected_min_reserves` value is a placeholder. 0 counts as
-not set, so it must be replaced with your account's last known reserve total
-before a real run. The number in any example is not universal and is not a limit
-you can rely on. The ledger on your account is the source of truth.
+The example config's `expected_min_reserves` is a text placeholder on purpose, so
+an unedited copy refuses ("must be a non-negative int"). Replace it with your
+account's last verified reserve total as an integer. No number in any example is
+universal. The ledger on your account is the source of truth.
 
 ### What the example proves and does not prove
 
@@ -176,14 +179,12 @@ free-unlimited.
 
 ## Rough edges (source gaps, not documented features)
 
-- No usage message: `live`, `init` and `run` with missing arguments raise
-  `IndexError`.
-- A configured `anchor_file` that does not exist raises `FileNotFoundError`
-  instead of a clean refusal.
-- No command writes the first anchor (workaround above).
-- An `anchor_file` that contains JSON `null` (or any non-object) is not rejected
-  by `live`; a `null` is treated as no anchor, so the truncation check is
-  silently off. An empty object is refused by the preflight.
+- No command creates the first anchor except the script above.
+- `reserve_preflight.py` run by itself treats an anchor-file argument that is
+  null or not an object as a refusal. Do not use it to build an anchor; use the
+  script above or the post-run refresh in `live`.
 - `init-http` hard-codes `call_budget` 2, so `live` is the only way to set budgets.
 - `live` runs with `stop_after` from the config; `stop_after: 0` or absent runs to
   the end of the graph.
+- Same-user storage: config, key file, anchor and ledger can all be changed by
+  the same account. The anchor and minimum raise the bar. They are not tamper-proof.

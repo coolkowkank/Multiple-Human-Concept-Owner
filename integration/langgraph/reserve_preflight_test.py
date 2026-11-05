@@ -124,6 +124,17 @@ check("anchored log deleted/replaced", has(rp.preflight(1, log_dir=d, cap=8, anc
 check("bad anchor refused", rp.preflight(1, log_dir=d, cap=8, anchor={"schema": "x"})["status"] == "refuse")
 check("snapshot of a refused result is None", rp.snapshot(refused(seq(9))) is None)
 
+# --- CLI: a configured anchor file that is null / non-object must refuse, never read as "no anchor"
+d = newdir(); write(d, M, seq(2))
+for bad in ("null", "[]", '"x"', "", "{}"):
+    af = os.path.join(newdir(), "a.json"); open(af, "w").write(bad)
+    check("CLI anchor file %r refuses" % bad,
+          rp.main(["--planned", "1", "--log-dir", d, "--cap", "8", "--anchor-file", af]) == 1)
+check("CLI missing anchor file refuses",
+      rp.main(["--planned", "1", "--log-dir", d, "--cap", "8", "--anchor-file", d + "/nope.json"]) == 1)
+af = os.path.join(newdir(), "a.json"); json.dump(rp.snapshot(rp.preflight(1, log_dir=d, cap=8)), open(af, "w"))
+check("CLI valid anchor file passes", rp.main(["--planned", "1", "--log-dir", d, "--cap", "8", "--anchor-file", af]) == 0)
+
 # --- advisory writer detection
 import fcntl
 d = newdir(); p = write(d, M, seq(1)); fh = open(p, "r+b"); fcntl.flock(fh, fcntl.LOCK_EX)

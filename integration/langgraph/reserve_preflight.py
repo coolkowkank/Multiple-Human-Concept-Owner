@@ -284,6 +284,8 @@ def main(argv):
             anchor = json.load(open(a.anchor_file, encoding="utf-8"))
         except (OSError, ValueError):
             anchor = {"schema": "unreadable"}
+        if not isinstance(anchor, dict):   # null/list/string must never read as "no anchor"
+            anchor = {"schema": "unreadable"}
     r = preflight(a.planned, log_dir=a.log_dir, cap=a.cap, anchor=anchor, allow_fresh=a.allow_fresh,
                   expected_min_reserves=a.expected_min_reserves)
     print(json.dumps(r, sort_keys=True))
