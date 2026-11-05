@@ -20,8 +20,9 @@ No fallback parse, no cause claimed, no new call authority) is vendored
 BYTE-EXACT into `runner/` and md5-pinned in `live_lane.VENDORED_MD5`:
 
 - `ryan_cycle.py` (ae08fb3c6dae3744e4a505ebc2428d8c) - envelope 7
-  (historic reserves are never reset; after the leanstral attempt the
-  executor root holds 5, so the gemma run is at most the 6th of 7),
+  (historic reserves are never reset; the project-internal reserve cap of 7
+  is a self-imposed bookkeeping control, not an owner limit; its count
+  is read from the authoritative ledger at run time, never from this doc),
   verifier max_tokens 4096, pre-I/O boundary under store.lock
   (halt/stop, own reserve line, operator assignment, rendered-input
   snapshot, grant, price-0, listing freshness at the actual clock;
@@ -171,3 +172,20 @@ window on the bound lineage; network-down settles unknown + halt with
 no dangling reserve. Prior suites re-run on this head: round-4 12/12;
 committed-control fail-closed 3/3 (round-3's worktree-write probe is
 stale by design - the graph reads the COMMITTED control only).
+
+
+## Current state (2026-11-05, after the Gemma attempt)
+
+- Verifier attempts so far: leanstral (HTTP 400) and gemma (response-shape
+  KeyError, body not retained). Neither is qualified and neither produced
+  a verdict. Historical counts live in the authoritative ledger only;
+  numbers in older sections of this file are snapshots and may be stale.
+- Diagnostics eef61c6 are vendored. They record structure only and do not
+  explain the earlier Gemma failure.
+- run-config/assignments.json still names gemma as the historical
+  verifier. A successor window must name a model not used by any earlier
+  attempt, from a lab other than the researcher's.
+- Free routes read from account metadata, no inference: Groq models list
+  includes openai/gpt-oss-120b and qwen/qwen3.8-27b; Cerebras lists
+  qwen-3.8-27b and gpt-oss-120b. Per-org limits and whether billing is
+  attached are not verified from here; free status rests on vendor docs.
