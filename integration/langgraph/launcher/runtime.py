@@ -77,6 +77,25 @@ def verify_sandbox_ready():
         os.path.isfile(shim) and os.access(shim, os.X_OK)
 
 
+def correction_suffix(kind, exc_text=None, bad=None, allowed=None):
+    """The EXACT text appended to the task for a correction round. Single
+    source for the runtime and for the audit wrapper (which compares
+    equality against what the runtime recorded, no pattern matching)."""
+    if kind == "format":
+        return (f"\n\nCORRECTION REQUIRED: your previous reply "
+                f"was not a single JSON object per the response "
+                f"contract ({exc_text}). Reply with EXACTLY ONE JSON object "
+                "matching the contract and nothing else - no prose, "
+                "no fences, no tool calls.")
+    if kind == "path":
+        return (f"\n\nCORRECTION REQUIRED: your previous reply "
+                f"tried to write {bad}, outside your allowed paths "
+                f"{allowed}. Reply again with the same JSON "
+                "contract, writing ONLY inside your allowed paths; leave "
+                "every other file untouched.")
+    raise ValueError("unknown correction kind")
+
+
 def sandboxed_verify_argv(argv):
     """When LG_VERIFY_SANDBOX is set (the live-run operator sets it),
     verify may ONLY run python3/python through sandbox/python3 (bwrap: no
@@ -486,6 +505,7 @@ class Seat:
 
     def _call_adapter(self, state):
         system, task = self.build_prompt(state)
+        self.correction_meta = None
         corrections = []
         try:
             response = self._complete(system, task)
@@ -500,12 +520,8 @@ class Seat:
             # reply is revalidated STRICTLY - no prose salvage, which
             # review rejected because text outside the object can carry
             # intent. A second format failure ends the turn honestly.
-            correction = (
-                f"{task}\n\nCORRECTION REQUIRED: your previous reply "
-                f"was not a single JSON object per the response "
-                f"contract ({exc}). Reply with EXACTLY ONE JSON object "
-                "matching the contract and nothing else - no prose, "
-                "no fences, no tool calls.")
+            self.correction_meta = {"kind": "format", "exc_text": str(exc)}
+            correction = task + correction_suffix("format", str(exc))
             try:
                 response = self._complete(system, correction)
             except AdapterError as exc2:
@@ -543,12 +559,10 @@ class Seat:
         # fails the turn honestly. Nothing has been written yet - the
         # pre-mutation refusal is preserved, and _apply still re-checks
         # every path as the hard guard.
-        correction = (
-            f"{task}\n\nCORRECTION REQUIRED: your previous reply "
-            f"tried to write {bad}, outside your allowed paths "
-            f"{self.allowed_paths}. Reply again with the same JSON "
-            "contract, writing ONLY inside your allowed paths; leave "
-            "every other file untouched.")
+        self.correction_meta = {"kind": "path", "bad": bad,
+                                "allowed": self.allowed_paths}
+        correction = task + correction_suffix("path", bad=bad,
+                                               allowed=self.allowed_paths)
         try:
             retry = self._complete(system, correction)
         except AdapterError as exc:
