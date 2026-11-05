@@ -2,6 +2,7 @@
 a local fake server stands in for the router, with HTTP_FREE_BASE patched to
 its address ONLY inside this test process. Scripted/fake results, not model
 output."""
+import os as _os; _os.environ.setdefault("LG_VERIFY_SANDBOX", "1")
 import http.server
 import json
 import os

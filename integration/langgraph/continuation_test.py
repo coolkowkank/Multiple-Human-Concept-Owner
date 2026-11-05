@@ -2,6 +2,7 @@
 continuation on a scratch lane, with a LOCAL FAKE server that returns
 structured replies per seat. Proves the wiring (roster swap, fences,
 budgets, verify run), not any model's ability. No provider request."""
+import os as _os; _os.environ.setdefault("LG_VERIFY_SANDBOX", "1")
 import http.server, json, os, shutil, sys, tempfile, threading
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import fenced_http

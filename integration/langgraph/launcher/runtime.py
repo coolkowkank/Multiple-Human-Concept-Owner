@@ -69,6 +69,14 @@ def verify_argv(cmd):
     return argv
 
 
+def verify_sandbox_ready():
+    """True only when the flag is set AND the shim is executable."""
+    shim = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), "sandbox", "python3")
+    return bool(os.environ.get("LG_VERIFY_SANDBOX")) and \
+        os.path.isfile(shim) and os.access(shim, os.X_OK)
+
+
 def sandboxed_verify_argv(argv):
     """When LG_VERIFY_SANDBOX is set (the live-run operator sets it),
     verify may ONLY run python3/python through sandbox/python3 (bwrap: no
@@ -619,6 +627,9 @@ class Seat:
                 f"{self.name}: legacy_shell_verify must be a literal "
                 f"boolean, got {raw_legacy!r}")
         legacy = raw_legacy is True
+        if legacy and os.environ.get("LG_VERIFY_SANDBOX"):
+            raise SeatError(f"{self.name}: legacy_shell_verify refused "
+                            "while LG_VERIFY_SANDBOX is set")
         argv = None
         if verify_cmd and not legacy:
             argv = verify_argv(verify_cmd)   # refuse BEFORE any write
@@ -634,7 +645,8 @@ class Seat:
                 argv = sandboxed_verify_argv(argv)
                 proc = subprocess.run(
                     argv, shell=False, cwd=self.bus.repo, env=_verify_env(),
-                    capture_output=True, text=True, timeout=600)
+                    capture_output=True, text=True,
+                    timeout=60 if os.environ.get("LG_VERIFY_SANDBOX") else 600)
             exit_code = proc.returncode
             tail = (proc.stdout + proc.stderr).strip().splitlines()[-5:]
         else:

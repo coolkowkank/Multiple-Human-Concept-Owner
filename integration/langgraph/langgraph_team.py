@@ -759,6 +759,11 @@ def seat_node(seat: str, state: TeamState) -> dict:
         if type(adapter) is not HttpAdapter:
             return {"seat_error": f"{seat} refused at execution: unexpected "
                                   f"constructed adapter for http spec"}
+        from launcher.runtime import verify_sandbox_ready
+        if not verify_sandbox_ready():
+            return {"seat_error": f"{seat} refused at execution: model-"
+                                  "backed seat requires LG_VERIFY_SANDBOX "
+                                  "and the sandbox shim (fail closed)"}
         ad = spec["adapter"]
         adapter = FencedHttpAdapter(
             HTTP_FREE_BASE, ad["model"], ad["api_key_env"], ad["log_epoch"],

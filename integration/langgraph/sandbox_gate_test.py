@@ -23,4 +23,11 @@ p = subprocess.run(rt.sandboxed_verify_argv(["python3", "tests/test_app.py"]), c
 check("repo test imports src and passes under sandbox (rc %s %s)" % (p.returncode, p.stderr[-80:]), p.returncode == 0)
 p = subprocess.run(rt.sandboxed_verify_argv(["python3", "-m", "unittest", "discover", "-s", "tests"]), cwd=d, env=rt._verify_env(), capture_output=True, text=True)
 check("unittest -m works (rc %s)" % p.returncode, p.returncode in (0,5))
+# legacy shell refused under the flag; ready() needs flag+shim
+check("ready with flag", rt.verify_sandbox_ready())
+os.environ.pop("LG_VERIFY_SANDBOX")
+check("not ready without flag", not rt.verify_sandbox_ready())
+os.environ["LG_VERIFY_SANDBOX"] = "1"
+src = open(os.path.join(HERE, "launcher", "runtime.py")).read()
+check("legacy refusal present in source", "legacy_shell_verify refused" in src)
 print("\nGATE:", "ALL CHECKS PASSED" if ok else "FAILURES ABOVE"); raise SystemExit(0 if ok else 1)
