@@ -39,9 +39,11 @@ BYTE-EXACT into `runner/` and md5-pinned in `live_lane.VENDORED_MD5`:
   is already bound to the lineage/work-fingerprint (a bound window is
   never replaced).
 
-Run config: `run-config/assignments.json` byte-exact from the local
-assignment head `49f189dd59843f66dc3719871e0750b5fa0ba5c0` (main's
-delta, 2026-11-05): researcher nvidia/nemotron-3-ultra-550b-a55b
+Run config: `run-config/assignments.json` carries the exact
+assignment content of the local assignment head
+`49f189dd59843f66dc3719871e0750b5fa0ba5c0` (the web editor normalized
+the final newline; the JSON content is identical) - main's delta,
+2026-11-05: researcher nvidia/nemotron-3-ultra-550b-a55b
 (unchanged), verifier mistral/leanstral-1-5 (exact free id, price-0 in
 the fresh public listing; viability unproven - the bounded run is the
 test), ryan novita/ling-3.1-flash (unchanged, NOT authorized for this
