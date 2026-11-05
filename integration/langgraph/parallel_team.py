@@ -3,11 +3,16 @@
 Three independent team pipelines (lane-a/b/c, separate repos, separate
 checkpoint threads) execute concurrently as parallel branches. Within
 each lane the project's dependency edges still serialize through the
-single turn token. A shared seat gate caps concurrent seat actions
-across ALL lanes (mock mode spends nothing; this is where a shared
-budget control would attach in live mode - one control, not per-lane
-allowances). Also runs a deterministic no-network overlap test proving
-the gate's cap and genuine parallel execution.
+single turn token.
+
+Caveat carried from langgraph_team.py: the shared seat gate is
+process-local and optional and caps concurrent seat ACTIONS (a seat
+action can make several adapter calls); it is NOT a provider budget and
+NOT a real request-concurrency control, and no RequestBudget/allowance
+wiring exists. In live mode a shared budget control would attach at this
+single point - one control, never per-lane multiplied allowances. The
+overlap test is deterministic and no-network; it proves thread-level
+overlap and the gate's high-water, nothing about provider behavior.
 """
 
 from __future__ import annotations
