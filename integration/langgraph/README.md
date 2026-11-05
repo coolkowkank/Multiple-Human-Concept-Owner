@@ -73,10 +73,28 @@ IMMEDIATELY before acting:
    turn's commit; the in-memory lease/turn changes are never committed.
    The bus transact itself is pull/commit/push/retry - no isolation,
    no rollback of already-committed state.
-   The control file fails CLOSED: missing/unreadable/invalid CONTROL
-   means hold, never run. Operator commits stage exactly their own
-   paths (`transact_paths`), so a control commit can never sweep an
-   in-flight seat's worktree changes.
+   The control file fails CLOSED: anything but an explicit dict with a
+   known mode and integer instruction_seq - missing file, bad JSON,
+   wrong type, unknown mode, missing/bool seq - means hold, never run.
+   The graph reads control from the COMMITTED state (`git show HEAD:`),
+   never the worktree: an uncommitted or failed control change is
+   invisible; control takes effect exactly at commit order. Operator
+   commits stage exactly their own paths (`transact_paths`), precheck a
+   clean index BEFORE mutating, and restore the worktree from HEAD on
+   failure, so a control commit can neither sweep an in-flight seat's
+   changes nor leave a dirty control value behind.
+
+   Control semantics, stated honestly: the guard checks at THREE points
+   - before the adapter runs, after it returns, and (routed upstream,
+   not yet landed) at the seat's pre-apply boundary inside
+   `Seat.act_once`. A pause/update landing before or during an adapter
+   call is refused; the residual window between the post-call check and
+   the seat's apply/commit is microseconds but real until the upstream
+   pre-apply hook exists, and closing it needs a repo-level lock shared
+   by seat apply and operator commits (executor-owned launcher change,
+   requested). Pause NEVER cancels in-flight work - it refuses
+   application of responses that complete after it lands, and blocks
+   the next seat action.
 4. Refusals (including `SeatError` from the project's own stale/lease/
    verify machinery) are recorded and route to the terminal node, never
    swallowed.
