@@ -173,7 +173,9 @@ def cmd_lease(args):
                 or not isinstance(lease.get("holder"), str)
                 or not ident.match(lease["holder"])
                 or isinstance(lease.get("claimed_at"), bool)
-                or not isinstance(lease.get("claimed_at"), (int, float))):
+                or not isinstance(lease.get("claimed_at"), (int, float))
+                or lease["claimed_at"] != lease["claimed_at"]
+                or lease["claimed_at"] in (float("inf"), float("-inf"))):
             refuse(f"lease for {args.name} is malformed; fix STATE.json by hand")
         return lease
 

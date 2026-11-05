@@ -63,6 +63,7 @@ try:
     bad_cases = {"leases is a list": lambda s: s.__setitem__("leases", []),
                  "lease is a string": lambda s: s["leases"].__setitem__("coordinator", "A"),
                  "claimed_at is a string": lambda s: s["leases"]["coordinator"].__setitem__("claimed_at", "x"),
+                 "claimed_at is NaN": lambda s: s["leases"]["coordinator"].__setitem__("claimed_at", float("nan")),
                  "holder has a newline": lambda s: s["leases"]["coordinator"].__setitem__("holder", "A\nforged")}
     for nm, mut in bad_cases.items():
         s_ = json.loads(orig); mut(s_); open(sp, "w").write(json.dumps(s_))

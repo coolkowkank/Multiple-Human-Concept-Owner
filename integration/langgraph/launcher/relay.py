@@ -32,6 +32,8 @@ MAX_FIELD = 2000            # per-field length cap
 
 class RelayState:
     def __init__(self, token):
+        if not isinstance(token, str) or not token:
+            raise ValueError("relay token must be a non-empty string")
         self.token = token
         self.messages = []  # [{seq, ts, seat, kind, body}] (most recent kept)
         self.latest = 0     # monotonic; never derived from len(messages)
@@ -66,30 +68,52 @@ class RelayState:
 
 def make_handler(state):
     class Handler(BaseHTTPRequestHandler):
+        timeout = 5   # per-connection socket read timeout (half-sent requests)
+
+        def handle(self):
+            # A closed or stalled client is routine for a hint channel:
+            # drop it quietly instead of printing a traceback per socket.
+            try:
+                super().handle()
+            except (OSError, ValueError):
+                self.close_connection = True
+
         def _authed(self):
             got = self.headers.get(TOKEN_HEADER) or ""
+            if not state.token:
+                return False
             return hmac.compare_digest(got.encode(), str(state.token).encode())
 
         def _send(self, code, payload):
             data = json.dumps(payload).encode()
-            self.send_response(code)
-            self.send_header("content-type", "application/json")
-            self.send_header("content-length", str(len(data)))
-            self.end_headers()
-            self.wfile.write(data)
+            try:
+                self.send_response(code)
+                self.send_header("content-type", "application/json")
+                self.send_header("content-length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+            except OSError:
+                self.close_connection = True
 
         def do_POST(self):
             if not self._authed():
                 return self._send(403, {"error": "bad token"})
+            if self.headers.get("transfer-encoding"):
+                return self._send(411, {"error": "content-length required"})
+            raw_len = self.headers.get("content-length")
+            if raw_len is None:
+                return self._send(411, {"error": "content-length required"})
             try:
-                length = int(self.headers.get("content-length", 0))
+                length = int(raw_len)
             except ValueError:
                 return self._send(400, {"error": "bad content-length"})
-            if length < 0 or length > MAX_BODY:
+            if length < 1:
+                return self._send(400, {"error": "empty body"})
+            if length > MAX_BODY:
                 return self._send(413, {"error": "body too large"})
             try:
-                body = json.loads(self.rfile.read(length) or b"{}")
-            except ValueError:
+                body = json.loads(self.rfile.read(length))
+            except (ValueError, RecursionError):
                 return self._send(400, {"error": "invalid json"})
             if not isinstance(body, dict):
                 return self._send(400, {"error": "body must be an object"})
