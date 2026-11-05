@@ -1005,7 +1005,7 @@ class Seat:
         """The ONE relative path form both the allow check and the write
         use, or None. Refuses (never repairs): non-str, empty, absolute
         (/ or \\ lead), any backslash, control chars or NUL, '.'/'..'/
-        empty segments, and a leading .git component."""
+        empty segments, and ANY .git path segment (case-insensitive)."""
         if not isinstance(path, str) or not path or len(path) > 1024:
             return None
         if path[0] in "/\\" or "\\" in path:
@@ -1013,8 +1013,8 @@ class Seat:
         if any(ord(c) < 32 or ord(c) == 127 for c in path):
             return None
         parts = path.split("/")
-        if any(x in ("", ".", "..") for x in parts) or parts[0] == ".git":
-            return None
+        if any(x in ("", ".", "..") or x.casefold() == ".git" for x in parts):
+            return None   # any .git segment: repo metadata is not seat content
         return path
 
     @staticmethod
@@ -1023,11 +1023,20 @@ class Seat:
         may be a symlink: a write through one could leave the repo. A
         missing component is fine (it will be created as a real dir)."""
         cur = repo
-        for part in rel.split("/"):
+        parts = rel.split("/")
+        for i, part in enumerate(parts):
             cur = os.path.join(cur, part)
             try:
                 if os.path.islink(cur):
                     return False
+                last = i == len(parts) - 1
+                if os.path.lexists(cur):
+                    # an existing ancestor must be a directory (a file there
+                    # would fail mid-batch); the target itself must not be one
+                    if last and os.path.isdir(cur):
+                        return False
+                    if not last and not os.path.isdir(cur):
+                        return False
             except OSError:
                 return False
         real = os.path.realpath(os.path.dirname(os.path.join(repo, rel)))
@@ -1050,11 +1059,17 @@ class Seat:
         if rel is None or not Seat._symlink_free(repo, rel):
             raise SeatError("refusing to write an unsafe path")
         full = os.path.join(repo, rel)
-        os.makedirs(os.path.dirname(full) or repo, exist_ok=True)
-        fd = os.open(full, os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-                     | os.O_NOFOLLOW, 0o644)
-        with os.fdopen(fd, "w") as fh:
-            fh.write(content)
+        try:
+            os.makedirs(os.path.dirname(full) or repo, exist_ok=True)
+            fd = os.open(full, os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+                         | os.O_NOFOLLOW, 0o644)
+            with os.fdopen(fd, "w") as fh:
+                fh.write(content)
+        except OSError as exc:
+            # arbitrary I/O failure: earlier writes of this batch are NOT
+            # rolled back (bus.transact has no rollback)
+            raise SeatError(f"write failed ({type(exc).__name__}); earlier "
+                            "writes of this batch are not rolled back")
 
     @staticmethod
     def _read(repo, path):

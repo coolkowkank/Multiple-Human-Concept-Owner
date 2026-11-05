@@ -250,8 +250,8 @@ verify command text as before; only the record holds hashes.
 ## Write paths
 
 A seat's `writes` keys are checked and written through one canonical relative path. Absolute
-or backslash paths, control characters or NUL, `.` / `..` / empty segments, and a leading `.git`
+or backslash paths, control characters or NUL, `.` / `..` / empty segments, and any `.git` path segment (case-insensitive)
 are refused before any write, as is any path whose existing component is a symlink (the final
-file is opened with O_NOFOLLOW). A batch naming a file and a path under it is refused. This is a
+file is opened with O_NOFOLLOW). A batch naming a file and a path under it is refused, as is a target under an existing non-directory or one that is an existing directory. An unexpected OS error during a write becomes a SeatError, but earlier writes of that batch are NOT rolled back. This is a
 check-then-open on a same-user filesystem: it is not descriptor-relative, so a symlink swapped in
 between the check and the write by another process is not covered. Not a sandbox.

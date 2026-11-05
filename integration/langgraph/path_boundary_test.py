@@ -37,7 +37,7 @@ try:
     leaked = lambda: os.listdir(outside)
     bad = {"absolute into outside dir": os.path.join(outside, "x"), "absolute /src/x": "/src/x", "backslash rootfile": "src\\x", "leading backslash": "\\x",
            "dotdot": "src/../x", "dotdot twice": "src/../../outside/x", "empty segment": "src//x", "trailing slash": "src/", "dot segment": "src/./x",
-           "dot lead": "./src/x", "newline": "src/a\nb", "NUL": "src/a\x00b", "tab": "src/a\tb", ".git component": ".git/hooks/x", "not allowed root": "other/x", "empty": ""}
+           "dot lead": "./src/x", "newline": "src/a\nb", "NUL": "src/a\x00b", "tab": "src/a\tb", ".git component": ".git/hooks/x", "nested .git config": "src/.git/config", "nested .GIT": "src/sub/.GIT/hooks/x", ".git as a file name": "src/.git", "not allowed root": "other/x", "empty": ""}
     for nm, path in bad.items():
         r, b, err, clean = attempt("b-" + str(abs(hash(nm))), {path: "pwn\n"})
         check(f"{nm}: refused with a clean SeatError, no crash, HEAD/state/worktree unchanged, nothing outside", err and "CRASH" not in err and clean and leaked() == [])
@@ -54,6 +54,13 @@ try:
         shutil.rmtree(os.path.join(r, "src")); os.symlink(outside, os.path.join(r, "src"))
     r, b, err, clean = attempt("s3", {"src/x": "pwn\n"}, setup=whole)
     check("allowed root itself a symlink to outside: refused, outside empty of x", err and "CRASH" not in err and "x" not in leaked())
+    r, b, err, clean = attempt("dots", {".team/.hidden": "h\n", ".team/a.gitignore": "x\n", ".team/.github/w.yml": "y\n"})
+    check("ordinary dotfiles (.hidden, a.gitignore, .github/) are still allowed", err is None and os.path.exists(os.path.join(r, ".team/.github/w.yml")))
+    for nm, pth in (("mixed-case .Git", "src/.Git/x"), ("existing dir as target", "src/adir")):
+        r, b, err, clean = attempt("k-" + nm.split()[0], {pth: "x"}, setup=lambda r: os.makedirs(os.path.join(r, "src", "adir"), exist_ok=True))
+        check(f"{nm}: refused before any write", err and "CRASH" not in err and clean)
+    r, b, err, clean = attempt("anc", {"src/ok": "1\n", "src/existingfile/b": "2\n"}, setup=lambda r: open(os.path.join(r, "src", "existingfile"), "w").write("f\n"))
+    check("write under an EXISTING FILE ancestor: refused before ANY write; src/ok is not left behind", err and "CRASH" not in err and clean and not os.path.exists(os.path.join(r, "src", "ok")))
     # legitimate paths preserved
     r, b, err, clean = attempt("ok", {".team/a/b.md": "pass\n", ".team/NOTE.md": "n\n"})
     check("legitimate nested and .team writes still applied and committed", err is None and open(os.path.join(r, ".team/a/b.md")).read() == "pass\n" and git(r, "status", "--porcelain") == "" and leaked() == ["target"])
