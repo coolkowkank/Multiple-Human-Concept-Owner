@@ -2,17 +2,21 @@ import unittest
 from launcher.matched_compare import compare
 
 
-def J(*toks, status='joined_provider'):
-    return {'schema': 'usage-join/v1', 'rows': [
-        {'call_id': f'c{i}', 'status': status, 'prompt_tokens': t, 'completion_tokens': 1} for i, t in enumerate(toks)]}
+def J(*toks, status='joined_provider', pre='c', rid=False):
+    rows = [{'call_id': f'{pre}{i}', 'status': status, 'prompt_tokens': t, 'completion_tokens': 1,
+             'response_id_sha256': (f'{pre}{i}r' if rid else None)} for i, t in enumerate(toks)]
+    return {'schema': 'usage-join/v1', 'rows': rows, 'total_calls': len(rows),
+            'provider_joined': len(rows) if status == 'joined_provider' else 0}
 
 
 def R(tid, toks, acc=True, **kw):
+    kw.setdefault('pre', tid + '-')
     return {'task_id': tid, 'accepted': acc, 'join': J(*toks, **kw)}
 
 
 def arm(n, t):
-    return [R(f't{i}', [t]) for i in range(n)]
+    # arms differ in token level; use it as the call-id namespace so ids stay unique across arms
+    return [R(f't{i}', [t], pre=f't{i}-{t}-') for i in range(n)]
 
 
 class T(unittest.TestCase):
@@ -35,13 +39,14 @@ class T(unittest.TestCase):
 
     def test_mock_missing_error_never_zero(self):
         b = arm(5, 99); v = arm(5, 49)
-        v[0] = R('t0', [1], status='joined_mock')
+        v[0] = R('t0', [1], status='joined_mock', pre='m')
         v[1] = R('t1', [1], status='no_usage_record')
         v[2] = {'task_id': 't2', 'accepted': True, 'join': {'rows': []}}
         v[3] = R('t3', [])
+        v[4] = {'task_id': 't4', 'accepted': True, 'join': dict(J(5), total_calls=9)}
         r = compare(b, v)
-        self.assertEqual(r['matched_pairs'], 1)
-        self.assertEqual(len(r['excluded']), 4)
+        self.assertEqual(r['matched_pairs'], 0)
+        self.assertEqual(len(r['excluded']), 5)
 
     def test_partial_task_with_one_unknown_call_excluded(self):
         v = arm(5, 49)
@@ -76,6 +81,43 @@ class T(unittest.TestCase):
 
     def test_bad_inputs_no_raise(self):
         self.assertEqual(compare(None, 'x')['matched_pairs'], 0)
+
+    def test_survivorship_not_headline(self):
+        b = arm(10, 99); v = arm(10, 49)
+        for x in v[5:]: x['accepted'] = False
+        r = compare(b, v)
+        self.assertEqual(r['verdict'], 'survivor_only')
+        self.assertIsNone(r['saving_percent'])
+        self.assertEqual(r['survivor_saving_percent'], 50.0)
+        self.assertEqual(r['arms'], {'baseline': {'tasks': 10, 'accepted': 10}, 'variant': {'tasks': 10, 'accepted': 5}})
+        self.assertFalse(r['accepted_sets_equal'])
+
+    def test_same_join_reused_across_tasks(self):
+        j = J(99, pre='shared')
+        b = [{'task_id': f't{i}', 'accepted': True, 'join': j} for i in range(5)]
+        r = compare(b, arm(5, 49))
+        self.assertEqual(r['matched_pairs'], 0)
+        self.assertEqual({e['reason'] for e in r['excluded']}, {'reused_usage_id'})
+
+    def test_reused_across_arms_and_response_id(self):
+        b = arm(5, 99); v = arm(5, 49)
+        v[0]['join'] = b[0]['join']
+        b[1]['join'] = J(99, pre='q', rid=True); v[1]['join'] = J(49, pre='z', rid=True)
+        v[1]['join']['rows'][0]['response_id_sha256'] = 'q0r'
+        r = compare(b, v)
+        self.assertEqual(r['matched_pairs'], 3)
+
+    def test_provider_joined_total_mismatch(self):
+        v = arm(5, 49); v[0]['join']['provider_joined'] = 0
+        self.assertEqual(compare(arm(5, 99), v)['matched_pairs'], 4)
+
+    def test_count_bound(self):
+        v = arm(5, 49); v[0]['join']['rows'][0]['prompt_tokens'] = 10 ** 9
+        self.assertEqual(compare(arm(5, 99), v)['matched_pairs'], 4)
+
+    def test_forged_status_known_limit(self):
+        # documented limit: caller-supplied flags are unauthenticated
+        self.assertEqual(compare(arm(5, 99), arm(5, 49))['verdict'], 'measured')
 
 
 if __name__ == '__main__':
