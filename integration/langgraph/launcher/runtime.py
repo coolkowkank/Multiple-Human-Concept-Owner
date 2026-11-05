@@ -421,7 +421,14 @@ class Seat:
             # contract is at-least-once, never exactly-once.
             while locks:
                 locks.pop().__exit__(None, None, None)
-            state = self.bus.state()
+            # A previous holder writes the handoff into the shared worktree
+            # BEFORE its commit, inside the action lock. Seeing turn==us
+            # therefore does not mean the commit landed: starting now would
+            # race its commit on the git index (observed: index.lock crash)
+            # or read its uncommitted state as torn. Take the lock briefly
+            # so its apply->commit window has finished, then re-read.
+            with self.bus.action_lock():
+                state = self.bus.state()
             if state.get("turn") != self.name:
                 return False
             self._preflight_dirt_check()

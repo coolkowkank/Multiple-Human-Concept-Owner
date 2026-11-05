@@ -274,3 +274,6 @@ Not covered: a kill during the push itself (needs a remote, which the test does 
 - The recheck pause is a plain `Seat.torn_recheck_seconds` attribute (default 2.0). It is finite but not validated and not settable from the CLI. Do not rely on it as a guarantee.
 - Not an unattended-operation claim: an operator must read the console, clean the residue and relaunch.
 - Ordering: the supervisor takes one snapshot of every exit status per poll and latches the block if ANY seat exited 75, before handling any other exit, so the order of seats within one poll does not matter. It cannot see the future: if another seat's exit was handled in an EARLIER poll than the seat that later exits 75, that earlier handling already wrote normally (restart log/commit, or a gate) and may have been committed before the torn state appeared.
+
+## Same-checkout handoff window
+Supervised seats share one worktree. A seat writes its handoff to the worktree inside the action lock and commits afterwards, so a next seat could see `turn == itself` before the commit landed and race it on the git index. A seat now takes the action lock briefly and re-reads state before its preflight. See ENDURANCE_RESULT_2026-11-05.md for what the scripted mock runs did and did not show.
