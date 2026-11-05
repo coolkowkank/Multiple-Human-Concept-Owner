@@ -77,7 +77,9 @@ IMMEDIATELY before acting:
    known mode and integer instruction_seq - missing file, bad JSON,
    wrong type, unknown mode, missing/bool seq - means hold, never run.
    The graph reads control, team state and roster from the COMMITTED
-   state (`git show HEAD:`), never the worktree: an uncommitted or failed control change is
+   state (`git show HEAD:`), never the worktree; a committed non-dict
+   state or roster document is a clean refusal (SeatError), never an
+   uncaught failure and never an action: an uncommitted or failed control change is
    invisible; control takes effect exactly at commit order. Operator
    commits stage exactly their own paths (`transact_paths`), precheck a
    clean index BEFORE mutating, and restore the worktree from HEAD on
@@ -170,12 +172,14 @@ integration. Wiring one needs halt clearance, a signed allowance grant
 with an owner-held key file, and a current route record - separate
 owner decisions, none taken, none of which this branch makes.
 
-`runner_lane_demo.py` proves the lane on disposable fixture roots, 9/9:
-halt blocks the step with zero attempts; a gate-passing attempt is
-recorded by the refusing post, consumed as a reserve, and halts on the
-unknown outcome (ledger shows reserve + unknown result + halt); a
-bad-signature allowance window blocks before any call; a stale
-verified_rev routes Ryan to needs-human with zero calls.
+`runner_lane_demo.py` proves the lane on disposable fixture roots,
+11/11, including through the ACTUAL compiled LangGraph graph (not just
+the step function): halt blocks the step with zero attempts; a
+gate-passing attempt is recorded by the refusing post, consumed as a
+reserve, and halts on the unknown outcome (ledger shows reserve +
+unknown result + halt); a bad-signature allowance window blocks before
+any call; a stale verified_rev routes Ryan to needs-human with zero
+calls. The runner graph ships with no checkpointer: no resume claim.
 
 ## Known limits (stated, not fixed)
 
