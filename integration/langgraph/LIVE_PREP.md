@@ -93,13 +93,24 @@ publication and freezes the root.
 4. Settle normalization: any exception escaping rc.step after the
    reserve (the transport raises only for local pre-I/O refusals, e.g.
    a key that vanishes between preflight and post) leaves no dangling
-   reserve - the driver settles ONLY this invocation's own newly
-   created reserves (pre-step reserve snapshot; historical or
-   concurrent reserves are never touched) as outcome unknown via the
+   reserve - the driver settles only reserves absent from its pre-step
+   snapshot as outcome unknown via the
    runner's own settle(), which appends the halt (tested: exactly one
    unknown result + halt; the halt is durable and a later step
    reserves and sends nothing; a pre-existing historical orphan is
    left untouched and blocks the run via the runner's own gate).
+   SCOPE OF THAT GUARANTEE (review condition, 2026-11-05): the
+   snapshot diff cannot distinguish this invocation's reserve from a
+   CONCURRENTLY created one - so the guarantee holds only under the
+   accepted operational constraint: EXTERNALLY QUIESCENT, SOLE-WRITER
+   execution (design A). The executor is the sole writer to its
+   authoritative root from preflight through settlement; no other
+   writer, no concurrent run, and this lane makes no provider calls
+   and no writes to the executor's root. This is NOT a
+   general-concurrency claim. (The same constraint supersedes the
+   "concurrent reserves are never touched" sentence in the live_lane
+   module docstring of the reviewed executable head, which stays
+   byte-exact for this run's evidence.)
    Paused-path accounting is evidence-driven, never a blanket number:
    the reason is the allowlisted exception CLASS ONLY (exception text
    can carry secrets/raw prompt - tested with a secret-bearing
