@@ -202,6 +202,91 @@ def completion_status(repo, branch, record_path, artifact_paths, *,
     return out
 
 
+def _private_file(path):
+    """Config/key files: regular file, not a symlink, owned by us, no group/other access."""
+    st = os.lstat(path)
+    import stat as _s
+    if not _s.S_ISREG(st.st_mode) or st.st_uid != os.getuid() or st.st_mode & 0o077:
+        raise ValueError(f"{os.path.basename(path)}: must be a regular file owned by the operator with mode 0600")
+
+
+def _run_checker(repo, artifact_paths, cmd, timeout):
+    """Run the operator's checker on a clean export of the COMMITTED files.
+    Child gets a scrubbed env (no keys, no seat env) and never sees the signing
+    key; it prints {"accepted": true|false}. NOT a hardened sandbox: it is a
+    plain subprocess under the operator's user with a timeout and output cap."""
+    import tempfile, shutil
+    files = committed_files(repo, artifact_paths)
+    d = tempfile.mkdtemp(prefix="lg-export-"); os.chmod(d, 0o700)
+    try:
+        for rel, content in files.items():
+            dst = os.path.join(d, rel); os.makedirs(os.path.dirname(dst), exist_ok=True)
+            with open(dst, "w", encoding="utf-8") as fh: fh.write(content)
+        pr = subprocess.run(list(cmd) + [d], cwd=d, stdin=subprocess.DEVNULL,
+                            capture_output=True, timeout=timeout,
+                            env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"})
+        if pr.returncode != 0:
+            raise ValueError(f"checker exited {pr.returncode}")
+        out = json.loads(pr.stdout[:65536].decode("utf-8"))
+        if not isinstance(out, dict) or not isinstance(out.get("accepted"), bool):
+            raise ValueError("checker output not {accepted: bool}")
+        return out["accepted"]
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def finalize(repo, branch, config_path):
+    """Operator-owned closeout at the END of a run. Default is fail closed:
+    no/invalid config, checker failure or timeout = 'cycle complete, quality
+    unproven'. Config (JSON, 0600, outside the lane): checker_cmd (absolute
+    argv0), checker_id, artifact_paths, key_file (0600), record_dir (0700),
+    optional timeout. The signing key is read here only; the checker
+    never gets it. The runtime bus DONE is not changed by this."""
+    from launcher.quality_gate import sign_operator
+    repo = os.path.abspath(repo)
+    cc, _ = _cycle_complete_at_head(repo, branch)
+    unproven = {"cycle_complete": cc, "terminal_done": False, "closeout_allowed": False,
+                "label": "cycle complete, quality unproven" if cc else "cycle not complete"}
+    try:
+        if not config_path:
+            return dict(unproven, reason="no operator config")
+        _private_file(config_path)
+        cfg = json.load(open(config_path, encoding="utf-8"))
+        cmd, cid, paths = cfg["checker_cmd"], cfg["checker_id"], cfg["artifact_paths"]
+        if not (isinstance(cmd, list) and cmd and all(isinstance(x, str) for x in cmd)
+                and os.path.isabs(cmd[0]) and isinstance(cid, str) and cid
+                and isinstance(paths, list) and paths):
+            raise ValueError("bad config fields")
+        lane = os.path.realpath(repo) + os.sep
+        for pth in (config_path, cfg["key_file"], cfg["record_dir"], cmd[0]):
+            if (os.path.realpath(pth) + os.sep).startswith(lane) or os.path.realpath(pth) == lane[:-1]:
+                raise ValueError("config, key, record dir and checker must be outside the lane")
+        _private_file(cfg["key_file"])
+        key = open(cfg["key_file"], "rb").read().strip()
+        if len(key) < 16:
+            raise ValueError("key too short")
+        bad = _private_parent(os.path.join(cfg["record_dir"], "x"))
+        if bad:
+            raise ValueError(bad)
+        head = head_sha(repo)
+        rec_path = os.path.join(cfg["record_dir"], f"done-{head[:12]}.json")
+        if not cc:
+            return dict(unproven, reason="cycle not complete; checker not run")
+        if not os.path.lexists(rec_path):
+            accepted = _run_checker(repo, paths, cmd, min(int(cfg.get("timeout", 60)), 300))
+            _, sha = current_artifact(repo, paths)
+            sig = sign_operator(key, {"hash_scheme": HASH_SCHEME, "artifact_sha256": sha,
+                                      "accepted": accepted,
+                                      "state": "accepted" if accepted else "rejected",
+                                      "checker_id": cid})
+            operator_close(repo, branch, paths, sig, operator_key=key,
+                           expected_operator_checker_id=cid, record_path=rec_path)
+        return completion_status(repo, branch, rec_path, paths, operator_key=key,
+                                 expected_operator_checker_id=cid)
+    except Exception as exc:   # fail closed; never echo key material
+        return dict(unproven, reason=f"operator finalization failed closed: {type(exc).__name__}: {str(exc)[:120]}")
+
+
 def main(argv):
     """Public closeout entry point: prints JSON, exit 0 only if closeout is
     allowed. The key is read from a file (never argv/env); keep it outside

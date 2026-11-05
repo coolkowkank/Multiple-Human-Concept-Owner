@@ -180,5 +180,57 @@ if art:
     check("langgraph_team status with signed record: exit 0 and allowed", rc1 == 0 and json.loads(o1)["closeout_allowed"])
     rc2, _ = lt_status("--record", pe, "--key-file", kf2, "--checker-id", CHK, "--path", "src/app.py")
     check("langgraph_team status with wrong key: exit 1", rc2 == 1)
+
+# ---- automatic operator-owned finalization (offline, PUBLIC test checker) ----
+cdir = tempfile.mkdtemp(dir=tmp); os.chmod(cdir, 0o700)
+chk = os.path.join(cdir, "chk.py")
+open(chk, "w").write("""import sys, os, json
+# public test checker: refuses if the parent's env leaked into the child
+leaked = any(k.startswith("LG_") or "KEY" in k.upper() for k in os.environ)
+ns = {}; exec(open(os.path.join(sys.argv[-1], "src/app.py")).read(), ns)
+ok = (not leaked) and all(ns["add"](a, b) == a + b for a, b in [(0, 0), (-5, 2), (3, -3)])
+print(json.dumps({"accepted": ok}))
+""")
+bad_chk = os.path.join(cdir, "bad.py"); open(bad_chk, "w").write("import sys; sys.exit(3)\n")
+fkey = os.path.join(cdir, "key.bin"); open(fkey, "wb").write(KEY); os.chmod(fkey, 0o600)
+def mkcfg(name, script=chk, **kw):
+    rd2 = os.path.join(cdir, name + "-rec"); os.makedirs(rd2, exist_ok=True); os.chmod(rd2, 0o700)
+    c = {"checker_cmd": [sys.executable, script], "checker_id": CHK, "artifact_paths": ["src/app.py"],
+         "key_file": fkey, "record_dir": rd2, "timeout": 30}; c.update(kw)
+    cp = os.path.join(cdir, name + ".json"); open(cp, "w").write(json.dumps(c)); os.chmod(cp, 0o600)
+    return cp, rd2
+def newlane():
+    d = tempfile.mkdtemp(dir=tmp); lt.init_repo(d); lt.run_graph(d, os.path.join(tmp, os.path.basename(d) + ".sqlite"), 0, "f"); return d
+os.environ["LG_OPERATOR_CONFIG"] = "leak-probe"; os.environ["SOME_API_KEY"] = "leak-probe"
+fl = newlane()
+check("finalize: no config -> quality unproven", (lambda s: s["cycle_complete"] and not s["closeout_allowed"] and "unproven" in s["label"])(done_gate.finalize(fl, lt.BRANCH, None)))
+cp, rd2 = mkcfg("ok")
+s = done_gate.finalize(fl, lt.BRANCH, cp)
+check("finalize: genuine public test checker (child env scrubbed) -> closeout allowed", s["closeout_allowed"] and s["terminal_done"] and KEY.hex() not in json.dumps(s))
+check("finalize: record written once, rerun still allowed without a second checker run", len(os.listdir(rd2)) == 1 and done_gate.finalize(fl, lt.BRANCH, cp)["closeout_allowed"])
+cp2, _ = mkcfg("loose"); os.chmod(cp2, 0o644)
+check("finalize: config with mode 0644 -> unproven", not done_gate.finalize(newlane(), lt.BRANCH, cp2)["closeout_allowed"])
+l3 = newlane(); cp3, rd3 = mkcfg("crash", script=bad_chk)
+s3 = done_gate.finalize(l3, lt.BRANCH, cp3)
+check("finalize: checker crash -> unproven and no record", not s3["closeout_allowed"] and os.listdir(rd3) == [])
+l4 = newlane(); kin = os.path.join(l4, "k.bin"); open(kin, "wb").write(KEY); os.chmod(kin, 0o600)
+cp4, _ = mkcfg("keyinlane", key_file=kin)
+check("finalize: key file inside the lane -> unproven", not done_gate.finalize(l4, lt.BRANCH, cp4)["closeout_allowed"])
+cp6, rd6 = mkcfg("reject"); l6 = newlane()
+open(os.path.join(l6, "src/app.py"), "w").write("def add(a, b):\n    return a - b\n")
+git(l6, "add", "-A"); git(l6, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "operator: bad artifact")
+s6 = done_gate.finalize(l6, lt.BRANCH, cp6)
+check("finalize: checker rejects the artifact -> not allowed", not s6["closeout_allowed"])
+# run phase end to end through the real launcher entry
+l7 = tempfile.mkdtemp(dir=tmp); subprocess.run([sys.executable, os.path.join(HERE, "langgraph_team.py"), "init", l7, os.path.join(tmp, "l7.sqlite")], check=True, capture_output=True)
+cp7, _ = mkcfg("run")
+env7 = dict(os.environ); env7["LG_OPERATOR_CONFIG"] = cp7
+r7 = subprocess.run([sys.executable, os.path.join(HERE, "langgraph_team.py"), "run", l7, os.path.join(tmp, "l7.sqlite"), "0", "r7"], capture_output=True, text=True, env=env7)
+check("run phase with operator config ends with closeout allowed (offline mock cycle, public test checker)", r7.returncode == 0 and '"closeout_allowed": true' in r7.stdout and KEY.hex() not in r7.stdout + r7.stderr)
+l8 = tempfile.mkdtemp(dir=tmp); subprocess.run([sys.executable, os.path.join(HERE, "langgraph_team.py"), "init", l8, os.path.join(tmp, "l8.sqlite")], check=True, capture_output=True)
+env8 = {k: v for k, v in os.environ.items() if k != "LG_OPERATOR_CONFIG"}
+r8 = subprocess.run([sys.executable, os.path.join(HERE, "langgraph_team.py"), "run", l8, os.path.join(tmp, "l8.sqlite"), "0", "r8"], capture_output=True, text=True, env=env8)
+check("run phase without operator config: cycle done, closeout unproven", r8.returncode == 0 and '"closeout_allowed": false' in r8.stdout and "quality unproven" in r8.stdout)
+os.environ.pop("LG_OPERATOR_CONFIG"); os.environ.pop("SOME_API_KEY")
 shutil.rmtree(tmp, ignore_errors=True)
 print("\nOPERATOR DONE HOOK:", "ALL CHECKS PASSED" if ok else "FAILURES ABOVE"); raise SystemExit(0 if ok else 1)

@@ -1045,6 +1045,14 @@ def main(argv) -> int:
         return 0
     if phase == "run":
         run_graph(repo, db, stop_after, thread_id)
+        # Operator-owned closeout. LG_OPERATOR_CONFIG is a PATH to an operator
+        # config outside the lane (never the key). Unset = quality unproven.
+        import json as _j
+        import done_gate
+        if not (stop_after and Bus(os.path.abspath(repo), BRANCH).state().get("status") != "done"):
+            st = done_gate.finalize(repo, BRANCH, os.environ.get("LG_OPERATOR_CONFIG"))
+            print("closeout: " + _j.dumps(st, sort_keys=True), flush=True)
+            return 0 if st["closeout_allowed"] or not os.environ.get("LG_OPERATOR_CONFIG") else 1
         return 0
     if phase == "verify":
         return 0 if verify(repo, db, thread_id, expect_resume=True) else 1
