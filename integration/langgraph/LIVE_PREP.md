@@ -1,6 +1,7 @@
-# Bounded live-run preparation (inert - nothing here runs a provider)
+# Bounded live-run preparation (integrated, reviewed-transport wired - still NO live go)
 
-Owner authority (corrected 2026-11-05 by recovered originals): free-tier
+Owner authority (attribution: main's relay of recovered owner originals,
+2026-11-05; this lane holds no independent owner evidence): free-tier
 resources, continuous work and failover are authorized; there is NO owner
 numeric cap or halt veto - the lifetime envelope, verifier cap and the
 durable halt were self-imposed project safety controls. The owner
@@ -9,72 +10,116 @@ bounded and ledger-preserving. Do not ask the owner to "lift" the
 self-imposed envelope; reconfiguring those controls is an executor
 operation on the project, not an owner approval question.
 
-## What a bounded live run looks like
+## Integrated accepted chain (2026-11-05)
 
-1. Scope: ONE lineage, research already drafted offline. The runner's
-   signed-window mechanism covers verifier (+ optionally ryan) only, so
-   the windowed run is: verifier qualification/review on a drafted item,
-   optionally followed by one Ryan review - at most 2 requests
-   (ALLOWANCE_MAX_REQUESTS hard ceiling in the runner itself).
-2. Route: free-only. `live_lane.check_free_route` requires route status
-   working + listing input/output price exactly 0 + fresh listing, and
-   the route must be in the run's explicit allowlist. A price-0 listing
-   alone is NOT proof of $0 charge: the executor's vendor-state
-   grounding confirmed the free catalog (fresh listing 03:58, 13 exact
-   free IDs, policy: model prefix / explicit managed id selection).
-   Selected qualification mapping (main, 2026-11-05 ~03:59): researcher
-   nvidia/nemotron-3-ultra-550b-a55b; verifier mistral/leanstral-1-5
-   (route viability unproven - the bounded run itself is the test);
-   Ryan third request ONLY on a valid verifier PASS with a grounded
-   model constraint. Bound: 3 requests max, serial, no retries, no 4th;
-   executor's runtime config keeps lifetime envelope 7 = 4 historical +
-   3 new, verifier max_tokens 4096, claim-set identity respected.
-3. Window: signed allowance body (lineage + work_fp bound, pinned model
-   per role, max_requests == number of window roles, <= 2) verified
-   against RYAN_ALLOWANCE_KEY_FILE (owner-held, 0600, outside the repo).
-   The runner enforces it durably: deny by default, every reserve
-   debited, a reserve counts clean only with an explicit
-   allowance-done line, history never edited. Shape note: windows cover
-   verifier (+ optionally ryan) only - the researcher request runs
-   under the ordinary gates, not a window.
-4. Transport: INJECTED reviewed guarded post only. The runner's
-   built-in rc.http_post_factory is NOT cleared (unbounded error
-   reads, loose endpoint shape, optional model echo). The pending
-   contract (executor's guarded_post_factory, first candidate rejected
-   in review): exact free-catalog ID allowlist, exact endpoint with no
-   redirects, no retry, mandatory model echo, bounded reads on every
-   error path including HTTPError and timeout. The key is read from
-   the named env var at call time, injected by the operator for the
-   run's duration only - never stored or committed. NO live step until
-   the integrated exact head passes independent review and main says
-   go. Missing usage/cost in a response is not proof of $0 - the free
-   determination rests on vendor docs + the fresh price-0 listing, not
-   on observed usage fields.
+Upstream tip `3b09eea8ccacebc4e5d3131e4b58fa9cf58a0fe2` (independently
+reviewed, accepted by main: bounded transport/boundary, 385 independent
++ adversarial + production stale-listing-0-send tests) is vendored
+BYTE-EXACT into `runner/` and md5-pinned in `live_lane.VENDORED_MD5`:
 
-   Accounting integration (reviewer-corrected, 2026-11-05): the live
-   boundary is owned by the ACCEPTED UPSTREAM chain - the corrected
-   guarded transport and the runner's own pre-I/O snapshot gate under
-   store.lock. The DURABLE bound on spend is the signed allowance
-   window and its ledger debits, enforced by the runner - not any
-   in-process counter here. An earlier draft of this lane carried a
-   pre-I/O recheck wrapper, a per-process counter and a window
-   re-check; review showed them to be weaker duplicates (historic-halt
-   overreach, deleted-grant revalidation missed, Halt-inside-post
-   leaving an unsettled reserve, counter resetting per step), so they
-   were REMOVED in favor of the upstream boundary. live_lane now does
-   wiring only: reviewed-transport identity check, run-model allowlist
-   + setup-time route sanity, factory passed exclusively into rc.step.
-5. Ledger: append-only. The run adds reserve/result/window lines to the
-   existing ledger; nothing is rewritten. Clearing the durable halt and
-   reconfiguring the self-imposed envelope are executor operations on
-   the project controls, coordinated upstream - not done by this lane.
-6. Remaining gate before first live step: the corrected upstream
-   (action_lock + pre_apply, e881384 under review) must be accepted and
-   integrated so control/operator coherence holds during the run.
+- `ryan_cycle.py` (ecc7bbb21c62b9aceccf95ba41deec5b) - envelope 7
+  (4 historic + at most 3 new; historic ledger never reset), verifier
+  max_tokens 4096, pre-I/O boundary under store.lock (halt/stop, own
+  reserve line, operator assignment, rendered-input snapshot, grant,
+  price-0, listing freshness at the actual clock; refusal = result
+  outcome not_sent + halt, reserve stays consumed).
+- `model_resources.py` (148d1e609f466332ebb1d6ce85ccf40d) - unchanged
+  from the previously accepted chain.
+- `requesty_transport.py` (701321b3a753b82365575b0b40f2acfd) - the
+  reviewed guarded transport: exact free-ID allowlist (subset of
+  FREE_IDS with an evidenced listing ceiling), fixed endpoint
+  (https://router.requesty.ai/v1/chat/completions, constant-verified,
+  no redirects), ONE request no retry, mandatory exact model echo,
+  bounded reads on every error path, max-3 attempts per factory counted
+  BEFORE I/O, and cost-zero accounting: an absent or invalid cost
+  signal is cost-unverified and surfaces as unknown, never ok.
+- `make_allowance.py` (8587d6e2d5ffd5b86446baa68a7a89ab) - offline
+  bookkeeping builder for ONE signed window; refuses when the item is
+  not at the Verifier step, the TTL exceeds the runner max, or a window
+  is already bound to the lineage/work-fingerprint (a bound window is
+  never replaced).
 
-## Inert behavior (tested)
+Run config: `run-config/assignments.json` byte-exact from the local
+assignment head `49f189dd59843f66dc3719871e0750b5fa0ba5c0` (main's
+delta, 2026-11-05): researcher nvidia/nemotron-3-ultra-550b-a55b
+(unchanged), verifier mistral/leanstral-1-5 (exact free id, price-0 in
+the fresh public listing; viability unproven - the bounded run is the
+test), ryan novita/ling-3.1-flash (unchanged, NOT authorized for this
+run).
 
-Importing this module performs no I/O. bounded_live_step refuses
-(BEFORE any network) without: RYAN_ALLOWANCE_KEY_FILE, a valid signed
-window within the per-run ceiling, and the key env var. The refusing
-runner lane (runner_lane.py) remains the only wired lane.
+## The bounded run shape (what main authorized preparing)
+
+ONE verifier-only window (max_requests 1, TTL <= 60 min) on the
+existing claim-set lineage research-model-vs-harness-v2: the drafted
+Ultra item C1-C6/P1-P9 continues (verifier already used 2 of its
+ordinary attempts, baseline pinned in the window). NO Researcher
+re-call, NO new lineage, NO Ryan role. The existing bound window
+mechanism prevents a second window; nothing here redesigns that. No
+retry and no halt-clearing until main's go after the run.
+
+Execution ownership (main, 2026-11-05): the EXECUTOR runs ONE driver
+pass of this exact integrated code against its own authoritative
+root/ledger (tip 49f189dd, unchanged), after independent review of
+this exact integrated head and main's go. This lane never makes a
+provider call and never executes a cloned ledger. The executor holds
+the vault Requesty key (env REQUESTY_API_KEY) and the allowance
+bookkeeping key (RYAN_ALLOWANCE_KEY_FILE); no secret passes through
+this repo or chat. After the run the executor returns the non-secret
+ledger/queue/result/grant-digest delta through main for forward-only
+publication and freezes the root.
+
+## What the driver adds (live_lane.py - wiring and run-shape only)
+
+1. Explicit authoritative root path (no cwd default; must be a
+   directory with queue.json).
+2. Preflight BEFORE any reserve: key env present; assignments parse
+   with decided_by == the runner's OPERATOR constant; every assigned
+   model in the run allowlist (subset of FREE_IDS with an evidenced
+   listing ceiling); routes working + price-0; listing fresh at the
+   actual clock. Preflight failure raises with the ledger untouched
+   (tested byte-identical).
+3. Reviewed-transport identity: the post callable is constructed ONLY
+   from the vendored, md5-pinned requesty_transport module. Callers
+   cannot inject a factory into the live path; a tampered vendored
+   file refuses at load (tested).
+4. Settle normalization: any exception escaping rc.step after the
+   reserve (the transport raises only for local pre-I/O refusals, e.g.
+   a key that vanishes between preflight and post) leaves no dangling
+   reserve - the driver settles every orphaned reserve as outcome
+   unknown via the runner's own settle(), which appends the halt
+   (tested: exactly one unknown result + halt; the halt is durable and
+   a later step reserves and sends nothing).
+5. The step runs through the ACTUAL compiled LangGraph
+   (build_live_runner_graph, one node, no checkpointer - no resume
+   claim), satisfying the requirement that the bounded run is driven
+   through the real graph, not a direct rc.step call. `opener` and
+   `before_io` parameters are test seams only (they mirror the
+   runner's own seams); production uses the defaults.
+
+The durable bound on spend is the signed allowance window and its
+ledger debits, enforced by the runner - not anything in-process here.
+
+## Accepted limits (documented, not redesigned)
+
+- Builder bookkeeping is offline/quiescent; its allowance.json write is
+  NOT crash-atomic (single-writer use; no crash-atomicity claim).
+- Socket timeout only - no strict total deadline.
+- Listing age is checked, not refetched; the checked-then-send residual
+  remains (state can change between the boundary check and the send).
+- A price-0 listing is NOT proof of $0 charge: free status rests on the
+  vendor docs + the fresh listing. Missing usage/cost in a response is
+  not proof of $0 either - the transport treats an absent/invalid cost
+  signal as unverified, never ok.
+
+## Offline test evidence (round 9, this head - no network, dummy key)
+
+8/8 driver probes pass: md5 pins load/tamper-refused; key-missing and
+config-fail (allowlist, authority, stale listing) raise pre-ledger with
+the ledger byte-identical; post-reserve transport raise settles exactly
+one unknown + halt; the compiled graph completes a verifier window
+(done-verifier, reserve tagged to the window, allowance-done, second
+invoke needs-human with no new reserve); the builder refuses a second
+window on the bound lineage; network-down settles unknown + halt with
+no dangling reserve. Prior suites re-run on this head: round-4 12/12;
+committed-control fail-closed 3/3 (round-3's worktree-write probe is
+stale by design - the graph reads the COMMITTED control only).
