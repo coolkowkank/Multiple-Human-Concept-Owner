@@ -96,8 +96,13 @@ def main(argv) -> int:
         if not cond:
             fails.append(name)
 
-    subprocess.run(["rm", "-rf", base])
-    os.makedirs(base)
+    if os.path.exists(base):
+        if not os.path.isdir(base) or os.listdir(base):
+            raise SystemExit(
+                f"refused: {base} exists and is non-empty; this demo only "
+                f"creates a FRESH directory - delete a used one by hand")
+    else:
+        os.makedirs(base)
     lt.init_repo(repo, queue_seats=("builder",))
 
     # Phase 1: coordinator acts, turn passes to the operator-fed builder.
