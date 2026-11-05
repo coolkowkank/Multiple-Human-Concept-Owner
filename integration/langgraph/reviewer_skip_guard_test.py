@@ -133,6 +133,96 @@ seats6["builder"].act_once()
 st = bus6.state()
 check("17. plain handoff still works", st["turn"] == "qc" and st["status"] == "running")
 
+# Case G (review D1): DONE turn carrying application writes -> refused even
+# with a fresh verdict
+repo7, bus7, seats7 = mk_repo(scripts={
+    "builder": [BUILD, dict(DONE_CLAIM, writes={"src/evil.py": "E = 1\n"})],
+    "qc": [QC_PASS]})
+seats7["builder"].act_once()
+seats7["qc"].act_once()
+give_turn(bus7, "builder")
+seats7["builder"].act_once()
+st = bus7.state()
+check("18. DONE with own application writes refused despite fresh verdict",
+      st["status"] != "done" and st["turn"] == "qc")
+
+# Case H (review D2): negated/qualified PASS text records NONE
+for i, line in enumerate(("QC cannot PASS this build", "PASS pending")):
+    repoN, busN, seatsN = mk_repo(scripts={
+        "builder": [BUILD, DONE_CLAIM],
+        "qc": [dict(QC_PASS, status_line=line, summary="x")]})
+    seatsN["builder"].act_once()
+    seatsN["qc"].act_once()
+    give_turn(busN, "builder")
+    seatsN["builder"].act_once()
+    st = busN.state()
+    check(f"{19+i}. {line!r} does not satisfy", st["status"] != "done" and st["turn"] == "qc")
+
+# Case I (review D3): rename of application work into an evidence path stales
+repo8, bus8, seats8 = mk_repo(scripts={"builder": [BUILD, DONE_CLAIM],
+                                       "qc": [QC_PASS]})
+seats8["builder"].act_once()
+seats8["qc"].act_once()
+subprocess.run(["git", "-C", repo8, "mv", "src/app.py", "review/app.py"], check=True)
+subprocess.run(["git", "-C", repo8, "commit", "-q", "-m", "human: rename app into review/"], check=True)
+give_turn(bus8, "builder")
+seats8["builder"].act_once()
+st = bus8.state()
+check("21. rename hiding application work stales the verdict", st["status"] != "done" and st["turn"] == "qc")
+
+# Case J (review D4): bare roster path "review" must not prefix-match reviewer_x.py
+def bare_review(roster):
+    roster["seats"]["qc"]["allowed_paths"] = ["review"]
+    roster["seats"]["reviewer"]["allowed_paths"] = ["review"]
+repo9, bus9, seats9 = mk_repo(roster_edit=bare_review,
+                              scripts={"builder": [BUILD, DONE_CLAIM], "qc": [QC_PASS]})
+seats9["builder"].act_once()
+seats9["qc"].act_once()
+open(os.path.join(repo9, "reviewer_x.py"), "w").write("E = 1\n")
+subprocess.run(["git", "-C", repo9, "add", "reviewer_x.py"], check=True)
+subprocess.run(["git", "-C", repo9, "commit", "-q", "-m", "human: add reviewer_x.py"], check=True)
+give_turn(bus9, "builder")
+seats9["builder"].act_once()
+st = bus9.state()
+check("22. bare 'review' prefix does not cover reviewer_x.py", st["status"] != "done" and st["turn"] == "qc")
+
+# Case K (policy): a QC seat MAY close DONE on its own earlier fresh verdict
+repoA, busA, seatsA = mk_repo(scripts={"builder": [BUILD],
+                                      "qc": [dict(QC_PASS, handoff="builder"), DONE_CLAIM]})
+seatsA["builder"].act_once()
+seatsA["qc"].act_once()       # verdict recorded, hands to builder
+give_turn(busA, "qc")
+seatsA["qc"].act_once()       # QC claims DONE on its own verdict
+st = busA.state()
+check("23. QC self-close with own fresh PASS verdict accepted", st["status"] == "done" and st["turn"] is None)
+
+# Case L (product P2): PASS then a newer FAIL cancels - DONE refused
+repoB, busB, seatsB = mk_repo(scripts={
+    "builder": [BUILD, DONE_CLAIM],
+    "qc": [QC_PASS, dict(QC_PASS, status_line="QC FAIL", summary="regression found")]})
+seatsB["builder"].act_once()
+seatsB["qc"].act_once()       # PASS at head, hands to builder
+give_turn(busB, "qc")
+seatsB["qc"].act_once()       # newer FAIL verdict (evidence-only commit)
+give_turn(busB, "builder")
+seatsB["builder"].act_once()  # DONE claim
+st = busB.state()
+check("24. newer QC FAIL cancels older fresh PASS", st["status"] != "done" and st["turn"] == "qc")
+
+# Case M (product P8): filename with a space is not a false stale
+repoC, busC, seatsC = mk_repo(scripts={"builder": [BUILD, DONE_CLAIM],
+                                       "qc": [QC_PASS]})
+seatsC["builder"].act_once()
+seatsC["qc"].act_once()
+sp = os.path.join(repoC, "review", "my file.md")
+open(sp, "w").write("note\n")
+subprocess.run(["git", "-C", repoC, "add", "review/my file.md"], check=True)
+subprocess.run(["git", "-C", repoC, "commit", "-q", "-m", "human: evidence file with a space"], check=True)
+give_turn(busC, "builder")
+seatsC["builder"].act_once()
+st = busC.state()
+check("25. space in an evidence filename stays fresh (no false block)", st["status"] == "done")
+
 for _r in REPOS:
     shutil.rmtree(_r, ignore_errors=True)
 print("REVIEWER-SKIP GUARD:", "ALL CHECKS PASSED" if ok else "FAILURES PRESENT")
