@@ -8,10 +8,10 @@ checker and never sees the checker's code: the operator runs their own
 result here. A seat cannot produce it because the HMAC key lives only in
 the operator process (never in a seat env, the lane repo or a message).
 
-Records this module writes carry gate_enforced=True ONLY when evaluate_done
+Records this module writes carry operator_terminal_check_passed=True ONLY when evaluate_done
 ran against signed external evidence bound to the artifact that is
 committed at the recorded HEAD. Any cycle that finished without this call
-keeps gate_enforced=false (historical runs stay false).
+has no such record (historical runs stay false). The runtime itself still sets bus status done unconditionally (runtime_blocks_done is false in every record); this hook is an operator-called check plus completion_status(), which is what user-facing closeout must use.
 
 Evidence is bounded (an operator check or a mutation gate), not proof of
 correctness, and a checker for one function says nothing about general
@@ -68,6 +68,24 @@ def current_artifact(repo, paths):
     return files, artifact_sha256(files)
 
 
+def _cycle_complete_at_head(repo, branch):
+    """(cycle_complete, note) from .team/STATE.json COMMITTED at HEAD, and
+    only if HEAD is on the expected branch. Never the worktree file."""
+    cur = subprocess.run(["git", "-C", repo, "rev-parse", "--abbrev-ref", "HEAD"],
+                         capture_output=True, text=True).stdout.strip()
+    if cur != branch:
+        return False, "HEAD is on %r, expected %r" % (cur, branch)
+    r = subprocess.run(["git", "-C", repo, "show", "HEAD:.team/STATE.json"],
+                       capture_output=True)
+    if r.returncode != 0:
+        return False, "no committed .team/STATE.json at HEAD"
+    try:
+        st = json.loads(r.stdout.decode("utf-8"))
+    except ValueError:
+        return False, "committed STATE.json is not JSON"
+    return (isinstance(st, dict) and st.get("status") == "done"), None
+
+
 def operator_close(repo, branch, artifact_paths, signed_operator_result, *,
                    operator_key, expected_operator_checker_id, record_path):
     """Evaluate terminal DONE and write the record. Returns the record.
@@ -84,8 +102,7 @@ def operator_close(repo, branch, artifact_paths, signed_operator_result, *,
     if rp.startswith(os.path.realpath(repo) + os.sep):
         raise ValueError("record path must be outside the lane repo")
     head0 = head_sha(repo)
-    state = Bus(repo, branch).state()
-    cycle_complete = state.get("status") == "done"
+    cycle_complete, state_note = _cycle_complete_at_head(repo, branch)
     try:
         files, sha = current_artifact(repo, artifact_paths)
         err = None
@@ -105,17 +122,56 @@ def operator_close(repo, branch, artifact_paths, signed_operator_result, *,
         "head": head0, "hash_scheme": HASH_SCHEME,
         "artifact_sha256": sha, "artifact_paths": sorted(files),
         "artifact_error": err,
-        "cycle_complete": cycle_complete,
+        "cycle_complete": cycle_complete, "cycle_complete_note": state_note,
+        "runtime_blocks_done": False,
         "quality": ev.get("quality"), "terminal_done": ev.get("terminal_done") is True,
         "reasons": ev.get("reasons", []),
         "expected_operator_checker_id": expected_operator_checker_id,
-        "gate_enforced": enforced and ev.get("terminal_done") is True,
+        "operator_terminal_check_passed": enforced and ev.get("terminal_done") is True,
         "note": "bounded operator evidence, not proof of correctness; "
                 "a checker for one function is not general quality",
     }
-    tmp = record_path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(rec, fh, indent=2, sort_keys=True); fh.write("\n")
-        fh.flush(); os.fsync(fh.fileno())
-    os.replace(tmp, record_path)
+    import tempfile
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(record_path)),
+                               prefix=".rec-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(rec, fh, indent=2, sort_keys=True); fh.write("\n")
+            fh.flush(); os.fsync(fh.fileno())
+        os.link(tmp, record_path)   # fails if anything (even a symlink) is there
+    except FileExistsError:
+        raise FileExistsError("record already exists; refusing to overwrite") from None
+    finally:
+        try: os.unlink(tmp)
+        except OSError: pass
     return rec
+
+
+def completion_status(repo, branch, record_path):
+    """What user-facing closeout must use. Returns cycle_complete and
+    terminal_done SEPARATELY; closeout_allowed is true only when a record
+    exists whose head equals the current HEAD, whose artifact hash still
+    matches the committed files, and which passed the operator terminal
+    check. Anything missing, stale or unreadable is not allowed."""
+    cc, note = _cycle_complete_at_head(os.path.abspath(repo), branch)
+    out = {"cycle_complete": cc, "terminal_done": False, "closeout_allowed": False,
+           "label": "cycle complete, quality unproven" if cc else "cycle not complete",
+           "reason": note}
+    try:
+        with open(record_path, encoding="utf-8") as fh:
+            rec = json.load(fh)
+        if rec.get("schema") != RECORD_SCHEMA:
+            raise ValueError("unknown record schema")
+        if rec.get("head") != head_sha(os.path.abspath(repo)):
+            out["reason"] = "record is for a different HEAD"; return out
+        _, sha = current_artifact(os.path.abspath(repo), rec.get("artifact_paths") or [])
+        if sha != rec.get("artifact_sha256"):
+            out["reason"] = "artifact changed since the record"; return out
+        if cc and rec.get("terminal_done") is True and rec.get("operator_terminal_check_passed") is True:
+            out.update(terminal_done=True, closeout_allowed=True,
+                       label="operator terminal check passed (bounded evidence, not proof)", reason=None)
+        else:
+            out["reason"] = "record does not show a passed terminal check"
+    except (OSError, ValueError):
+        out["reason"] = out["reason"] or "no usable operator record"
+    return out

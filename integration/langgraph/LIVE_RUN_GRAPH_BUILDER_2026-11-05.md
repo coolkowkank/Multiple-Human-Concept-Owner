@@ -32,5 +32,5 @@ Code: branch live/langgraph-http-seat, accepted head 1e013ac0b967135d60ee236f4b0
 - A stronger gate would need independent multi-input or unittest checks (negatives, zero, floats) or an operator-held hidden mutation check. None of that was run.
 - Product audit runner (live/wp9-builder-audit-runner) is published but not wired into this graph.
 
-## Addendum 2: gate_enforced for these runs
-The DONE reached in this run was set by the runtime from one model turn, before any operator-side quality hook existed. For this run gate_enforced is false. A later operator check of the same committed add_lib files (see the product record) does not change that. Future records use integration/langgraph/done_gate.py, which writes gate_enforced true only after signed, hash-bound external evidence passed for the artifact committed at the recorded HEAD.
+## Addendum 2: terminal check status for these runs
+The DONE reached in this run was set by the runtime from one model turn, before any operator-side quality hook existed. For this run the operator terminal check was not applied (no record, closeout_allowed false). A later operator check of the same committed add_lib files (see the product record) does not change that. The runtime still sets bus status done unconditionally (runtime_blocks_done false). Future user-facing closeout should use done_gate.completion_status(), and records from done_gate.py writes operator_terminal_check_passed true only after signed, hash-bound external evidence passed for the artifact committed at the recorded HEAD.
