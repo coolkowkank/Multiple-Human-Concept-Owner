@@ -11,10 +11,15 @@ module. Rules (fail closed, never infer):
 - Call ids and provider response-id hashes (when present) must be unique across ALL
   tasks and both arms. A task whose id also appears in any other task, or twice in
   itself, is excluded as 'reused_usage_id', so one usage record cannot be counted again.
+- Every call_id must be a canonical UUID4 string (the prompt_audit format); rows without
+  one are excluded. This is a format check, not proof the audit call happened.
 - Counts must be ints in [0, 1e9), the same bound as usage_join.
 - If the accepted task sets differ between arms, the result is 'survivor_only': the
   saving is computed over tasks accepted in both arms and is given as
-  survivor_saving_percent, never as saving_percent. It says nothing about equal quality.
+  restricted_saving_percent, never as saving_percent. It says nothing about equal quality.
+- If some tasks accepted in both arms lack usable usage evidence, the verdict is
+  'partial_coverage' (same restricted figure, coverage shows comparable vs accepted_in_both).
+  Only 'measured' (equal accepted sets, full evidence coverage) fills saving_percent.
 - Savings are reported only over matched pairs. Below `min_pairs` the verdict is
   'insufficient' and no percentage is given.
 - LIMITS: `accepted` and the join report are caller-supplied and unauthenticated. A
@@ -25,8 +30,18 @@ module. Rules (fail closed, never infer):
 """
 from __future__ import annotations
 
+import uuid
+
 SCHEMA = 'matched-compare/v1'
 MAX_COUNT = 10 ** 9  # same bound as usage_join
+
+
+def _uuid4(x):
+    """True only for a canonical lowercase UUID4 string (the prompt_audit call_id format)."""
+    try:
+        return isinstance(x, str) and str(uuid.UUID(x)) == x and uuid.UUID(x).version == 4
+    except ValueError:
+        return False
 
 
 def _tokens(join):
@@ -36,12 +51,15 @@ def _tokens(join):
     rows = join['rows']
     if not rows:
         return None, 'no_calls'
-    if join.get('total_calls') != len(rows) or join.get('provider_joined') != len(rows):
+    tc, pj = join.get('total_calls'), join.get('provider_joined')
+    if any(type(v) is not int for v in (tc, pj)) or tc != len(rows) or pj != len(rows):
         return None, 'join_totals_inconsistent'
     tot = 0
     for r in rows:
         if not isinstance(r, dict) or r.get('status') != 'joined_provider':
             return None, 'usage_not_provider_joined'
+        if not _uuid4(r.get('call_id')):
+            return None, 'call_id_not_uuid4'
         p, c = r.get('prompt_tokens'), r.get('completion_tokens')
         if not all(isinstance(v, int) and not isinstance(v, bool) and 0 <= v < MAX_COUNT for v in (p, c)):
             return None, 'usage_not_provider_joined'
@@ -108,6 +126,7 @@ def compare(baseline, variant, min_pairs=5):
     acc_a = {t for t, r in a.items() if r.get('accepted') is True and t not in dup_a}
     acc_b = {t for t, r in b.items() if r.get('accepted') is True and t not in dup_b}
     survivor = acc_a != acc_b
+    both = len(acc_a & acc_b)
     arms = {'baseline': {'tasks': len(a), 'accepted': len(acc_a)},
             'variant': {'tasks': len(b), 'accepted': len(acc_b)}}
     n = len(pairs)
@@ -115,12 +134,15 @@ def compare(baseline, variant, min_pairs=5):
     var = sum(p['variant_tokens'] for p in pairs)
     ok = isinstance(min_pairs, int) and not isinstance(min_pairs, bool) and min_pairs >= 1 and n >= min_pairs and base > 0
     pct = round(100.0 * (base - var) / base, 2) if ok else None
-    verdict = 'insufficient' if not ok else ('survivor_only' if survivor else 'measured')
+    partial = n < both
+    verdict = ('insufficient' if not ok else 'survivor_only' if survivor
+               else 'partial_coverage' if partial else 'measured')
     return {'schema': SCHEMA, 'verdict': verdict, 'arms': arms,
-            'accepted_sets_equal': not survivor,
+            'accepted_sets_equal': not survivor, 'accepted_in_both': both,
+            'coverage': {'accepted_in_both': both, 'comparable': n},
             'matched_pairs': n, 'min_pairs': min_pairs, 'pairs': pairs, 'excluded': excluded,
             'ignored_records': bad_a + bad_b,
             'baseline_tokens': base if ok else None, 'variant_tokens': var if ok else None,
             'saving_percent': pct if verdict == 'measured' else None,
-            'survivor_saving_percent': pct if verdict == 'survivor_only' else None,
+            'restricted_saving_percent': pct if verdict in ('survivor_only', 'partial_coverage') else None,
             'note': 'descriptive, matched accepted tasks only; caller-supplied unauthenticated inputs; not provider proof, not a significance test, not WP9 completion; survivor_only says nothing about equal quality'}

@@ -1,10 +1,16 @@
+import hashlib
 import unittest
+import uuid
 from launcher.matched_compare import compare
 
 
+def U4(n):
+    return str(uuid.UUID(bytes=hashlib.md5(n.encode()).digest(), version=4))
+
+
 def J(*toks, status='joined_provider', pre='c', rid=False):
-    rows = [{'call_id': f'{pre}{i}', 'status': status, 'prompt_tokens': t, 'completion_tokens': 1,
-             'response_id_sha256': (f'{pre}{i}r' if rid else None)} for i, t in enumerate(toks)]
+    rows = [{'call_id': U4(f'{pre}{i}'), 'status': status, 'prompt_tokens': t, 'completion_tokens': 1,
+             'response_id_sha256': (U4(f'{pre}{i}r') if rid else None)} for i, t in enumerate(toks)]
     return {'schema': 'usage-join/v1', 'rows': rows, 'total_calls': len(rows),
             'provider_joined': len(rows) if status == 'joined_provider' else 0}
 
@@ -31,6 +37,27 @@ class T(unittest.TestCase):
         self.assertEqual(r['verdict'], 'insufficient')
         self.assertIsNone(r['saving_percent'])
 
+    def test_partial_coverage_no_headline(self):
+        b = arm(10, 99); v = arm(10, 49)
+        for x in v[5:]: x['join'] = {'schema': 'usage-join/v1', 'rows': [], 'total_calls': 0, 'provider_joined': 0}
+        r = compare(b, v)
+        self.assertEqual(r['verdict'], 'partial_coverage')
+        self.assertIsNone(r['saving_percent'])
+        self.assertEqual(r['restricted_saving_percent'], 50.0)
+        self.assertEqual(r['coverage'], {'accepted_in_both': 10, 'comparable': 5})
+
+    def test_call_id_must_be_uuid4(self):
+        for bad in (None, '', 'c0', str(uuid.uuid1()), U4('z').upper(), U4('z').replace('-', '')):
+            v = arm(5, 49)
+            v[0]['join']['rows'][0]['call_id'] = bad
+            self.assertEqual(compare(arm(5, 99), v)['matched_pairs'], 4, bad)
+
+    def test_bool_totals_rejected(self):
+        v = arm(5, 49)
+        v[0]['join']['rows'] = v[0]['join']['rows'][:1]
+        v[0]['join']['total_calls'] = True; v[0]['join']['provider_joined'] = True
+        self.assertEqual(compare(arm(5, 99), v)['matched_pairs'], 4)
+
     def test_unaccepted_either_arm_excluded(self):
         b = arm(6, 99); v = arm(6, 49); v[0]['accepted'] = False; b[1]['accepted'] = 'yes'
         r = compare(b, v)
@@ -50,7 +77,7 @@ class T(unittest.TestCase):
 
     def test_partial_task_with_one_unknown_call_excluded(self):
         v = arm(5, 49)
-        v[0]['join']['rows'].append({'call_id': 'x', 'status': 'no_usage_record', 'prompt_tokens': None, 'completion_tokens': None})
+        v[0]['join']['rows'].append({'call_id': U4('x'), 'status': 'no_usage_record', 'prompt_tokens': None, 'completion_tokens': None})
         self.assertEqual(compare(arm(5, 99), v)['matched_pairs'], 4)
 
     def test_duplicates_missing_and_garbage(self):
@@ -88,7 +115,7 @@ class T(unittest.TestCase):
         r = compare(b, v)
         self.assertEqual(r['verdict'], 'survivor_only')
         self.assertIsNone(r['saving_percent'])
-        self.assertEqual(r['survivor_saving_percent'], 50.0)
+        self.assertEqual(r['restricted_saving_percent'], 50.0)
         self.assertEqual(r['arms'], {'baseline': {'tasks': 10, 'accepted': 10}, 'variant': {'tasks': 10, 'accepted': 5}})
         self.assertFalse(r['accepted_sets_equal'])
 
@@ -103,7 +130,7 @@ class T(unittest.TestCase):
         b = arm(5, 99); v = arm(5, 49)
         v[0]['join'] = b[0]['join']
         b[1]['join'] = J(99, pre='q', rid=True); v[1]['join'] = J(49, pre='z', rid=True)
-        v[1]['join']['rows'][0]['response_id_sha256'] = 'q0r'
+        v[1]['join']['rows'][0]['response_id_sha256'] = U4('q0r')
         r = compare(b, v)
         self.assertEqual(r['matched_pairs'], 3)
 
