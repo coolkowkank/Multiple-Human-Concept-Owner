@@ -215,9 +215,10 @@ calls. The runner graph ships with no checkpointer: no resume claim.
 
 `live_lane.py` is the bounded live-run driver: explicit root, preflight
 before any reserve, md5-pinned vendored runner/transport (accepted
-3b09eea), the reviewed guarded transport constructed only from the
-pinned module, settle normalization (no dangling reserve), ONE step
-through the actual compiled graph. Run config in `run-config/`. NO live
+ab79bf9, append-only window succession), the reviewed guarded
+transport constructed only from the pinned module, settle
+normalization (no dangling reserve), ONE step through the actual
+compiled graph. Run config in `run-config/`. NO live
 step until independent review of the exact integrated head and main's
 go. See `LIVE_PREP.md`.
 
