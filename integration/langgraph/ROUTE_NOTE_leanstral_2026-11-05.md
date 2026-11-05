@@ -1,17 +1,21 @@
 # Route note: mistral/leanstral-1-5 - failed-first-call (2026-11-05)
 
-Sanitized publication of the project's authoritative route-record note
-(executor patch f970bcf against the frozen root 75ee635). Task-result
-facts only; no raw audit lines. This branch carries no
-docs/team/model-availability.json, so the note publishes as this file;
-the executor's authoritative record carries the same status. The
-reviewed executable head d97ccc07 is unchanged.
+Sanitized publication of the project's route-record note. Task-result
+facts only; no raw audit lines. The executor's route-record change
+(patch f970bcf) lives on a SEPARATE route-notes branch; the
+authoritative root stays frozen at 75ee635. This branch carries no
+docs/team/model-availability.json, so the note publishes as this
+standalone file. The reviewed executable head d97ccc07 is unchanged.
 
 ## Status
 
 `failed-first-call` - the route must not be reused without a new
-operator decision. The runner's route gate admits only
-"working"/"untested", so this label blocks accidental reuse.
+operator decision. ENFORCEMENT SCOPE: this file is documentation only.
+The runtime gate engages where the route record the runner actually
+loads carries this status (the executor's route-record change): the
+runner's route gate admits only "working"/"untested", so a loaded
+"failed-first-call" record refuses the route. This standalone note by
+itself changes no loaded record and blocks nothing.
 
 ## Evidence
 
