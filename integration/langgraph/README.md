@@ -286,9 +286,26 @@ python integration/langgraph/parallel_team.py /tmp/demo   # resumes lane-a, runs
 python integration/langgraph/controls_demo.py /tmp/lg-controls   # operator controls run
 ```
 
-Developed and tested against the project head `46fa728`. The integration lives in
-`integration/langgraph/`; later live/* branches also touch vendored
-launcher files (byte-pinned) as noted in their records.
+The integration lives in `integration/langgraph/`; vendored launcher files are
+byte-pinned as noted above.
+
+### Clean-clone check (no keys, no network after the pip install)
+
+Reproduced from a fresh clone of `live/operator-done` at 478240b1d7547edb60bca8b8eb2bd09c7d05282b, a new venv, Python 3.10.12, `bwrap` present, only the steps in this section:
+
+```
+git clone --branch live/operator-done --single-branch <repo-url> repo && cd repo
+python3 -m venv ../venv && . ../venv/bin/activate
+pip install langgraph==1.2.19 langgraph-checkpoint-sqlite==3.1.3
+# the six "How to run" commands above, in order: each exit 0, ending in
+#   PARALLEL RUN: ALL CHECKS PASSED   and   CONTROLS DEMO: ALL CHECKS PASSED
+python integration/langgraph/langgraph_team.py status /tmp/demo/lane-c    # exit 1, "cycle complete, quality unproven" (expected: no operator record)
+cd integration/langgraph
+for t in *_test.py; do python $t; done   # run ONE at a time, never in parallel (bwrap tests flake); the whole set takes a few minutes
+python lease_probe_test.py --strict      # likewise relay_probe, path_boundary_probe, supervisor_stall_probe (the *_probe_test.py files take --strict)
+```
+
+All 25 test files exited 0 in that run (the four probes with `--strict`). The tests use mock adapters and scratch repos; none makes a provider request. This shows the documented local commands work from a clean state. It is not a live run, not provider-backed and not an unattended run, and it says nothing about named-member qualification.
 
 ## Closeout status (operator workflow)
 
