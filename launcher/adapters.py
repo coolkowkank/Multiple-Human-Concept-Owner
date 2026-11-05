@@ -285,13 +285,17 @@ class HttpAdapter(Adapter):
         text = data["choices"][0]["message"]["content"]
         return parse_response(text)
 
-    def _record(self, attempt, outcome, usage=None):
+    def _record(self, attempt, outcome, usage=None, response_id=None):
         if not self.usage_log:
             return
         import datetime
         line = {"ts": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 "model": self.model, "attempt": attempt, "outcome": outcome,
                 "usage": usage}
+        if response_id is not None:
+            # Provider-reported completion id (body "id"), recorded verbatim
+            # as join evidence. Absent when the provider sends none.
+            line["response_id"] = response_id
         os.makedirs(os.path.dirname(os.path.abspath(self.usage_log)),
                     exist_ok=True)
         with open(self.usage_log, "a") as fh:
@@ -309,7 +313,9 @@ class HttpAdapter(Adapter):
             try:
                 with urllib.request.urlopen(req, timeout=self.timeout)                         as resp:
                     data = json.loads(resp.read())
-                    self._record(attempt + 1, "ok", data.get("usage"))
+                    rid = data.get("id")
+                    self._record(attempt + 1, "ok", data.get("usage"),
+                                 rid if isinstance(rid, str) and rid else None)
                     if self.require_zero_cost:
                         cost = (data.get("usage") or {}).get("cost")
                         if cost:

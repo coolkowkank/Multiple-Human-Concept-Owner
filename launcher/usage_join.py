@@ -79,3 +79,18 @@ def join(audit_rows, usage_rows):
             'provider_prompt_tokens': sum(r['prompt_tokens'] for r in prov) if prov else None,
             'provider_completion_tokens': sum(r['completion_tokens'] for r in prov) if prov else None,
             'note': 'totals cover only provider-joined calls; mock and estimate rows excluded'}
+
+
+def main(argv=None):
+    """python -m launcher.usage_join AUDIT.jsonl USAGE.jsonl > report.json (offline)."""
+    import json, sys
+    argv = sys.argv[1:] if argv is None else argv
+    if len(argv) != 2:
+        sys.exit('usage: usage_join AUDIT.jsonl USAGE.jsonl')
+    rd = lambda p: [json.loads(l) for l in open(p, encoding='utf-8') if l.strip()]
+    json.dump(join(rd(argv[0]), rd(argv[1])), sys.stdout, indent=2)
+    sys.stdout.write('\n')
+
+
+if __name__ == '__main__':
+    main()

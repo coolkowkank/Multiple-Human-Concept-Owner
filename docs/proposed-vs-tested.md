@@ -244,3 +244,15 @@ $5 credits against a verified payment method, credits are spend, and
 whether this account's earlier probe consumed credit is unverified
 without a console/ledger check. Legacy behavior is unchanged when the keys are absent - existing
 rosters keep working, but unattended autonomous runs should set budgets.
+
+## WP9 usage join (offline, unwired)
+
+`launcher/usage_join.py` joins prompt-audit `call_id` rows to explicit usage
+records that carry `call_id`, `origin` (`provider`|`mock`) and a `request_id`.
+Tested offline only. Not wired into any runtime path; no provider call has
+been made through it and no token savings are measured or claimed.
+
+Known gap: `HttpAdapter` usage_log lines now carry the provider body `id` as
+`response_id` (when present) but do not carry the audit `call_id`; a runtime
+step that writes the `call_id`-keyed usage record from the adapter result is
+still unwritten. Until it exists no live matched comparison is possible.
