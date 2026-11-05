@@ -52,7 +52,7 @@ def _scripts():
              "writes": {"review/qc-verdict-1.md": "# QC verdict\nPASS. Verify re-run exit 0 at head.\n"},
              "verify_command": "python3 tests/test_app.py",
              "handoff": "records",
-             "status_line": "QC PASS, records archiving"},
+             "status_line": "QC PASS"},
         ],
         "records": [
             {"summary": "archived batch 1 handoffs, findings and verdict",

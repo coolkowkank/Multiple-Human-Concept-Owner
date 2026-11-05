@@ -143,6 +143,17 @@ _DONE_RE = _re.compile(r"DONE(?![A-Za-z0-9_])")
 
 
 _VERDICT_ROW_RE = _re.compile(r"^verdict (PASS|FAIL|NONE) at head ([0-9a-f]{40})\b")
+# Whole-line verdict grammar (review 7f214b0 round 3): PASS is the
+# bare word PASS or QC PASS, optionally "at head <sha>" and one
+# trailing . or ! - and nothing else on the line. A qualified or
+# conditional line ("PASS (2 tests fail)", "PASS if the owner agrees",
+# "PASS-ish", "PASS? unsure") is NOT a pass. Reasoning belongs in
+# summary and the verdict file, not status_line.
+_PASS_VERDICT_RE = _re.compile(
+    r"(?:QC[ \t]+)?PASS(?:[ \t]+at head [0-9a-f]{7,40})?[.!]?")
+# A QC turn may close with the bare word DONE only; any other QC DONE
+# text carries an opinion and must record a verdict row (below).
+_PLAIN_DONE_RE = _re.compile(r"(?:QC[ \t]+)?DONE[.!]?")
 _EVIDENCE_ROLES = ("reviewer", "qc", "records")
 
 
@@ -949,19 +960,12 @@ class Seat:
         head0 = subprocess.run(["git", "-C", self.bus.repo, "rev-parse",
                                 "HEAD"], capture_output=True,
                                text=True).stdout.strip()
-        sl = response.get("status_line") or ""
-        # strict form only (review 29d6ca5 D2): the line must OPEN with
-        # PASS or QC PASS, and carry no negation/qualifier token. Free
-        # text like "QC cannot PASS this build" or "PASS pending"
-        # records NONE, never PASS.
-        if _re.search(r"\bFAIL\b", sl):
-            outcome = "FAIL"
-        elif (_re.match(r"(?:QC[ \t]+)?PASS\b", sl)
-              and not _re.search(r"\b(NOT|CANNOT|BLOCKED|PENDING|BUT)\b",
-                                 sl, _re.IGNORECASE)):
-            outcome = "PASS"
-        else:
-            outcome = "NONE"
+        sl = (response.get("status_line") or "").strip()
+        # Whole-line whitelist (review 7f214b0 round 3): the blacklist
+        # approach accepted qualified passes ("PASS with failures",
+        # "PASS once fixed"). Now only the exact grammar is a PASS;
+        # everything else, including any FAIL wording, records NONE.
+        outcome = "PASS" if _PASS_VERDICT_RE.fullmatch(sl) else "NONE"
         self.bus.append_log(self.name, "verdict",
                             f"verdict {outcome} at head {head0}: "
                             f"{(response.get('summary') or '')[:200]}")
@@ -1101,10 +1105,17 @@ class Seat:
         # decide next/status BEFORE the row so the record carries the same
         # values STATE gets (DONE closes: next None; DONE+handoff is refused)
         done = is_done_status(response.get("status_line"))
-        if self.role == "qc" and not done:
-            # A DONE-claiming turn renders no verdict; recording its
-            # DONE status_line as a NONE row would veto the QC's own
-            # earlier verdict under newest-verdict-wins (review round 2).
+        if self.role == "qc" and (
+                not done
+                or not _PLAIN_DONE_RE.fullmatch(
+                    (response.get("status_line") or "").strip())):
+            # A QC turn closing with the bare word DONE renders no
+            # verdict of its own, so it records no row and may close on
+            # its own EARLIER fresh PASS (review round 2 policy). Any
+            # other QC DONE text carries an opinion ("DONE FAIL",
+            # "DONE - found a blocking bug") and must not ride that
+            # earlier PASS silently (product probe, round 3): record
+            # the row so newest-verdict-wins vetoes the close.
             self._record_qc_verdict(response)
         done_refusal = None
         if done:

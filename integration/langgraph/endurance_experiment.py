@@ -37,7 +37,7 @@ def scripts(n, slow_batch):
         out["reviewer"].append({"summary": f"reviewed batch {k}", "writes": {f"review/findings-{k}.md": f"batch {k}: none; verify re-run green\n"},
             "verify_command": "python3 tests/test_app.py", "handoff": "qc", "status_line": f"batch {k} reviewed"})
         out["qc"].append({"summary": f"qc batch {k}", "writes": {f"review/qc-verdict-{k}.md": f"batch {k}: PASS\n"},
-            "verify_command": "python3 tests/test_app.py", "handoff": "records", "status_line": f"batch {k} qc pass"})
+            "verify_command": "python3 tests/test_app.py", "handoff": "records", "status_line": "QC PASS"})
         out["records"].append({"summary": f"archived batch {k}", "writes": {f"records/archive-{k}.md": f"batch {k} archived\n"},
             "verify_command": None, "handoff": "coordinator", "status_line": f"batch {k} archived"})
     out["coordinator"].append({"summary": "all batches accepted", "writes": {}, "verify_command": None, "handoff": None,

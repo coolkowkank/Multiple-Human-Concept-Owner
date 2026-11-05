@@ -188,13 +188,14 @@ check("22. bare 'review' prefix does not cover reviewer_x.py", st["status"] != "
 
 # Case K (policy): a QC seat MAY close DONE on its own earlier fresh verdict
 repoA, busA, seatsA = mk_repo(scripts={"builder": [BUILD],
-                                      "qc": [dict(QC_PASS, handoff="builder"), DONE_CLAIM]})
+                                      "qc": [dict(QC_PASS, handoff="builder"),
+                                             dict(DONE_CLAIM, status_line="DONE")]})
 seatsA["builder"].act_once()
 seatsA["qc"].act_once()       # verdict recorded, hands to builder
 give_turn(busA, "qc")
 seatsA["qc"].act_once()       # QC claims DONE on its own verdict
 st = busA.state()
-check("23. QC self-close with own fresh PASS verdict accepted", st["status"] == "done" and st["turn"] is None)
+check("23. QC self-close (bare DONE) with own fresh PASS verdict accepted", st["status"] == "done" and st["turn"] is None)
 
 # Case L (product P2): PASS then a newer FAIL cancels - DONE refused
 repoB, busB, seatsB = mk_repo(scripts={
@@ -222,6 +223,50 @@ give_turn(busC, "builder")
 seatsC["builder"].act_once()
 st = busC.state()
 check("25. space in an evidence filename stays fresh (no false block)", st["status"] == "done")
+
+# Case N (review round 3): the PASS grammar is a whole-line whitelist.
+# Every qualified/conditional/hedged line records NONE, never PASS.
+QUALIFIED = ("PASS (2 tests fail)", "PASS with failures", "PASS unless the API changes",
+             "PASS if the owner agrees", "PASS - needs rework", "PASS? unsure",
+             "PASS w/ open P1 issues", "PASS, no wait, broken", "PASS once fixed",
+             "PASS (skipped all checks)", "PASS-ish", "PASS rejected by owner")
+for i, line in enumerate(QUALIFIED):
+    repoN, busN, seatsN = mk_repo(scripts={
+        "builder": [BUILD, DONE_CLAIM],
+        "qc": [dict(QC_PASS, status_line=line, summary="x")]})
+    seatsN["builder"].act_once()
+    seatsN["qc"].act_once()
+    give_turn(busN, "builder")
+    seatsN["builder"].act_once()
+    st = busN.state()
+    check(f"{26+i}. qualified {line!r} records no PASS", st["status"] != "done" and st["turn"] == "qc")
+
+# Case O: the strict good forms still pass - bare "PASS" (no QC prefix)
+repoO, busO, seatsO = mk_repo(scripts={"builder": [BUILD, DONE_CLAIM],
+                                       "qc": [dict(QC_PASS, status_line="PASS")]})
+seatsO["builder"].act_once()
+seatsO["qc"].act_once()
+give_turn(busO, "builder")
+seatsO["builder"].act_once()
+st = busO.state()
+check("38. bare 'PASS' verdict still satisfies", st["status"] == "done" and st["turn"] is None)
+
+# Case P/Q (product probe round 3): a QC DONE carrying its own verdict
+# text must not close on an earlier PASS - the row is recorded and the
+# newest-verdict-wins rule vetoes the close.
+for i, line in enumerate(("DONE FAIL", "DONE - found a blocking bug, work is bad")):
+    repoX, busX, seatsX = mk_repo(scripts={
+        "builder": [BUILD],
+        "qc": [dict(QC_PASS, handoff="builder"), dict(DONE_CLAIM, status_line=line)]})
+    seatsX["builder"].act_once()
+    seatsX["qc"].act_once()       # fresh PASS, hands to builder
+    give_turn(busX, "qc")
+    seatsX["qc"].act_once()       # QC claims DONE with its own verdict text
+    st = busX.state()
+    v = [e for e in busX.log() if e.get("kind") == "verdict"]
+    check(f"{39+i}. QC {line!r} refused and veto row recorded",
+          st["status"] != "done" and st["turn"] == "qc"
+          and v[-1]["body"].startswith("verdict NONE at head "))
 
 for _r in REPOS:
     shutil.rmtree(_r, ignore_errors=True)
