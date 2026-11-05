@@ -167,6 +167,40 @@ def adapter_tests():
         a5 = mk(base, "lc3"); e = tryc(a5)
         check("nonzero cost halts and still keeps usage evidence",
               e is not None and a5.last_call is not None)
+        # stale-evidence regression: a prior success must not survive a
+        # later pre-request refusal (missing key, budget, halt, chain break)
+        fenced_http.HTTP_LOG_DIR = os.path.join(tmp, "logs-stale")
+        MODE.update(kind="ok", content=GOODJSON, cost=0)
+        st = mk(base, "st1")
+        st.complete("s", "p")
+        check("prior success sets last_call", st.last_call is not None)
+        hits0 = len(HITS)
+        key = os.environ.pop(lt.HTTP_KEY_ENV)
+        e = tryc(st)
+        check("prior success then missing key: None, no request",
+              e is not None and st.last_call is None and len(HITS) == hits0)
+        os.environ[lt.HTTP_KEY_ENV] = key
+        st.complete("s", "p")
+        check("second success sets last_call", st.last_call is not None)
+        e = tryc(st)   # budget (2) exhausted
+        check("budget exhausted: None, no request",
+              e is not None and st.last_call is None and len(HITS) == hits0 + 1)
+        fenced_http.HTTP_LOG_DIR = os.path.join(tmp, "logs-stale2")
+        MODE.update(kind="ok", content=GOODJSON, cost=0)
+        st2 = mk(base, "st2"); st2.complete("s", "p")
+        with open(st2.path, "a") as fh:
+            fh.write(json.dumps({"phase": "halt", "n": 9, "why": "x"}) + "\n")
+        n0 = len(HITS); e = tryc(st2)
+        check("halt/chain break after success: None, no request",
+              e is not None and st2.last_call is None and len(HITS) == n0)
+        fenced_http.HTTP_LOG_DIR = os.path.join(tmp, "logs-empty")
+        MODE.update(kind="ok", content="x", cost=0)
+        saved_keys = fenced_http.USAGE_KEYS
+        fenced_http.USAGE_KEYS = ("nonexistent",)   # clean usage dict is {}
+        em = mk(base, "em1"); e = tryc(em)
+        fenced_http.USAGE_KEYS = saved_keys
+        check("empty clean usage {}: no evidence row, never zero",
+              e is not None and em.last_call is None)
         fenced_http.HTTP_LOG_DIR = _saved_dir
         MODE.update(kind="slow")
         e = tryc(mk(base, "s1", timeout=1))
