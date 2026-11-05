@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 import time
 import uuid
 
@@ -465,17 +466,56 @@ class Seat:
             except Exception:
                 pass
 
+    RELAY_RETRY_SECONDS = 60
+
     def _wait(self):
-        """Long-poll the relay for a wake signal; fall back to sleep."""
+        """Long-poll the relay for a wake hint; fall back to sleep.
+
+        The relay is a latency hint only (the git bus is the record), so
+        every failure path here costs latency, never correctness. A failed
+        relay is retried after RELAY_RETRY_SECONDS instead of being
+        disabled for the life of the process, the failure is printed once
+        per outage, and a server restart (new epoch, or a latest seq below
+        ours) resyncs the cursor instead of leaving the seat deaf."""
+        if self.relay is None and getattr(self, "_relay_cfg", None) \
+                and time.time() >= getattr(self, "_relay_retry_at", 0):
+            self.relay = self._relay_cfg
         if self.relay:
             try:
-                msgs = self.relay.since(self._relay_seq,
-                                        wait=self.poll_interval)
+                poll = getattr(self.relay, "poll", None)
+                if poll is None:
+                    msgs = self.relay.since(self._relay_seq,
+                                            wait=self.poll_interval)
+                    info = {}
+                else:
+                    info = poll(self._relay_seq, wait=self.poll_interval)
+                    msgs = info.get("messages", [])
+                epoch, latest = info.get("epoch"), info.get("latest")
+                restarted = (
+                    (epoch is not None
+                     and getattr(self, "_relay_epoch", None) not in (None, epoch))
+                    or (isinstance(latest, int) and latest < self._relay_seq))
+                if epoch is not None:
+                    self._relay_epoch = epoch
+                if restarted:
+                    self._relay_seq = latest if isinstance(latest, int) else 0
+                    print(f"relay: server restarted; resynced at seq "
+                          f"{self._relay_seq}", file=sys.stderr, flush=True)
+                    return
                 for m in msgs:
                     self._relay_seq = max(self._relay_seq, m["seq"])
+                self._relay_down = False
                 return
-            except Exception:
-                self.relay = None  # permanent fallback to git polling
+            except Exception as exc:
+                if not getattr(self, "_relay_down", False):
+                    print(f"relay: unavailable ({type(exc).__name__}); "
+                          f"git polling, retry in "
+                          f"{self.RELAY_RETRY_SECONDS}s", file=sys.stderr,
+                          flush=True)
+                self._relay_down = True
+                self._relay_cfg = self.relay
+                self._relay_retry_at = time.time() + self.RELAY_RETRY_SECONDS
+                self.relay = None
         time.sleep(self.poll_interval)
 
     # -- internals -------------------------------------------------------

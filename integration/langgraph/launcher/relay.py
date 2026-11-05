@@ -14,7 +14,9 @@ not a default.
 
 from __future__ import annotations
 
+import hmac
 import json
+import os
 import threading
 import time
 import urllib.request
@@ -23,22 +25,34 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 TOKEN_HEADER = "x-relay-token"
 
 
+MAX_BODY = 64 * 1024        # request body cap (bytes)
+MAX_MESSAGES = 1000         # retained hints; the bus is the record
+MAX_FIELD = 2000            # per-field length cap
+
+
 class RelayState:
     def __init__(self, token):
         self.token = token
-        self.messages = []  # [{seq, ts, seat, kind, body}]
+        self.messages = []  # [{seq, ts, seat, kind, body}] (most recent kept)
+        self.latest = 0     # monotonic; never derived from len(messages)
+        # New per server start: a client that sees it change knows seq
+        # numbering restarted and must resync instead of waiting for
+        # sequence numbers it already passed (hints would die silently).
+        self.epoch = "%016x" % int.from_bytes(os.urandom(8), "big")
         self.cond = threading.Condition()
 
     def post(self, seat, kind, body):
         with self.cond:
-            seq = len(self.messages) + 1
+            self.latest += 1
             self.messages.append({
-                "seq": seq,
+                "seq": self.latest,
                 "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "seat": seat, "kind": kind, "body": body,
+                "seat": str(seat)[:MAX_FIELD], "kind": str(kind)[:MAX_FIELD],
+                "body": str(body)[:MAX_FIELD],
             })
+            del self.messages[:-MAX_MESSAGES]
             self.cond.notify_all()
-            return seq
+            return self.latest
 
     def since(self, after, wait=0):
         deadline = time.time() + wait
@@ -53,7 +67,8 @@ class RelayState:
 def make_handler(state):
     class Handler(BaseHTTPRequestHandler):
         def _authed(self):
-            return self.headers.get(TOKEN_HEADER) == state.token
+            got = self.headers.get(TOKEN_HEADER) or ""
+            return hmac.compare_digest(got.encode(), str(state.token).encode())
 
         def _send(self, code, payload):
             data = json.dumps(payload).encode()
@@ -66,11 +81,18 @@ def make_handler(state):
         def do_POST(self):
             if not self._authed():
                 return self._send(403, {"error": "bad token"})
-            length = int(self.headers.get("content-length", 0))
+            try:
+                length = int(self.headers.get("content-length", 0))
+            except ValueError:
+                return self._send(400, {"error": "bad content-length"})
+            if length < 0 or length > MAX_BODY:
+                return self._send(413, {"error": "body too large"})
             try:
                 body = json.loads(self.rfile.read(length) or b"{}")
-            except json.JSONDecodeError:
+            except ValueError:
                 return self._send(400, {"error": "invalid json"})
+            if not isinstance(body, dict):
+                return self._send(400, {"error": "body must be an object"})
             seq = state.post(body.get("seat", "?"),
                              body.get("kind", "signal"),
                              body.get("body", ""))
@@ -81,9 +103,17 @@ def make_handler(state):
                 return self._send(403, {"error": "bad token"})
             from urllib.parse import urlparse, parse_qs
             q = parse_qs(urlparse(self.path).query)
-            after = int(q.get("since", ["0"])[0])
-            wait = min(float(q.get("wait", ["0"])[0]), 30.0)
-            self._send(200, {"messages": state.since(after, wait)})
+            try:
+                after = int(q.get("since", ["0"])[0])
+                wait = float(q.get("wait", ["0"])[0])
+            except ValueError:
+                return self._send(400, {"error": "bad query"})
+            if not (wait == wait) or wait < 0:   # NaN or negative
+                wait = 0.0
+            wait = min(wait, 30.0)
+            msgs = state.since(after, wait)
+            self._send(200, {"messages": msgs, "epoch": state.epoch,
+                             "latest": state.latest})
 
         def log_message(self, *args):
             pass
@@ -119,8 +149,12 @@ class RelayClient:
                          {"seat": seat, "kind": kind, "body": body})["seq"]
 
     def since(self, after, wait=0):
-        return self._req(
-            "GET", f"/messages?since={after}&wait={wait}")["messages"]
+        return self.poll(after, wait)["messages"]
+
+    def poll(self, after, wait=0):
+        """Like since() but returns the whole reply: messages plus the
+        server's epoch and latest seq (absent on an older server)."""
+        return self._req("GET", f"/messages?since={after}&wait={wait}")
 
 
 class WebhookSink:
