@@ -21,6 +21,8 @@ An orchestration layer that drives the project's existing team machinery
   archive. The seat set is read from the project's roster
   (`launcher.cli.default_roster`), not hardcoded here.
 
+Operator commands, flags, exit codes and prerequisites: OPERATOR_GUIDE.md.
+
 Files:
 
 - `langgraph_team.py` - single-lane orchestrator with execution-time
@@ -29,6 +31,9 @@ Files:
 - `parallel_team.py` - parent graph running several independent lanes
   concurrently, with one shared seat gate capping simultaneous seat
   actions across all lanes, plus a deterministic no-network overlap test.
+- `fenced_http.py`, `reserve_preflight.py`, `done_gate.py`, `audit_wiring.py` -
+  fenced single-request http adapter, read-only reserve preflight, operator
+  closeout gate, opt-in audit wrapper (see OPERATOR_GUIDE.md).
 - `controls_demo.py` - scripted operator-intervention run proving the
   four controls below.
 - `launcher/` - vendored copy of the project's own seat runtime (bus,
@@ -67,8 +72,11 @@ IMMEDIATELY before acting:
    claim is made for response payloads, only for the transport. The CONSTRUCTED adapter is then checked by exact class
    identity against the preselected safe constructor for that spec (the
    imported class object itself, not a forgeable `__name__` string).
-   Provider-calling adapters (http/cli/live) are refused at sync and at
-   execution. No provider call is possible from this graph.
+   `cli` and `live` adapters are refused at sync and at execution. An `http`
+   seat is allowed only as the exact fenced free-route spec (fixed router
+   endpoint, allowlisted price-0 model, `require_zero_cost`, `FencedHttpAdapter`
+   or its audit wrapper); see OPERATOR_GUIDE.md. Scripted demos make no
+   provider call.
 3. A `GuardedAdapter` wrapper re-validates status, turn, OPERATOR
    CONTROL (mode and instruction_seq) and adapter identity AT the
    adapter call - inside the seat transaction, after the lease claim.
@@ -234,8 +242,10 @@ go. See `LIVE_PREP.md`.
   seat action can make several adapter calls, so it is NOT a provider
   budget or request-concurrency control. The runner's own guard chain
   (allowance window, verified_rev, envelope, completion) runs in the
-  runner lane below, but only with the REFUSING post - no provider call
-  is possible from this branch.
+  runner lane below, but only with the REFUSING post. The separate
+  `live` entry can make provider requests through the fenced adapter
+  (see OPERATOR_GUIDE.md); the lifetime request cap is 8 per account and
+  is not atomic across processes.
 - Resume evidence is a narrow new-process sqlite demo, not live
   readiness. Team-state durability is the git bus; LangGraph checkpoints
   cover orchestration state only.
@@ -244,8 +254,9 @@ go. See `LIVE_PREP.md`.
 
 - Not the named team (Nora, Eva, Ryan, Alex, Bill, Sam) running. Wiring a
   named member means giving a seat a live adapter (a provider route or an
-  operator queue). This graph structurally refuses non-mock adapters, and
-  no named member currently holds a qualified route or authorized budget.
+  operator queue). The scripted graph refuses non-mock adapters; only the operator
+  `live` entry can configure fenced http seats, and no named member
+  currently holds a qualified route or authorized budget.
   Parallel live model execution has not happened and is not claimed.
 - Not a 24/7 service, not a resident process guarantee, not an
   architecture migration.
