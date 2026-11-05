@@ -49,18 +49,21 @@ class InFlight(unittest.TestCase):
         return m
 
     def stale(self, out, store, status):
-        self.assertEqual(out["action"], "stale-result-not-applied")
+        self.assertEqual(out["action"], "stale-result-halt")
         self.assertEqual(store.queue()["questions"][0]["status"], status)
         self.assertNotIn("verifier_verdict", store.queue()["questions"][0])
         led = store.ledger()
-        self.assertEqual(led[-1]["phase"], "stale-result")
+        self.assertEqual(led[-1]["phase"], "halt")
+        # durable: the next step cannot run automatically
+        with self.assertRaises(rc.Halt):
+            rc.ledger_gate(store, T + 100, "check-one")
         # the call is still counted as consumed, raw result kept for audit
         self.assertTrue(any(l.get("phase") == "reserved" for l in led))
 
     def test_claim_edit(self):
         out, st = self.run_case(self.edit(
             lambda q, s: q["findings"][0].update(claim="Changed claim.")))
-        self.stale(out, st, "ready-verify")
+        self.stale(out, st, "needs-human")
         self.assertEqual(st.queue()["questions"][0]["findings"][0]["claim"],
                          "Changed claim.")
 
@@ -77,10 +80,10 @@ class InFlight(unittest.TestCase):
     def test_packet_and_author_edit(self):
         out, st = self.run_case(self.edit(
             lambda q, s: q["packet"][0].update(passage="Other text.")))
-        self.stale(out, st, "ready-verify")
+        self.stale(out, st, "needs-human")
         out, st = self.run_case(self.edit(
             lambda q, s: q.update(author_model="lab-c/other")))
-        self.stale(out, st, "ready-verify")
+        self.stale(out, st, "needs-human")
 
     def test_assignment_changed(self):
         def m(store, root):
@@ -89,7 +92,29 @@ class InFlight(unittest.TestCase):
             a["models"]["eva"] = "lab-b/other"
             json.dump(a, open(p, "w"))
         out, st = self.run_case(m)
-        self.assertEqual(out["action"], "stale-result-not-applied")
+        self.stale(out, st, "needs-human")
+
+    def test_same_model_authority_edit(self):
+        def m(store, root):
+            p = os.path.join(root, "eva-assignment.json")
+            with open(p) as f:
+                a = json.load(f)
+            a["decided_by"] = "revoked"
+            with open(p, "w") as f:
+                json.dump(a, f)
+        out, st = self.run_case(m)
+        self.stale(out, st, "needs-human")
+
+    def test_same_model_provenance_edit(self):
+        def m(store, root):
+            p = os.path.join(root, "eva-assignment.json")
+            with open(p) as f:
+                a = json.load(f)
+            a["decided_at"] = "2000-01-01T00:00:00Z"
+            with open(p, "w") as f:
+                json.dump(a, f)
+        out, st = self.run_case(m)
+        self.stale(out, st, "needs-human")
 
     def test_unrelated_item_edit_does_not_invalidate(self):
         other = base("other")

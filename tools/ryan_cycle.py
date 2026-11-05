@@ -727,19 +727,19 @@ def pick(queue):
     return None
 
 
-def input_snapshot(q, role, model):
-    """sha256 of everything a provider call depended on: item identity,
-    status, role, model, lineage, claims, packet, author and the feedback
-    that goes into the prompt. A result is applied only if this is
-    unchanged when it comes back. Unrelated items do not enter it."""
+def input_snapshot(q, role, model, system, prompt, assign):
+    """sha256 over everything a provider call depended on: the EXACT
+    system+prompt submitted, item identity, status, role, model, lineage,
+    claims, packet, author, and the whole assignment record (decided_by,
+    source_ref, decided_at, models). A result is applied only if this and
+    the apply-time authority are unchanged. Other items do not enter it."""
     import hashlib
-    body = {"id": q.get("id"), "kind": q.get("kind"),
-            "status": q.get("status"), "role": role, "model": model,
-            "lineage": lineage_of(q), "question": q.get("question"),
+    body = {"system": system, "prompt": prompt, "id": q.get("id"),
+            "kind": q.get("kind"), "status": q.get("status"),
+            "role": role, "model": model, "lineage": lineage_of(q),
             "findings": q.get("findings"), "packet": q.get("packet"),
             "author_model": q.get("author_model"),
-            "feedback": q.get("feedback"),
-            "fb": q.get("fb_" + role)}
+            "verified_ids": q.get("verified_ids"), "assign": assign}
     return hashlib.sha256(json.dumps(body, sort_keys=True,
                                      ensure_ascii=True).encode()).hexdigest()
 
@@ -827,7 +827,8 @@ def step(root, post, list_models, now, record):
                       "qid": qid, "role": role, "model": model,
                       "lineage": lineage_of(q), "work_fp": work_fp(q)})
         q["attempts"][role] = q["attempts"].get(role, 0) + 1
-        snap = input_snapshot(q, role, model)
+        status0 = q["status"]
+        snap = input_snapshot(q, role, model, system, prompt, assign)
         store.save_queue(queue)
         n = q["attempts"][role]
     res = post(model, system, prompt, CEILINGS[role], effort=EFFORT[role])
@@ -846,19 +847,27 @@ def step(root, post, list_models, now, record):
         try:
             cur = (load_eva_assignment(root) if q.get("kind") == "verify"
                    else load_assignments(root))
-            cur_model = (cur or {}).get("models", {}).get(
+            cur_model = ((cur or {}).get("models") or {}).get(
                 "eva" if q.get("kind") == "verify" else role)
         except Exception:
-            cur_model = None
-        if input_snapshot(q, role, model) != snap or cur_model != model:
-            # Raw result stays in runs/ for audit; it is never applied to
-            # an item whose input, status, role, identity or assignment
-            # changed (hold, supersession, claim edit) during the call.
-            store.append({"phase": "stale-result", "ts": iso(now),
-                          "rid": rid, "qid": qid, "role": role,
-                          "reason": "item, status or assignment changed "
-                          "during the call; result not applied"})
-            return {"action": "stale-result-not-applied", "qid": qid,
+            cur, cur_model = None, None
+        authority_ok = (cur or {}).get("decided_by") == OPERATOR
+        if (not authority_ok or cur_model != model or
+                input_snapshot(q, role, model, system, prompt, cur)
+                != snap):
+            # Raw result stays in runs/ and the call stays consumed. It is
+            # never applied. A durable halt needs explicit reconciliation,
+            # so the item cannot run again automatically. A hold or
+            # supersession set during the call is left exactly as is; a
+            # still-runnable item moves to needs-human.
+            why = ("stale result not applied: item, status, assignment "
+                   "authority or model changed during call %s" % rid)
+            store.append({"phase": "halt", "ts": iso(now), "reason": why})
+            if q.get("status") == status0 and next_action(q):
+                q["status"] = "needs-human"
+                q["reason"] = why
+                store.save_queue(queue)
+            return {"action": "stale-result-halt", "qid": qid,
                     "role": role, "status": q.get("status"), "calls": 1}
         try:
             obj = strict_json(res["content"])
