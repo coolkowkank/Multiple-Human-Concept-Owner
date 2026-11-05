@@ -11,9 +11,10 @@ nav.appendChild(inn);
 function go(){document.body.insertBefore(nav,document.body.firstChild);
  var panel=document.createElement('aside');panel.className='updateclock';panel.setAttribute('aria-label','Update schedule');
  var title=document.createElement('b'),last=document.createElement('p'),detail=document.createElement('details'),summary=document.createElement('summary'),note=document.createElement('p');
- title.textContent='Update schedule: loading recorded check time';summary.textContent='Schedule and freshness details';detail.appendChild(summary);detail.appendChild(note);panel.appendChild(title);panel.appendChild(last);panel.appendChild(detail);nav.after(panel);
+ title.textContent='Update status: loading';summary.textContent='Freshness details';detail.appendChild(summary);detail.appendChild(note);panel.appendChild(title);panel.appendChild(last);panel.appendChild(detail);nav.after(panel);
  fetch(new URL('update-status.json',base).href,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error();return r.json()}).then(function(d){
   function dt(s){return new Date(s).toLocaleString('en-GB',{timeZone:'Europe/Helsinki',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false})+' EET'}
+  if(!d.next_check_at){title.textContent='Manual snapshot, no automatic checks';last.textContent='Published content snapshot: '+dt(d.content_as_of)+'.';note.textContent=d.notice;return}
   last.textContent='Published content snapshot: '+dt(d.content_as_of)+'. '+(d.last_check_at?'Last completed check: '+dt(d.last_check_at)+'. '+d.check_result+'. ':'')+'Next recorded check: '+dt(d.next_check_at)+'.';
   note.textContent=d.cadence+'. Schedule recorded '+dt(d.schedule_recorded_at)+'. '+d.notice+' If no new evidence exists, the charts stay unchanged. No timer reset is treated as a successful update.';
   function tick(){var left=new Date(d.next_check_at)-Date.now();if(Date.now()>=new Date(d.schedule_expires_at)){title.textContent='Schedule needs renewal; no next check confirmed';return}
