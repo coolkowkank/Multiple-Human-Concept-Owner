@@ -266,3 +266,10 @@ between the check and the write by another process is not covered. Not a sandbox
 - During verify: in-domain files remain, a stale `.git/lg-live-<seat>.json` declaration stays until the next turn clears it, and a restart re-runs the turn (a replayed turn can replay a model call).
 
 Not covered: a kill during the push itself (needs a remote, which the test does not create), `index.lock` residue, kills of a real adapter or http call, `bus.transact` has no rollback, and no unattended claim.
+
+### Torn-state block: operational limits (accepted 8713d51)
+- Exit status 75 is trusted as a number only. The supervisor does not verify that the process really saw torn state; any process exiting 75 latches the block.
+- The block latch is in supervisor memory and never clears until the supervisor is relaunched, even if the operator already cleaned the tree.
+- While the latch is set, EVERY other seat exit and every stall is console-only: no durable gate, no LOG row, no commit. Protection is reduced for the whole lane during that time. A spending seat that exits or stalls in that window gets no durable escalation, only a console line, so watch the console and do not treat silence as safety.
+- The recheck pause is a plain `Seat.torn_recheck_seconds` attribute (default 2.0). It is finite but not validated and not settable from the CLI. Do not rely on it as a guarantee.
+- Not an unattended-operation claim: an operator must read the console, clean the residue and relaunch.
