@@ -146,32 +146,70 @@ def cmd_lease(args):
     never touches turn, turn_seq, status, log or queues. Because STATE.json
     changes, queued responses bound to an older head are stale and must be
     re-queued: the head binding is not weakened."""
+    import re as _re
     import time as _t
     from .bus import STATE
+    ident = _re.compile(r"^[A-Za-z0-9._:@-]{1,128}$")
+
+    def refuse(msg):
+        print("refused: " + msg, file=sys.stderr)
+        sys.exit(1)
+
+    def state_clean():
+        # worktree STATE.json must equal HEAD: the release commit may
+        # carry the leases deletion ONLY, never someone's unrelated edit
+        return subprocess.run(
+            ["git", "-C", bus.repo, "diff", "--quiet", "HEAD", "--", STATE],
+            capture_output=True).returncode == 0
+
+    def read_lease(state):
+        leases = state.get("leases", {}) if isinstance(state, dict) else None
+        if not isinstance(leases, dict):
+            refuse("STATE.json leases is malformed")
+        lease = leases.get(args.name)
+        if lease is None:
+            return None
+        if (not isinstance(lease, dict)
+                or not isinstance(lease.get("holder"), str)
+                or not ident.match(lease["holder"])
+                or isinstance(lease.get("claimed_at"), bool)
+                or not isinstance(lease.get("claimed_at"), (int, float))):
+            refuse(f"lease for {args.name} is malformed; fix STATE.json by hand")
+        return lease
+
+    if not ident.match(args.name):
+        refuse("seat name has characters outside [A-Za-z0-9._:@-]")
+    if args.holder is not None and not ident.match(args.holder):
+        refuse("--holder has characters outside [A-Za-z0-9._:@-]")
     bus = Bus(args.repo, args.branch)
-    bus.pull()
-    leases = bus.state().get("leases", {})
-    lease = leases.get(args.name)
+    bus.pull()   # git fetch/rebase: show mode is not a pure local read
+    if args.name not in bus.roster().get("seats", {}):
+        refuse(f"seat {args.name!r} not in roster")
+    if args.release and not state_clean():
+        refuse("worktree .team/STATE.json differs from HEAD; commit or "
+               "restore it first (the release must change only the lease)")
+    lease = read_lease(bus.state())
     if lease is None:
         print(f"lease {args.name}: none")
         if args.release:
             sys.exit(1)
         return
-    age = _t.time() - lease.get("claimed_at", 0)
-    print(f"lease {args.name}: holder={lease.get('holder')} "
+    age = _t.time() - lease["claimed_at"]
+    print(f"lease {args.name}: holder={lease['holder']} "
           f"age={int(age)}s (a different session is refused for 900s)")
     if not args.release:
         return
-    if args.holder != lease.get("holder"):
-        print("refused: --release needs --holder equal to the holder shown "
-              "above (compare-and-set)", file=sys.stderr)
-        sys.exit(1)
-    seen = lease.get("holder")
+    if args.holder != lease["holder"]:
+        refuse("--release needs --holder equal to the holder shown above "
+               "(compare-and-set)")
+    seen = lease["holder"]
 
     def mutate():
+        if not state_clean():
+            raise BusError("STATE.json changed in the worktree; refusing")
         state = bus.state()
-        cur = state.get("leases", {}).get(args.name)
-        if cur is None or cur.get("holder") != seen:
+        cur = read_lease(state)
+        if cur is None or cur["holder"] != seen:
             raise BusError(f"lease for {args.name} changed; re-inspect")
         del state["leases"][args.name]
         bus.write_state(state)

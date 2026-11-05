@@ -49,6 +49,38 @@ try:
     open(os.path.join(r, "stray.txt"), "w").write("x"); git(r, "add", "stray.txt")
     give = cli(r, "lease", "coordinator", "--release", "--holder", "B")
     check("staged residue blocks the release (refused, not swept)", give[0] != 0 and "stray.txt" not in git(r, "show", "--name-only", "--format=", "HEAD").stdout)
+    # --- reviewer findings: unstaged hand edit, malformed state, injection ---
+    r2 = os.path.join(tmp, "l2"); lt.init_repo(r2)
+    Seat(Bus(r2, lt.BRANCH), "coordinator", instance_id="A").act_once()
+    sp = os.path.join(r2, ".team", "STATE.json"); orig = open(sp).read()
+    st = json.loads(orig); st["turn"] = "builder"; st["status_line"] = "HAND EDIT"
+    open(sp, "w").write(json.dumps(st, indent=2) + "\n"); edited = open(sp).read()
+    h2 = git(r2, "rev-parse", "HEAD").stdout
+    rc, out = cli(r2, "lease", "coordinator", "--release", "--holder", "A")
+    check("unstaged hand edit of STATE.json: refused, no commit, edit preserved",
+          rc == 1 and git(r2, "rev-parse", "HEAD").stdout == h2 and open(sp).read() == edited)
+    open(sp, "w").write(orig)
+    bad_cases = {"leases is a list": lambda s: s.__setitem__("leases", []),
+                 "lease is a string": lambda s: s["leases"].__setitem__("coordinator", "A"),
+                 "claimed_at is a string": lambda s: s["leases"]["coordinator"].__setitem__("claimed_at", "x"),
+                 "holder has a newline": lambda s: s["leases"]["coordinator"].__setitem__("holder", "A\nforged")}
+    for nm, mut in bad_cases.items():
+        s_ = json.loads(orig); mut(s_); open(sp, "w").write(json.dumps(s_))
+        git(r2, "add", "-A"); git(r2, "-c", "user.name=x", "-c", "user.email=x@x", "commit", "-qm", "operator: test malformed")
+        hh = git(r2, "rev-parse", "HEAD").stdout
+        rc, out = cli(r2, "lease", "coordinator", "--release", "--holder", "A")
+        rc2, out2 = cli(r2, "lease", "coordinator")
+        check(f"malformed state ({nm}): clean refusal, no traceback, no commit",
+              rc == 1 and rc2 in (0, 1) and "Traceback" not in out + out2 and git(r2, "rev-parse", "HEAD").stdout == hh)
+        open(sp, "w").write(orig); git(r2, "add", "-A"); git(r2, "-c", "user.name=x", "-c", "user.email=x@x", "commit", "-qm", "operator: test restore")
+    h3 = git(r2, "rev-parse", "HEAD").stdout
+    for arg in ("A\nforged", "A;rm", "x" * 200):
+        rc, out = cli(r2, "lease", "coordinator", "--release", "--holder", arg)
+        check(f"--holder {arg[:6]!r}: refused, no commit", rc == 1 and git(r2, "rev-parse", "HEAD").stdout == h3)
+    rc, out = cli(r2, "lease", "../x", "--release", "--holder", "A"); check("bad seat name refused", rc == 1 and "Traceback" not in out)
+    rc, out = cli(r2, "lease", "ghost"); check("seat not in roster refused", rc == 1)
+    rc, out = cli(r2, "lease", "coordinator", "--release", "--holder", "A")
+    check("clean release still works after all that", rc == 0 and git(r2, "log", "-1", "--format=%s").stdout.startswith("operator: lease released for coordinator (holder A)"))
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 print("\nLEASE RECOVERY:", "ALL CHECKS PASSED" if ok else "FAILURES ABOVE")
