@@ -79,7 +79,7 @@ def lane():
 
 def cfg(**over):
     n[0] += 1
-    c = {"key_file": keyf, "brief_extra_file": rules, "stop_after": 1, "preflight": {"allow_fresh": True},
+    c = {"key_file": keyf, "brief_extra_file": rules, "stop_after": 1, "preflight": {},
          "seats": {"coordinator": {"model": NEM, "epoch": f"b{n[0]}", "budget": 1, "max_tokens": 100},
                    "reviewer": {"model": LING, "epoch": f"r{n[0]}", "budget": 1, "max_tokens": 100}}}
     c.update(over)
@@ -96,10 +96,10 @@ def untouched(r, before):
     return roster(r) == before and not POSTS
 
 
-def attempt(c, r, d):
+def attempt(c, r, d, fresh=False):
     del POSTS[:]; del GETS[:]
     before = roster(r)
-    msg = refused(lambda: lt.live_entry(r, d, c))
+    msg = refused(lambda: lt.live_entry(r, d, c, allow_fresh=fresh))
     return msg, untouched(r, before)
 
 
@@ -125,14 +125,14 @@ try:
     check("sandbox not ready refused before any request", msg and "sandbox" in msg and clean and not GETS)
     # listing-based refusals: lane untouched, zero POSTs
     for m in ("nonzero", "missing", "unlisted", "500", "redirect"):
-        MODE["list"] = m; r, d = lane(); msg, clean = attempt(cfg(), r, d)
+        MODE["list"] = m; r, d = lane(); msg, clean = attempt(cfg(), r, d, fresh=True)
         check(f"listing '{m}' refused, roster untouched, zero POSTs", msg and "refused" in msg and clean and len(GETS) == 1)
     # happy path: heterogeneous seats, fresh listing price 0, key in-process only
     MODE["list"] = "ok"; r, d = lane(); c = cfg(); del POSTS[:]; del GETS[:]
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
         try:
-            rc = lt.live_entry(r, d, c)
+            rc = lt.live_entry(r, d, c, allow_fresh=True)
         except BaseException as e:
             rc = "ended:" + type(e).__name__
     out = buf.getvalue()
@@ -189,6 +189,36 @@ try:
     # bad preflight config values
     r6, d6 = lane(); msg, clean = attempt(cfg(preflight={"allow_fresh": "yes"}), r6, d6); check("allow_fresh must be a bool", msg and clean)
     r7, d7 = lane(); msg, clean = attempt(cfg(preflight={"surprise": 1}), r7, d7); check("unknown preflight key refused", msg and clean)
+    r6, d6 = lane(); msg, clean = attempt(cfg(preflight={"allow_fresh": True}), r6, d6); check("allow_fresh in the config file is refused (CLI only)", msg and clean and not GETS)
+    # allow_fresh is ignored when a minimum is configured, even from the CLI
+    fenced_http.HTTP_LOG_DIR = os.path.join(tmp, "nologs2")
+    r8, d8 = lane(); msg, clean = attempt(cfg(preflight={"expected_min_reserves": 7}), r8, d8, fresh=True)
+    check("--allow-fresh cannot override expected_min_reserves", msg and "unestablished" in msg and clean and not GETS)
+    fenced_http.HTTP_LOG_DIR = saved
+    # unlisted http seats in the roster count toward the planned total
+    r9, d9 = lane(); lt.operator_set_http_seat(r9, "qc", NEM, "u1", 8)
+    msg, clean = attempt(cfg(seats={"coordinator": {"model": NEM, "epoch": "u2", "budget": 1}}, preflight={"anchor_file": anchor_f}), r9, d9)
+    check("roster http seat not in the config counts: planned over remaining refused", msg and "over_cap" in msg and not GETS)
+    # anchor refresh is atomic and keeps the old file when the ledger does not verify
+    before_anchor = open(anchor_f).read()
+    with contextlib.redirect_stdout(io.StringIO()) as o9:
+        lt._refresh_anchor(anchor_f, json.loads(before_anchor), 99)
+    check("anchor kept when expected minimum fails to verify", open(anchor_f).read() == before_anchor)
+    with contextlib.redirect_stdout(io.StringIO()):
+        lt._refresh_anchor(anchor_f, json.loads(before_anchor), None)
+    check("anchor refreshed after a verified read, private mode, no temp left", os.stat(anchor_f).st_mode & 0o777 == 0o600 and not [f for f in os.listdir(cdir) if f.startswith(".anchor-")])
+    # exit codes when the bus is not done: 3 unless a deliberate stop_after left it running
+    MODE["list"] = "ok"
+    fenced_http.HTTP_LOG_DIR = os.path.join(tmp, "nologs3")
+    orig_rg = lt.run_graph; lt.run_graph = lambda *a, **k: None
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            r10, d10 = lane(); rc_a = lt.live_entry(r10, d10, cfg(stop_after=0, preflight={}), allow_fresh=True)
+            r11, d11 = lane(); rc_b = lt.live_entry(r11, d11, cfg(stop_after=1, preflight={}), allow_fresh=True)
+    finally:
+        lt.run_graph = orig_rg; fenced_http.HTTP_LOG_DIR = saved
+    check("bus not done and no deliberate stop (stop_after 0): exit 3", rc_a == 3)
+    check("bus still running after a deliberate stop_after: exit 0", rc_b == 0)
 finally:
     srv.shutdown(); shutil.rmtree(tmp, ignore_errors=True)
 print("\nLIVE ENTRY TESTS:", "ALL CHECKS PASSED" if ok else "FAILURES ABOVE")

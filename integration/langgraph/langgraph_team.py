@@ -1020,7 +1020,7 @@ def verify(repo: str, checkpoint_db: str, thread_id: str,
 # Lifetime budget cannot be created here (fenced_http owns it).
 
 LIVE_CFG_KEYS = {"key_file", "seats", "brief_extra_file", "stop_after", "preflight"}
-LIVE_PREFLIGHT_KEYS = {"anchor_file", "expected_min_reserves", "allow_fresh"}
+LIVE_PREFLIGHT_KEYS = {"anchor_file", "expected_min_reserves"}
 LIVE_SEAT_KEYS = {"model", "epoch", "budget", "max_tokens"}
 
 
@@ -1082,7 +1082,41 @@ def _closeout(repo):
     return 3   # cycle ended but closeout is NOT allowed (quality unproven)
 
 
-def live_entry(repo, db, config_path, thread_id="live-1") -> int:
+def _refresh_anchor(anchor_file, old_anchor, emr):
+    """After a run: if the ledger verifies against the OLD anchor, atomically
+    replace the anchor with a fresh snapshot (temp file in the same private
+    dir, then rename). Any failure keeps the old anchor untouched."""
+    if not anchor_file:
+        return
+    try:
+        import reserve_preflight
+        res = reserve_preflight.preflight(0, anchor=old_anchor, expected_min_reserves=emr)
+        snap = reserve_preflight.snapshot(res)
+        if snap is None:
+            print("live: anchor NOT updated (ledger did not verify); old anchor kept",
+                  flush=True)
+            return
+        d = os.path.dirname(os.path.abspath(anchor_file))
+        import tempfile
+        fd, tmp = tempfile.mkstemp(dir=d, prefix=".anchor-", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                json.dump(snap, fh); fh.flush(); os.fsync(fh.fileno())
+            os.chmod(tmp, 0o600)
+            os.replace(tmp, anchor_file)
+        except BaseException:
+            try: os.unlink(tmp)
+            except OSError: pass
+            raise
+        print(f"live: anchor updated (recorded reserves {snap['reserves']}); "
+              f"set expected_min_reserves to {snap['reserves']} if you want the "
+              f"minimum raised", flush=True)
+    except Exception as exc:
+        print(f"live: anchor NOT updated ({type(exc).__name__}); old anchor kept",
+              flush=True)
+
+
+def live_entry(repo, db, config_path, thread_id="live-1", allow_fresh=False) -> int:
     from launcher.runtime import verify_sandbox_ready
     repo = os.path.abspath(repo)
     roster_path = os.path.join(repo, ".team", "roster.json")
@@ -1148,12 +1182,22 @@ def live_entry(repo, db, config_path, thread_id="live-1") -> int:
     emr = pfc.get("expected_min_reserves")
     if emr is not None and (not isinstance(emr, int) or isinstance(emr, bool) or emr < 0):
         raise SystemExit("refused: expected_min_reserves must be a non-negative int")
-    if pfc.get("allow_fresh") not in (None, True, False):
-        raise SystemExit("refused: allow_fresh must be a bool")
+    if allow_fresh:
+        print("live: WARNING --allow-fresh: operator asserts this is a first run "
+              "with no earlier spend; it is ignored when an anchor or "
+              "expected_min_reserves is configured", flush=True)
     import reserve_preflight
+    # planned = every http seat that will actually run: the configured ones
+    # plus any other http seat already in the roster (source: roster.json)
     planned = sum(sp["call_budget"] for sp in specs.values())
+    for seat, rs in roster["seats"].items():
+        ad = rs.get("adapter") or {}
+        if seat not in specs and ad.get("type") == "http":
+            if not isinstance(ad.get("call_budget"), int) or isinstance(ad.get("call_budget"), bool):
+                raise SystemExit(f"refused: roster seat {seat!r} is http with an unreadable budget")
+            planned += ad["call_budget"]
     pf = reserve_preflight.preflight(planned, anchor=anchor,
-                                     allow_fresh=bool(pfc.get("allow_fresh")),
+                                     allow_fresh=bool(allow_fresh),
                                      expected_min_reserves=emr)
     print(f"live: reserve preflight status={pf['status']} planned={planned} "
           f"recorded_reserves={pf['reserves_total']} remaining={pf['remaining']} "
@@ -1185,11 +1229,13 @@ def live_entry(repo, db, config_path, thread_id="live-1") -> int:
         run_graph(repo, db, stop_after, thread_id)
     finally:
         os.environ.pop(HTTP_KEY_ENV, None)
+        _refresh_anchor(pfc.get("anchor_file"), anchor, emr)
     bus_state = Bus(repo, BRANCH).state().get("status")
     if bus_state != "done":
         print(f"live: run stopped with bus status {bus_state!r}; no closeout evaluated",
               flush=True)
-        return 0
+        # 0 only for a deliberate graceful stop that left the run resumable
+        return 0 if (stop_after and bus_state == "running") else 3
     return _closeout(repo)
 
 
@@ -1216,8 +1262,10 @@ def status_cmd(argv) -> int:
 
 def main(argv) -> int:
     if len(argv) > 4 and argv[1] == "live":
+        rest = [a for a in argv[5:] if a != "--allow-fresh"]
         return live_entry(argv[2], argv[3], argv[4],
-                          argv[5] if len(argv) > 5 else "live-1")
+                          rest[0] if rest else "live-1",
+                          allow_fresh="--allow-fresh" in argv[5:])
     if len(argv) > 2 and argv[1] == "status":
         return status_cmd(argv[2:])
     phase, repo, db = argv[1], argv[2], argv[3]

@@ -3,7 +3,21 @@
   "brief_extra_file": "/OPERATOR/PRIVATE/brief_rules.md",
   "stop_after": 2,
   "seats": {
-    "builder":     {"model": "nvidia/nemotron-3-ultra-550b-a55b", "epoch": "b1", "budget": 1, "max_tokens": 6000},
-    "reviewer":    {"model": "novita/ling-3.1-flash",             "epoch": "r1", "budget": 1, "max_tokens": 6000}
+    "coordinator": {
+      "model": "nvidia/nemotron-3-ultra-550b-a55b",
+      "epoch": "c1",
+      "budget": 1,
+      "max_tokens": 6000
+    },
+    "reviewer": {
+      "model": "novita/ling-3.1-flash",
+      "epoch": "r1",
+      "budget": 1,
+      "max_tokens": 6000
+    }
+  },
+  "preflight": {
+    "anchor_file": "/OPERATOR/PRIVATE/reserve_anchor.json",
+    "expected_min_reserves": 0
   }
 }
