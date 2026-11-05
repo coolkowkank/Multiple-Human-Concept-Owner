@@ -727,6 +727,23 @@ def pick(queue):
     return None
 
 
+def input_snapshot(q, role, model):
+    """sha256 of everything a provider call depended on: item identity,
+    status, role, model, lineage, claims, packet, author and the feedback
+    that goes into the prompt. A result is applied only if this is
+    unchanged when it comes back. Unrelated items do not enter it."""
+    import hashlib
+    body = {"id": q.get("id"), "kind": q.get("kind"),
+            "status": q.get("status"), "role": role, "model": model,
+            "lineage": lineage_of(q), "question": q.get("question"),
+            "findings": q.get("findings"), "packet": q.get("packet"),
+            "author_model": q.get("author_model"),
+            "feedback": q.get("feedback"),
+            "fb": q.get("fb_" + role)}
+    return hashlib.sha256(json.dumps(body, sort_keys=True,
+                                     ensure_ascii=True).encode()).hexdigest()
+
+
 def step(root, post, list_models, now, record):
     """One step. post(model, system, prompt, max_tokens) ->
     {'kind': 'ok'|'http'|'unknown', 'code': int, 'content': str,
@@ -810,6 +827,7 @@ def step(root, post, list_models, now, record):
                       "qid": qid, "role": role, "model": model,
                       "lineage": lineage_of(q), "work_fp": work_fp(q)})
         q["attempts"][role] = q["attempts"].get(role, 0) + 1
+        snap = input_snapshot(q, role, model)
         store.save_queue(queue)
         n = q["attempts"][role]
     res = post(model, system, prompt, CEILINGS[role], effort=EFFORT[role])
@@ -825,6 +843,23 @@ def step(root, post, list_models, now, record):
                           "reason": "queue entry %s vanished mid-flight; "
                           "result kept in runs/, explicit recovery" % qid})
             raise Halt("queue entry vanished mid-flight")
+        try:
+            cur = (load_eva_assignment(root) if q.get("kind") == "verify"
+                   else load_assignments(root))
+            cur_model = (cur or {}).get("models", {}).get(
+                "eva" if q.get("kind") == "verify" else role)
+        except Exception:
+            cur_model = None
+        if input_snapshot(q, role, model) != snap or cur_model != model:
+            # Raw result stays in runs/ for audit; it is never applied to
+            # an item whose input, status, role, identity or assignment
+            # changed (hold, supersession, claim edit) during the call.
+            store.append({"phase": "stale-result", "ts": iso(now),
+                          "rid": rid, "qid": qid, "role": role,
+                          "reason": "item, status or assignment changed "
+                          "during the call; result not applied"})
+            return {"action": "stale-result-not-applied", "qid": qid,
+                    "role": role, "status": q.get("status"), "calls": 1}
         try:
             obj = strict_json(res["content"])
             bad = precheck(role, q, obj)
