@@ -186,6 +186,12 @@ class FencedHttpAdapter(Adapter):
                        "status": code, "class": cls, "usage": usage,
                        "cost_zero": bool(cost_known_zero)}
             self._append(fh, outcome)
+            if code == 200 and usage is not None:
+                # the request happened and the provider reported usage:
+                # keep that evidence even if the reply is unusable or the
+                # cost check below halts (never reads as "no call")
+                self.last_call = {"origin": "provider", "response_id": None,
+                                  "usage": usage}
             if code == 200 and not cost_known_zero:
                 self._append(fh, {"phase": "halt", "n": n,
                                   "why": "cost missing or nonzero"})

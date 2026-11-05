@@ -151,6 +151,23 @@ def adapter_tests():
         a2 = mk(base, "m1")   # simulated restart: fresh object, same log
         check("malformed 200: reserve+result written, count survives restart",
               n == 2 and a2.call_budget == 2 and reserves(d) == 2)
+        _saved_dir = fenced_http.HTTP_LOG_DIR
+        fenced_http.HTTP_LOG_DIR = os.path.join(tmp, "logs-lastcall")
+        MODE.update(kind="ok", content="", cost=0)
+        a3 = mk(base, "lc1"); e = tryc(a3)
+        check("200 with usage but empty content: error AND usage evidence kept",
+              e is not None and a3.last_call is not None
+              and a3.last_call["usage"]["prompt_tokens"] == 1)
+        MODE.update(kind="malformed200")
+        a4 = mk(base, "lc2"); e = tryc(a4)
+        check("malformed 200 (no usage): last_call stays None",
+              e is not None and a4.last_call is None)
+        fenced_http.HTTP_LOG_DIR = os.path.join(tmp, "logs-lastcall2")
+        MODE.update(kind="ok", content="not structured", cost=0.5)
+        a5 = mk(base, "lc3"); e = tryc(a5)
+        check("nonzero cost halts and still keeps usage evidence",
+              e is not None and a5.last_call is not None)
+        fenced_http.HTTP_LOG_DIR = _saved_dir
         MODE.update(kind="slow")
         e = tryc(mk(base, "s1", timeout=1))
         check("read timeout: attempt stays counted", e is not None)
