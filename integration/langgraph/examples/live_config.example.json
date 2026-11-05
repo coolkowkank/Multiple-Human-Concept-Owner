@@ -18,6 +18,6 @@
   },
   "preflight": {
     "anchor_file": "/OPERATOR/PRIVATE/reserve_anchor.json",
-    "expected_min_reserves": 0
+    "expected_min_reserves": "REPLACE-WITH-YOUR-LAST-VERIFIED-RESERVE-COUNT-AS-AN-INTEGER"
   }
 }

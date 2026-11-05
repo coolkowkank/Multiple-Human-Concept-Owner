@@ -1173,12 +1173,25 @@ def live_entry(repo, db, config_path, thread_id="live-1", allow_fresh=False) -> 
         raise SystemExit("refused: preflight keys must be a subset of "
                          f"{sorted(LIVE_PREFLIGHT_KEYS)}")
     anchor = None
-    if pfc.get("anchor_file"):
-        if (os.path.realpath(pfc["anchor_file"]) + os.sep).startswith(lane):
+    if "anchor_file" in pfc:
+        af = pfc["anchor_file"]
+        # A configured anchor must load as a real snapshot or the entry
+        # refuses: null / "" / non-object / wrong schema would otherwise
+        # read as "no anchor" and silently drop the truncation check.
+        if not isinstance(af, str) or not af or "\x00" in af:
+            raise SystemExit("refused: preflight.anchor_file must be a non-empty path string")
+        if (os.path.realpath(af) + os.sep).startswith(lane):
             raise SystemExit("refused: anchor_file must be outside the lane")
-        _private_regular(pfc["anchor_file"], "anchor_file")
-        with open(pfc["anchor_file"], encoding="utf-8") as fh:
-            anchor = json.load(fh)
+        try:
+            _private_regular(af, "anchor_file")
+            with open(af, encoding="utf-8") as fh:
+                anchor = json.load(fh)
+        except (OSError, ValueError):
+            raise SystemExit("refused: anchor_file is missing, unreadable or not JSON") from None
+        import reserve_preflight as _rp
+        if (not isinstance(anchor, dict) or anchor.get("schema") != _rp.SCHEMA
+                or not isinstance(anchor.get("files"), dict) or not anchor["files"]):
+            raise SystemExit("refused: anchor_file is not a reserve-preflight/v1 snapshot object")
     emr = pfc.get("expected_min_reserves")
     if emr is not None and (not isinstance(emr, int) or isinstance(emr, bool) or emr < 0):
         raise SystemExit("refused: expected_min_reserves must be a non-negative int")
@@ -1261,6 +1274,14 @@ def status_cmd(argv) -> int:
 
 
 def main(argv) -> int:
+    if len(argv) > 1 and argv[1] == "live" and len(argv) < 5:
+        print("usage: langgraph_team.py live LANE DB CONFIG [THREAD] [--allow-fresh]",
+              file=sys.stderr)
+        return 2
+    if len(argv) < 4 and not (len(argv) > 2 and argv[1] == "status"):
+        print("usage: langgraph_team.py init|init-http|run|verify|live|status ... "
+              "(see OPERATOR_GUIDE.md)", file=sys.stderr)
+        return 2
     if len(argv) > 4 and argv[1] == "live":
         rest = [a for a in argv[5:] if a != "--allow-fresh"]
         return live_entry(argv[2], argv[3], argv[4],
@@ -1276,6 +1297,10 @@ def main(argv) -> int:
         init_repo(repo)
         return 0
     if phase == "init-http":
+        if len(argv) < 7:
+            print("usage: langgraph_team.py init-http REPO DB SEAT MODEL LOG_EPOCH",
+                  file=sys.stderr)
+            return 2
         seat, model, usage_log = argv[4], argv[5], argv[6]
         init_repo(repo, http_seats={seat: {
             "type": "http", "base_url": HTTP_FREE_BASE, "model": model,

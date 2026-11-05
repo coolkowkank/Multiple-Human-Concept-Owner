@@ -185,6 +185,36 @@ try:
     open(lf, "w").write("".join(lines[:-1]))
     r5, d5 = lane(); msg, clean = attempt(cfg(preflight={"anchor_file": anchor_f}), r5, d5)
     check("truncated log vs anchor refused, no request", msg and "refuse" in msg and clean and not GETS)
+    # tail truncation is STILL in place here: a null/blank/malformed anchor must refuse,
+    # never read as "no anchor" (which would pass the truncated ledger)
+    def anchor_variant(name, content, af=None):
+        if af is None:
+            af = os.path.join(cdir, name + ".json")
+            open(af, "w").write(content); os.chmod(af, 0o600)
+        rr, dd = lane()
+        m, cl = attempt(cfg(preflight={"anchor_file": af, "expected_min_reserves": 1}), rr, dd)
+        check(f"anchor_file {name}: clean refusal before any request/roster write",
+              m and "refused" in m and cl and not GETS)
+    anchor_variant("JSON null", "null")
+    anchor_variant("JSON list", "[]")
+    anchor_variant("JSON string", '"x"')
+    anchor_variant("empty object", "{}")
+    anchor_variant("wrong schema", json.dumps({"schema": "x", "files": {"a": 1}}))
+    anchor_variant("empty files", json.dumps({"schema": rp.SCHEMA, "files": {}}))
+    anchor_variant("not JSON", "{oops")
+    anchor_variant("missing file", None, af=os.path.join(cdir, "nope.json"))
+    for nm, val in (("null value", None), ("empty string", ""), ("number", 0), ("list", [])):
+        rr, dd = lane()
+        m, cl = attempt(cfg(preflight={"anchor_file": val}), rr, dd)
+        check(f"preflight.anchor_file {nm}: refused (not silently ignored)", m and "refused" in m and cl and not GETS)
+    rr, dd = lane()
+    m, cl = attempt(cfg(preflight={"anchor_file": anchor_f}), rr, dd)
+    check("valid anchor + truncated log: refused (control)", m and cl and not GETS)
+    for argv in (["x", "live"], ["x", "live", "a", "b"], ["x"], ["x", "init-http", "r", "d"], ["x", "run"]):
+        with contextlib.redirect_stderr(io.StringIO()):
+            try: rc = lt.main(argv)
+            except BaseException as e: rc = repr(e)
+        check(f"CLI {argv[1:]} missing args: usage exit 2, no traceback", rc == 2)
     open(lf, "w").write("".join(lines))
     # bad preflight config values
     r6, d6 = lane(); msg, clean = attempt(cfg(preflight={"allow_fresh": "yes"}), r6, d6); check("allow_fresh must be a bool", msg and clean)
