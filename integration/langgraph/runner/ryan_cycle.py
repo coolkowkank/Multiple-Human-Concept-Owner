@@ -54,7 +54,11 @@ CANDIDATES = {
 }
 BLOCKED_STATUS = ("not-qualified", "uncallable", "capped", "cooldown")
 ROLES = ("researcher", "verifier", "ryan")
-CEILINGS = {"researcher": 2048, "verifier": 1536, "ryan": 2048}
+# verifier 1536 -> 4096 (operator ordinary bounded config, 2026-11-05):
+# the 1536 ceiling produced empty/truncated output twice; both reasoning
+# tokens and content count against max_tokens. Listing max output for the
+# candidate models is 32768/65536, so 4096 stays far inside it.
+CEILINGS = {"researcher": 2048, "verifier": 4096, "ryan": 2048}
 # per-role reasoning_effort (docs.requesty.ai/features/reasoning lists
 # none|min|low|medium|high; whether a given route accepts a value is
 # unknown until used - an unsupported field halts, there is no fallback).
@@ -62,8 +66,10 @@ EFFORT = {"researcher": "low", "verifier": "none", "ryan": "low"}
 EFFORT_VALUES = ("none", "min", "low", "medium", "high")
 ROLE_CAP = {"researcher": 2, "verifier": 2, "ryan": 2}  # per question
 QUESTION_BUDGET = 5  # <= 5 requests per question; clean path = 3
-ENVELOPE_TOTAL = 6   # first-qualification envelope: ALL reserves ever (incl.
-                     # the allocation attempt); raising it is an operator edit
+ENVELOPE_TOTAL = 7   # envelope: ALL reserves ever (incl. the allocation
+                     # attempt). 6 -> 7 = 4 historic + at most 3 new
+                     # requests (operator edit, 2026-11-05). The historic
+                     # ledger is never reset or rewritten.
 DAILY_CAP = 24      # 4 cycles x 6 requests, all three roles combined
 CYCLES_PER_DAY = 4
 SPACING_S = 10
@@ -970,12 +976,82 @@ def allowance_done(store, aid, rid, role, now):
                       "allowance": aid, "rid": rid, "role": role})
 
 
-def step(root, post, list_models, now, record, clock=None):
+def _active_halt(led):
+    halts = [e for e in led if e["phase"] == "halt"]
+    cleared = [e for e in led if e["phase"] == "cleared"]
+    if not halts:
+        return None
+    if cleared and led.index(halts[-1]) < led.index(cleared[-1]):
+        return None
+    return halts[-1]
+
+
+def _io_boundary(root, store, rid, qid, role, model, snap, aid, listing,
+                 now, clock, is_verify):
+    """'' when the request may be sent, else a short reason. Runs under
+    the store lock, reading CURRENT state: ledger, queue, assignments,
+    grant. Nothing here trusts what step() read before the reserve."""
+    try:
+        with store.lock():
+            led = store.ledger()
+            h = _active_halt(led)
+            if h is not None:
+                return "halted: " + str(h.get("reason"))[:120]
+            mine = [e for e in led if e.get("phase") == "reserved"
+                    and e.get("rid") == rid]
+            if len(mine) != 1 or mine[0].get("model") != model \
+                    or mine[0].get("qid") != qid \
+                    or mine[0].get("role") != role:
+                return "own reserve line missing or changed"
+            if any(e.get("rid") == rid and e.get("phase") == "result"
+                   for e in led):
+                return "reserve already has a result"
+            if aid and any(e.get("phase") == "allowance-stop"
+                           and e.get("allowance") == aid for e in led):
+                return "allowance stopped"
+            queue = store.queue()
+            q = next((x for x in queue["questions"] if x["id"] == qid),
+                     None)
+            if q is None:
+                return "queue entry vanished"
+            cur = (load_eva_assignment(root) if q.get("kind") == "verify"
+                   else load_assignments(root))
+            cur_model = ((cur or {}).get("models") or {}).get(
+                "eva" if q.get("kind") == "verify" else role)
+            if (cur or {}).get("decided_by") != OPERATOR \
+                    or cur_model != model:
+                return "assignment authority or model changed"
+            gnow = grant_digest_now(root, store, q, aid, clock()) \
+                if aid else None
+            if aid and gnow is None:
+                return "grant missing, expired or invalid"
+            sysm = "You are the %s in a source-bound review pipeline." % role
+            snow = input_snapshot(q, role, model, sysm,
+                                  build_prompt(role, q),
+                                  {"a": cur, "g": gnow})
+            if snow != snap:
+                return "item, prompt or assignment changed after reserve"
+            if not mr.price_zero(listing, model):
+                return "model not price-0 in the listing"
+            if not listing_fresh(listing, clock()):
+                return "listing not fresh at the actual clock"
+    except Exception as e:
+        return "boundary check failed closed: %s" % type(e).__name__
+    return ""
+
+
+def step(root, post, list_models, now, record, clock=None, before_io=None):
     """One step. post(model, system, prompt, max_tokens) ->
     {'kind': 'ok'|'http'|'unknown', 'code': int, 'content': str,
      'usage': dict}. RECORD is the route record (model-availability).
     Gate+reserve+queue write are one locked transaction; the lock is not
-    held across the request. Returns a dict describing what happened."""
+    held across the request. Immediately before network I/O the step
+    re-validates (under the store lock) halt/stop state, its own reserve
+    line, operator assignment, the rendered-input snapshot, the grant
+    and the price-0 listing fact; any change means NO request is sent
+    (result outcome not_sent + halt; the reserve stays consumed).
+    before_io is a test seam only: called after the reserve and before
+    that boundary check. Returns a dict describing what happened."""
     store = Store(root)
     with store.lock():
         queue = store.queue()
@@ -1070,8 +1146,26 @@ def step(root, post, list_models, now, record, clock=None):
                               {"a": assign, "g": gdig})
         store.save_queue(queue)
         n = q["attempts"][role]
-    res = post(model, system, prompt, CEILINGS[role], effort=EFFORT[role])
     clock = clock or time.time
+    if before_io is not None:
+        before_io()
+    refuse = _io_boundary(root, store, rid, qid, role, model, snap, aid,
+                          listing, now, clock, is_verify)
+    if refuse:
+        with store.lock():
+            store.append({"phase": "result", "rid": rid, "ts": iso(now),
+                          "qid": qid, "role": role, "model": model,
+                          "outcome": "not_sent", "usage": None,
+                          "diag": {"stage": "pre-io-boundary",
+                                   "class": "refused"}})
+            store.append({"phase": "halt", "ts": iso(now),
+                          "reason": "pre-I/O boundary refused %s: %s"
+                                    % (rid, refuse)})
+            allowance_stop(store, aid, now, "pre-I/O refused " + rid,
+                           kind="stale")
+        return {"action": "pre-io-refused", "qid": qid, "role": role,
+                "reason": refuse, "calls": 0}
+    res = post(model, system, prompt, CEILINGS[role], effort=EFFORT[role])
     with store.lock():
         try:
             out = settle(store, rid, qid, role, model, res, now)
@@ -1457,7 +1551,7 @@ def cost_signal(usage_raw):
 def raw_usage(raw):
     try:
         d = json.loads(raw)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, RecursionError, MemoryError):
         return None
     u = d.get("usage") if isinstance(d, dict) else None
     return u if isinstance(u, dict) else None
