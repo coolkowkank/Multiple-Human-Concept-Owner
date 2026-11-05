@@ -21,6 +21,7 @@ import time
 
 from .bus import Bus
 from .runtime import EXIT_TORN_STATE
+from .bus import EXIT_PUSH_UNKNOWN
 from . import liveness
 
 
@@ -161,6 +162,12 @@ class Supervisor:
                 del self.procs[name]
                 self._note_blocked(name, "refused to start on uncommitted "
                                    "coordination state (exit %d)" % EXIT_TORN_STATE)
+        for name, rc in snap.items():
+            if rc == EXIT_PUSH_UNKNOWN and name in self.procs:
+                del self.procs[name]
+                print(f"[push-unknown] seat {name} stopped: its commit is kept "
+                      "locally and may have landed. Not restarted, nothing "
+                      "written. Check the remote, then relaunch.", flush=True)
         for name, rc in snap.items():
             proc = self.procs.get(name)
             if proc is None:

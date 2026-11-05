@@ -9,7 +9,7 @@ import subprocess
 import sys
 
 from .adapters import MockAdapter
-from .bus import Bus, BusError
+from .bus import Bus, BusError, BusPushUnknown, EXIT_PUSH_UNKNOWN
 from .runtime import Seat
 from .supervisor import Supervisor
 
@@ -75,6 +75,12 @@ def cmd_seat(args):
         print(f"{args.name}: BLOCKED ({exc.code}): {exc}", file=sys.stderr,
               flush=True)
         raise SystemExit(EXIT_TORN_STATE)
+    except BusPushUnknown as exc:
+        print(f"{args.name}: STOPPED (push_outcome_unknown): the turn commit "
+              "is kept locally and may have landed. Not restarted, not "
+              "retried. Check the remote before relaunching.",
+              file=sys.stderr, flush=True)
+        raise SystemExit(EXIT_PUSH_UNKNOWN)
 
 
 def unbounded_http_seats(repo, branch):
@@ -131,6 +137,14 @@ def cmd_answer(args):
                            [".team/gates/ANSWERS.jsonl"],
                            lambda: bus.answer_gate(args.gate_id,
                                                    args.answer))
+    except BusPushUnknown:
+        # The answer commit is KEPT locally and may have landed: do NOT
+        # restore the snapshot (that would leave the worktree different from
+        # HEAD and a later commit could undo the answer).
+        print(f"answer for gate {args.gate_id} is committed locally; the push "
+              "outcome is unknown. Do not repeat it. Check the remote.",
+              file=sys.stderr)
+        raise
     except Exception:
         if snapshot is not None:
             with open(answers, "w") as fh:
@@ -233,6 +247,11 @@ def cmd_lease(args):
             bus.transact_paths(
                 f"operator: lease released for {args.name} (holder {seen})",
                 [STATE], mutate)
+    except BusPushUnknown:
+        print(f"lease release for {args.name} is committed locally; the push "
+              "outcome is unknown. Do not repeat it. Check the remote.",
+              file=sys.stderr)
+        sys.exit(EXIT_PUSH_UNKNOWN)
     except BusError as exc:
         refuse(f"release not committed: {str(exc)[:300]}")
     print(f"released lease {args.name} (was {seen}); re-queue any queued "
