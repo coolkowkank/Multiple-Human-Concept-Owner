@@ -118,7 +118,14 @@ IMMEDIATELY before acting:
    check under the action lock. COMMITTED changes stay permitted:
    committed reads and the queue-binding staleness checks handle them,
    and mid-turn queue commits are ordinary operation. Unrelated files
-   elsewhere in the repo do not block a turn.
+   elsewhere in the repo do not block a turn. On top of that, a
+   committed-context digest (brief bytes + the seat's FULL roster
+   spec) is captured at construction and re-compared at every
+   boundary: a committed brief edit with no instruction_seq bump or a
+   committed spec change (e.g. allowed_paths emptied) mid-call refuses
+   the stale response, because the seat still holds the OLD prompt and
+   adapter. Queue files are exempt from the digest - the `_queue`
+   binding checks own queue staleness.
 5. Refusals (including `SeatError` from the project's own stale/lease/
    verify machinery) are recorded and route to the terminal node, never
    swallowed.
