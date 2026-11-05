@@ -463,6 +463,35 @@ def operator_update_instructions(repo: str, text: str,
     return c["instruction_seq"]
 
 
+def operator_set_http_seat(repo: str, seat: str, model: str, epoch: str,
+                           budget: int, max_tokens: int = 6000) -> None:
+    """Operator roster commit: make `seat` a fenced http seat. The spec is
+    the exact shape _http_spec_refusal accepts (validated here too); the
+    lifetime cap and log identity live in fenced_http, so this cannot
+    create budget. Seat-only: other seats are untouched."""
+    repo = os.path.abspath(repo)
+    spec = {"type": "http", "base_url": HTTP_FREE_BASE, "model": model,
+            "api_key_env": HTTP_KEY_ENV, "require_zero_cost": True,
+            "call_budget": budget, "max_tokens": max_tokens, "timeout": 280,
+            "reasoning_effort": "low", "log_epoch": epoch,
+            "usage_log": fenced_http.log_path(model, epoch)}
+    why = _http_spec_refusal({"adapter": spec}, repo)
+    if why:
+        raise SystemExit(f"refused: {why}")
+
+    def mutate():
+        path = os.path.join(repo, ".team", "roster.json")
+        with open(path) as fh:
+            roster = json.load(fh)
+        roster["seats"][seat]["adapter"] = spec
+        with open(path, "w") as fh:
+            json.dump(roster, fh, indent=2)
+
+    _operator_transact(repo, f"operator: seat {seat} -> fenced http "
+                             f"({model}, epoch {epoch}, budget {budget})",
+                       [".team/roster.json"], mutate)
+
+
 def operator_assign(repo: str, brief: str, seat: str,
                     note="new assignment") -> None:
     """Assign new work: fresh brief, turn to the named seat, team back to
