@@ -183,9 +183,10 @@ if art:
 
 # ---- automatic operator-owned finalization (offline, PUBLIC test checker) ----
 cdir = tempfile.mkdtemp(dir=tmp); os.chmod(cdir, 0o700)
+# PLUMBING-ONLY checker (in-process import of the candidate; unsafe against hostile code, see README)
 chk = os.path.join(cdir, "chk.py")
 open(chk, "w").write("""import sys, os, json
-# public test checker: refuses if the parent's env leaked into the child
+# PLUMBING-ONLY public test checker: imports the candidate IN-PROCESS, so it is NOT safe against a hostile candidate (see README). It tests config/sandbox/signing/record handling, not quality.
 leaked = any(k.startswith("LG_") or "KEY" in k.upper() for k in os.environ)
 ns = {}; exec(open(os.path.join(sys.argv[-1], "src/app.py")).read(), ns)
 ok = (not leaked) and all(ns["add"](a, b) == a + b for a, b in [(0, 0), (-5, 2), (3, -3)])
