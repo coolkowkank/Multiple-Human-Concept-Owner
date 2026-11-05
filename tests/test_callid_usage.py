@@ -56,6 +56,13 @@ class T(unittest.TestCase):
         with mock.patch('urllib.request.urlopen', return_value=Resp({"choices": []})):
             with self.assertRaises(Exception):
                 a.complete('s', 'p')
+        # the call happened (JSON body returned): evidence is THIS response's, never the stale one
+        self.assertNotIn('stale', a.last_call)
+        self.assertIsNone(a.last_call['usage'])
+        a.last_call = {'stale': 1}
+        with mock.patch('urllib.request.urlopen', side_effect=OSError('x')):
+            with self.assertRaises(Exception):
+                a.complete('s', 'p')
         self.assertIsNone(a.last_call)
 
     def test_audit_row_has_hash_not_raw_id(self):

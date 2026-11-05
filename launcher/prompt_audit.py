@@ -151,8 +151,14 @@ class PromptAuditAdapter:
             result = self.inner.complete(system, prompt)
         except Exception as exc:
             try:
-                self._record(dict(event='adapter_call_error', call_id=call_id,
-                                  error_type=type(exc).__name__))
+                row = dict(event='adapter_call_error', call_id=call_id,
+                           error_type=type(exc).__name__)
+                evidence = (reported_call_evidence(getattr(self.inner, 'last_call', None))
+                            if getattr(type(self.inner), 'REPORTS_PROVIDER_USAGE', False) is True
+                            else None)
+                if evidence is not None:
+                    row['reported'] = evidence  # call returned but output failed later
+                self._record(row)
             except Exception as audit_exc:
                 # Preserve the adapter exception as the raised failure. The
                 # failed audit write is its cause, never a replacement verdict.

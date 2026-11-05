@@ -291,11 +291,12 @@ class HttpAdapter(Adapter):
         data = self._post(req)
         # Provider-REPORTED fields of the last successful response (raw, kept in
         # memory only). Reported, not verified; consumers must sanitize.
-        text = data["choices"][0]["message"]["content"]
-        result = parse_response(text)
+        # The request returned a JSON body, so the call happened and may be
+        # billed: keep reported fields even if the text below fails to parse.
         self.last_call = {"origin": "provider", "response_id": data.get("id"),
                           "usage": data.get("usage")}
-        return result
+        text = data["choices"][0]["message"]["content"]
+        return parse_response(text)
 
     def _record(self, attempt, outcome, usage=None, response_id=None):
         if not self.usage_log:

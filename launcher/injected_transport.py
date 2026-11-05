@@ -17,10 +17,10 @@ from .adapters import Adapter, AdapterError, parse_response
 
 
 class InjectedTransportAdapter(Adapter):
-    # Class-level capability checked by PromptAuditAdapter. Set only because this
-    # class maps a real transport result; it is meaningful only when the injected
-    # callable is a real provider transport, which the caller must guarantee.
-    REPORTS_PROVIDER_USAGE = True
+    # Default class never claims provider origin: an injected callable is
+    # untrusted (it may be a fake). Use ProviderInjectedTransportAdapter with an
+    # explicit trust binding for a real provider transport.
+    REPORTS_PROVIDER_USAGE = False
 
     def __init__(self, transport):
         if not callable(transport):
@@ -38,7 +38,23 @@ class InjectedTransportAdapter(Adapter):
         content = result.get('content')
         if not isinstance(content, str):
             raise AdapterError('transport ok result has no text content')
-        parsed = parse_response(content)
+        # The transport returned ok, so the call happened (and may be billed):
+        # keep its reported usage even if the text then fails to parse.
         self.last_call = {'origin': 'provider', 'response_id': None,
                           'usage': result.get('usage')}
-        return parsed
+        return parse_response(content)
+
+
+class ProviderInjectedTransportAdapter(InjectedTransportAdapter):
+    """Same mapping, class-level provider capability, explicit trust binding.
+
+    The caller asserts, in wiring code that a reviewer can see, that `transport`
+    is a real provider transport (not a fake). This class cannot verify that.
+    """
+    REPORTS_PROVIDER_USAGE = True
+
+    def __init__(self, transport, *, trust_provider_transport=False):
+        if trust_provider_transport is not True:
+            raise AdapterError('trust_provider_transport=True required (explicit '
+                               'binding that the callable is a real provider transport)')
+        super().__init__(transport)

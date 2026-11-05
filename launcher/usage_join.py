@@ -51,7 +51,7 @@ def usage_from_audit(audit_rows):
     out = []
     audit_rows, _ = _rows(audit_rows)
     for r in audit_rows:
-        rep = r.get('reported') if r.get('event') == 'adapter_call_returned' else None
+        rep = r.get('reported') if r.get('event') in TERMINAL else None
         if not isinstance(rep, dict) or rep.get('origin') != 'provider':
             continue
         u, rid = rep.get('reported_usage'), rep.get('response_id_sha256')
