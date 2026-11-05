@@ -77,9 +77,15 @@ publication and freezes the root.
 2. Preflight BEFORE any reserve: key env present; assignments parse
    with decided_by == the runner's OPERATOR constant; every assigned
    model in the run allowlist (subset of FREE_IDS with an evidenced
-   listing ceiling); routes working + price-0; listing fresh at the
-   actual clock. Preflight failure raises with the ledger untouched
-   (tested byte-identical).
+   listing ceiling); listing fresh at the actual clock; and, for the
+   ACTUAL next_action role's model only (the runner's own pick +
+   next_action selection), a recorded non-blocked route with a
+   non-blocked provider and exact price-0. An "untested" route is
+   passed through AS untested - the bounded run IS its qualification -
+   never relabeled "working"; any other non-working status, a blocked
+   provider, or an unrecorded id refuses. Inactive assigned roles do
+   not gate the step. Preflight failure raises with the ledger
+   untouched (tested byte-identical).
 3. Reviewed-transport identity: the post callable is constructed ONLY
    from the vendored, md5-pinned requesty_transport module. Callers
    cannot inject a factory into the live path; a tampered vendored
@@ -87,10 +93,20 @@ publication and freezes the root.
 4. Settle normalization: any exception escaping rc.step after the
    reserve (the transport raises only for local pre-I/O refusals, e.g.
    a key that vanishes between preflight and post) leaves no dangling
-   reserve - the driver settles every orphaned reserve as outcome
-   unknown via the runner's own settle(), which appends the halt
-   (tested: exactly one unknown result + halt; the halt is durable and
-   a later step reserves and sends nothing).
+   reserve - the driver settles ONLY this invocation's own newly
+   created reserves (pre-step reserve snapshot; historical or
+   concurrent reserves are never touched) as outcome unknown via the
+   runner's own settle(), which appends the halt (tested: exactly one
+   unknown result + halt; the halt is durable and a later step
+   reserves and sends nothing; a pre-existing historical orphan is
+   left untouched and blocks the run via the runner's own gate).
+   Paused-path accounting is evidence-driven, never a blanket number:
+   the reason is the allowlisted exception CLASS ONLY (exception text
+   can carry secrets/raw prompt - tested with a secret-bearing
+   RuntimeError), and calls/io_attempted come from the ledger:
+   runner-settled result lines say exactly (not_sent = no I/O;
+   unknown/http_* = one attempt), a driver-settled dangling reserve is
+   io "unknown" counted conservatively as 1, no new reserve is 0.
 5. The step runs through the ACTUAL compiled LangGraph
    (build_live_runner_graph, one node, no checkpointer - no resume
    claim), satisfying the requirement that the bounded run is driven
@@ -115,7 +131,7 @@ ledger debits, enforced by the runner - not anything in-process here.
 
 ## Offline test evidence (round 9, this head - no network, dummy key)
 
-8/8 driver probes pass: md5 pins load/tamper-refused; key-missing and
+12/12 driver probes pass (round 9b, reviewer-corrected): md5 pins load/tamper-refused; key-missing and
 config-fail (allowlist, authority, stale listing) raise pre-ledger with
 the ledger byte-identical; post-reserve transport raise settles exactly
 one unknown + halt; the compiled graph completes a verifier window
