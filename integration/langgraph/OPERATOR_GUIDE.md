@@ -287,3 +287,86 @@ Supervised seats share one worktree. A seat writes its handoff to the worktree i
 Limits: files outside `artifact_paths` can change and stay pinned; check-then-read is not TOCTOU-hardened; `record_ok` is shape only; a reviewer seat name is a claim; same-model review is not independent.
 
 Queue-assisted lanes: the operator's "response queued" commit sits between the reviewed commit and the reviewer turn, and a null-verify reviewer response has no own verify run. In the RW2 lane the report was therefore `not_pinned` for both. The check does not accept a queue commit in between; that would be a separate reviewed change.
+
+## Runner roles through the shared fence (source candidate, no live use)
+
+`runner_lane.FencedRunner` + `live_runner_step` let the Ryan runner roles
+(researcher, verifier, ryan) make a request ONLY through the shared
+fenced adapter: reserve-before-I/O, hash chain, shared halt and
+`HTTP_LIFETIME_CAP` (8) in `~/.lg-http-usage`. `ryan_cycle.http_post_factory`
+is not used (a test checks the lane never references it). The vendored
+runner is unchanged (md5 pin intact). Nothing here calls a real provider;
+the shipped lane `post` is still the refusing one.
+
+Flow: the runner reserves (its ledger) -> its `before_io` seam calls the
+lane gate, which makes the SHARED reserve (`adapter.reserve()`, same
+checks and lock as `complete()`: key, chain, halt, cap, allowlist) ->
+the runner's pre-I/O boundary -> `post` executes only against that
+reservation (`adapter.execute(token)`). If the gate cannot reserve, no shared
+reserve exists, so it writes a runner halt and the runner's own boundary
+records a factual `not_sent`. The runner reserve stays consumed (one
+runner envelope slot burned with no request); preflight reduces but does
+not remove that.
+
+Two histories, both kept, neither rewritten:
+- Runner ledger (`docs/team/ryan/ledger.jsonl`, envelope `ENVELOPE_TOTAL`,
+  own halt/allowance state): 6 historical reserves, made through the
+  independent path, so NOT in the shared 8.
+- Shared fenced log: 8 of 8 reserves consumed.
+A new runner request counts in BOTH (one runner reserve, one shared
+reserve); either refusing stops it. They are different counters, not 8
+requests in total. No cap, envelope or halt is changed by this code.
+
+Outcomes: raw HTTP 200 with content and explicit zero cost = `ok`
+(parsed-JSON validity is still the runner's own format precheck). 4xx =
+`http` (the runner halts on 400/401/403/404/422/429). Redirect, 5xx,
+malformed or empty 200, timeout, socket error, or any exception after
+the reserve = `unknown` (consumed, halt). Nonzero or invalid cost (200,
+or in a bounded 2000-byte error body read with a 5 s deadline checked between
+256-byte reads, cost only, no text kept; one blocking read can still last
+up to the socket timeout) halts the
+shared log and the runner. Single use is durable: execute() appends a
+hash-chained `exec` claim under the log flock, after re-checking chain
+and shared halt, BEFORE any I/O, and refuses a rid that already has an
+exec, exec-refused or result line (threads, copied/rebuilt tokens and a
+second process are tested). A reserve is identified by a random rid, not
+by count. States per rid (`fenced_http.reserve_states`): reserve() only =
+the fence never started a request (consumed, known not sent by this
+fence; only reserves written by the reserve()/execute() protocol carry
+that marker; a reserve written by complete(), or a legacy line without a
+marker, stays `unknown-*` until a result exists because complete() sends
+without an exec line, and execute() refuses such reserves); reserve+exec-refused = stopped before start (for example a halt
+written after the reserve); reserve+exec without result = started,
+outcome unknown, never re-executed; plus result = settled. A crash
+between gate and post is therefore reserve only. The gate binds to the last
+runner ledger line, which is safe only with ONE process driving a runner
+root (the runner's own advisory single-writer expectation); concurrent
+processes on one root are not supported by this lane. If the runner's
+boundary refuses after the shared reserve (assignment or grant changed),
+the shared reserve is consumed without a request. A halt written by
+another process after the reserve and before the exec claim stops the
+request; after the claim it cannot (at most once).
+
+Differences from `complete()`: the log lock is not held across the
+request on this path (it is on `complete()`); `complete()` behavior is
+unchanged. `post` without a reservation (seam not called, model or
+parameters mismatch) makes no request and raises Halt, leaving a runner
+reserve with no result for an operator to reconcile; a test fails if the
+pinned runner stops calling `before_io`, which this lane depends on
+(declared test seam in the vendored runner).
+
+Limits: the adapter sends `max_completion_tokens`, the old runner post
+sent `max_tokens`; provider equivalence is not verified. The adapter
+keeps 4 usage keys and `finish_reason`; the old path's diag shape probes
+are not carried. The allowlist is the two free models;
+`google/gemma-4-31b-it` is refused. The prior Gemma outcome (unknown,
+consumed, halt not cleared) is untouched. Same-user process, cooperative
+checks, no TOCTOU hardening beyond the log lock.
+
+Authority wording: a runner allowance is an operator-issued technical
+token, not a user-authored or user-signed approval of a call. Its HMAC
+authenticates only whoever holds the key file. This candidate creates no
+allowance, fetches no key, clears no halt and makes no request. A future
+call needs separate operator decisions (shared cap, envelope, halt
+clearance with an external-condition note, a signed allowance, a current
+route record).

@@ -29,6 +29,9 @@ import json
 import math
 import os
 import re
+import secrets
+import threading
+import time
 import urllib.error
 import urllib.request
 
@@ -89,6 +92,65 @@ def _read_all(dirpath):
     return reserves, halted, ok
 
 
+class FenceRefused(AdapterError):
+    """Raised BEFORE the reserve line is written: nothing was reserved
+    and no request was made (known not-sent). Still an AdapterError with
+    the same message complete() always used."""
+
+
+class Reservation:
+    """One shared reserve line, identified by a random rid and bound to
+    the canonical log path (model + epoch) and n. Single use, enforced
+    twice: an in-process lock around the used flag, and DURABLY in the
+    log: execute() appends a hash-chained `exec` claim under the log
+    flock BEFORE any I/O and refuses a rid that already has an exec,
+    exec-refused or result line. States seen in the log for one rid:
+    reserve only = the fence never started a request (consumed, known
+    not sent by this fence); reserve+exec-refused = refused before start;
+    reserve+exec without result = started, outcome unknown (never
+    re-executed); reserve+exec+result = settled."""
+    def __init__(self, model, n, rid, path):
+        self.model, self.n, self.rid, self.path = model, n, rid, path
+        self.used = False
+        self.lock = threading.Lock()
+
+
+def reserve_states(dirpath=None):
+    """{key: state} over the shared log dir. Only a reserve written by
+    the explicit reserve()/execute() protocol (via=reserve) can be
+    'reserved-not-started'. Other states: refused-before-start,
+    started-unsettled, settled. A reserve written by complete()
+    (via=complete) or a legacy line with no via marker could have sent a
+    request without leaving an exec line, so until a result exists it is
+    'unknown-complete-path' / 'unknown-legacy', never not-started. Legacy
+    lines without a rid are keyed 'legacy:<file>:<n>'."""
+    out, d = {}, dirpath or HTTP_LOG_DIR
+    if not os.path.isdir(d):
+        return out
+    for fn in sorted(os.listdir(d)):
+        if not fn.endswith(".jsonl"):
+            continue
+        for raw in open(os.path.join(d, fn), "rb"):
+            try:
+                e = json.loads(raw)
+            except ValueError:
+                continue
+            ph = e.get("phase")
+            key = e.get("rid") or "legacy:%s:%s" % (fn, e.get("n"))
+            if ph == "reserve":
+                via = e.get("via")
+                out[key] = ("reserved-not-started" if via == "reserve"
+                            else "unknown-complete-path" if via == "complete"
+                            else "unknown-legacy")
+            elif ph == "exec-refused" and out.get(key) == "reserved-not-started":
+                out[key] = "refused-before-start"
+            elif ph == "exec" and out.get(key) == "reserved-not-started":
+                out[key] = "started-unsettled"
+            elif ph == "result" and key in out:
+                out[key] = "settled"
+    return out
+
+
 class FencedHttpAdapter(Adapter):
     REPORTS_PROVIDER_USAGE = True
 
@@ -123,97 +185,254 @@ class FencedHttpAdapter(Adapter):
         return fh
 
     def complete(self, system, prompt):
+        r = self._core(system, prompt)
+        if r["cost_halt"]:
+            raise AdapterError("cost not reported as exactly zero; halted")
+        if r["text"] is None:
+            raise AdapterError("no usable response (%s)" % r["cls"])
+        return self._parse(r["text"])
+
+    # ---- raw path: reserve() then execute(token), used by the runner lane
+    def reserve(self):
+        """Run every pre-request check (key present, chain, halt, cap,
+        per-model budget) and write the shared reserve line under the log
+        lock. Raises FenceRefused (nothing written, known not-sent) or
+        returns a single-use Reservation. No request is made here."""
+        if not os.environ.get(self.api_key_env):
+            raise FenceRefused("missing API key env var")
+        rid = secrets.token_hex(8)
+        fh = self._open_log()
+        try:
+            n = self._check_and_reserve(fh, rid, "reserve")
+        finally:
+            fh.close()
+        return Reservation(self.model, n, rid, self.path)
+
+    def execute(self, token, system, prompt):
+        """Make the ONE request for a Reservation from reserve() and
+        settle it in the log. Returns the raw transport result:
+        {kind, code, content, usage, cost_signal, cls, n, finish_reason}.
+        kind 'ok' = HTTP 200, usable content, explicit zero cost; 'http'
+        = a 4xx status; 'unknown' = redirect, 5xx, malformed/empty 200,
+        timeout, socket error, or any other post-reserve outcome. A
+        nonzero or invalid cost (200, or in a bounded error body) writes
+        a shared halt. Raw HTTP success is not parsed-JSON success.
+        The reserve is the only authority: a used, forged, foreign or
+        already-settled token raises FenceRefused with no request. The
+        log lock is NOT held across the request here (complete() holds
+        it); a concurrent process can therefore append its own lines
+        meanwhile, and a halt written meanwhile does not cancel this
+        already-reserved request."""
+        if not isinstance(token, Reservation) or token.model != self.model \
+                or token.path != self.path:
+            raise FenceRefused("reservation unusable")
+        with token.lock:                       # in-process check-and-set
+            if token.used:
+                raise FenceRefused("reservation unusable")
+            token.used = True
+        key = os.environ.get(self.api_key_env)
+        fh = self._open_log()                  # claim under the log flock
+        try:
+            seen, vias = set(), set()
+            for l in open(self.path, "rb"):
+                try:
+                    e = json.loads(l)
+                except ValueError:
+                    continue
+                if e.get("rid") == token.rid:
+                    seen.add(e.get("phase"))
+                    if e.get("phase") == "reserve":
+                        vias.add(e.get("via"))
+            why = None
+            if "reserve" not in seen or vias != {"reserve"}:
+                why = "reservation not in the log"
+                seen.discard("reserve")
+            elif seen & {"exec", "exec-refused", "result"}:
+                raise FenceRefused("reservation already claimed or settled")
+            elif not key:
+                why = "missing API key env var"
+            else:
+                total, halted, chain_ok = _read_all(HTTP_LOG_DIR)
+                if not chain_ok:
+                    why = "usage log chain broken; refusing"
+                elif halted:
+                    why = "adapter halted earlier; refusing"
+            if why:
+                if "reserve" in seen:
+                    self._append(fh, {"phase": "exec-refused",
+                                      "rid": token.rid, "n": token.n,
+                                      "why": why[:60]})
+                raise FenceRefused(why)
+            self._append(fh, {"phase": "exec", "rid": token.rid,
+                              "n": token.n, "model": self.model})
+        finally:
+            fh.close()
+        io = self._io(key, system, prompt)
+        fh = self._open_log()
+        try:
+            r = self._record(fh, token.n, io, halt_on_err_cost=True,
+                             rid=token.rid)
+        finally:
+            fh.close()
+        return self._raw_result(r)
+
+    def _raw_result(self, r):
+        code, cls = r["code"], r["cls"]
+        if r["cost_halt"]:
+            cs = "nonzero" if (r["usage"] or {}).get("cost") else "invalid"
+            kind = "ok" if r["text"] is not None else "unknown"
+        elif cls == "http" and code is not None and 400 <= code < 500:
+            kind, cs = "http", r["err_cost"]
+        elif cls in ("http", "redirect"):    # 5xx, 3xx: outcome unknown
+            kind, cs = "unknown", r["err_cost"]
+        elif r["text"] is not None:
+            kind, cs = "ok", "zero"
+        else:
+            kind, cs = "unknown", ("zero" if r["usage"] and
+                                   r["usage"].get("cost") == 0 else None)
+        if r["err_cost"] in ("nonzero", "invalid"):
+            cs = r["err_cost"]
+        return {"kind": kind, "code": code or 0, "content": r["text"] or "",
+                "usage": r["usage"], "cost_signal": cs, "cls": cls,
+                "finish_reason": r["finish_reason"], "n": r["n"]}
+
+    # ---- shared pieces (complete() uses all three, behavior unchanged)
+    def _check_and_reserve(self, fh, rid, via):
+        total, halted, chain_ok = _read_all(HTTP_LOG_DIR)
+        if not chain_ok:
+            raise FenceRefused("usage log chain broken; refusing")
+        if halted:
+            raise FenceRefused("adapter halted earlier; refusing")
+        mine = sum(1 for l in open(self.path, "rb")
+                   if b'"phase": "reserve"' in l)
+        if mine >= self.call_budget or total >= HTTP_LIFETIME_CAP:
+            raise FenceRefused("request budget exhausted; refusing")
+        n = mine + 1
+        self._append(fh, {"phase": "reserve", "n": n, "rid": rid, "via": via,
+                          "model": self.model})   # BEFORE any I/O
+        return n
+
+    def _io(self, key, system, prompt):
+        cls, usage, code, text = "unknown", None, None, None
+        err_cost, fin = None, None
+        try:
+            payload = {"model": self.model,
+                       "messages": [{"role": "system", "content": system},
+                                    {"role": "user", "content": prompt}],
+                       "max_completion_tokens": self.max_tokens,
+                       "reasoning_effort": self.effort}
+            req = urllib.request.Request(
+                self.base_url + "/chat/completions",
+                data=json.dumps(payload).encode(), method="POST",
+                headers={"content-type": "application/json",
+                         "authorization": "Bearer " + key,
+                         "user-agent": "lg-fenced-http/0.1"})
+            try:
+                with self._opener.open(req, timeout=self.timeout) as r:
+                    code = r.status
+                    raw = r.read(MAX_BODY + 1)
+            except urllib.error.HTTPError as e:
+                code = e.code
+                cls = "redirect" if 300 <= e.code < 400 else "http"
+                raw = None
+                try:    # bounded read, cost signal only (no text kept)
+                    buf, dl = b"", time.monotonic() + 5
+                    while len(buf) < 2000 and time.monotonic() < dl:
+                        c = e.read(min(256, 2000 - len(buf)))
+                        if not c:
+                            break
+                        buf += c
+                    eb = json.loads(buf)
+                    eu = eb.get("usage") if isinstance(eb, dict) else None
+                    if isinstance(eu, dict) and "cost" in eu:
+                        err_cost = ("invalid" if not _num_ok(eu["cost"])
+                                    else "zero" if eu["cost"] == 0
+                                    else "nonzero")
+                except Exception:
+                    pass
+            if raw is not None:
+                if code != 200 or len(raw) > MAX_BODY:
+                    cls = "bad-status-or-size"
+                else:
+                    d = json.loads(raw)
+                    u = d.get("usage") if isinstance(d, dict) else None
+                    if isinstance(u, dict):
+                        usage = {k: u[k] for k in USAGE_KEYS
+                                 if k in u and _num_ok(u[k])}
+                    cls = "ok-shape"
+                    fr = d["choices"][0].get("finish_reason")
+                    fin = fr if fr in ("stop", "length", "content_filter",
+                                       "tool_calls", "function_call",
+                                       "error") else None
+                    ch = d["choices"][0]["message"]["content"]
+                    if not isinstance(ch, str) or not ch.strip():
+                        cls = "empty-content"
+                    else:
+                        text = ch
+        except Exception as e:   # malformed body, timeout, socket, shape
+            if cls == "unknown":
+                cls = "error:" + type(e).__name__
+        return {"cls": cls, "usage": usage, "code": code, "text": text,
+                "err_cost": err_cost, "finish_reason": fin}
+
+    def _record(self, fh, n, io, halt_on_err_cost=False, rid=None):
+        cls, usage, code, text = io["cls"], io["usage"], io["code"], io["text"]
+        cost = (usage or {}).get("cost")
+        cost_known_zero = cost == 0 and isinstance(cost, (int, float))
+        outcome = {"phase": "result", "n": n, "rid": rid,
+                   "model": self.model,
+                   "status": code, "class": cls, "usage": usage,
+                   "cost_zero": bool(cost_known_zero)}
+        self._append(fh, outcome)
+        if code == 200 and usage:
+            # the request happened and the provider reported usage:
+            # keep that evidence even if the reply is unusable or the
+            # cost check below halts (never reads as "no call")
+            self.last_call = {"origin": "provider", "response_id": None,
+                              "usage": usage}
+        res = {"n": n, "code": code, "cls": cls, "usage": usage,
+               "text": text, "cost_halt": False,
+               "err_cost": io["err_cost"], "finish_reason": io["finish_reason"]}
+        if code == 200 and not cost_known_zero:
+            self._append(fh, {"phase": "halt", "n": n,
+                              "why": "cost missing or nonzero"})
+            res["cost_halt"] = True
+            return res
+        if halt_on_err_cost and io["err_cost"] in ("nonzero", "invalid"):
+            self._append(fh, {"phase": "halt", "n": n,
+                              "why": "error-body cost nonzero or invalid"})
+        if text is not None:
+            self.last_call = {"origin": "provider", "response_id": None,
+                              "usage": usage}
+        return res
+
+    def _core(self, system, prompt):
         self.last_call = None
         key = os.environ.get(self.api_key_env)
         if not key:
-            raise AdapterError("missing API key env var")
+            raise FenceRefused("missing API key env var")
         fh = self._open_log()
         try:
-            total, halted, chain_ok = _read_all(HTTP_LOG_DIR)
-            if not chain_ok:
-                raise AdapterError("usage log chain broken; refusing")
-            if halted:
-                raise AdapterError("adapter halted earlier; refusing")
-            mine = sum(1 for l in open(self.path, "rb")
-                       if b'"phase": "reserve"' in l)
-            if mine >= self.call_budget or total >= HTTP_LIFETIME_CAP:
-                raise AdapterError("request budget exhausted; refusing")
-            n = mine + 1
-            self._append(fh, {"phase": "reserve", "n": n,
-                              "model": self.model})   # BEFORE any I/O
-            cls, usage, code, text = "unknown", None, None, None
-            try:
-                payload = {"model": self.model,
-                           "messages": [{"role": "system", "content": system},
-                                        {"role": "user", "content": prompt}],
-                           "max_completion_tokens": self.max_tokens,
-                           "reasoning_effort": self.effort}
-                req = urllib.request.Request(
-                    self.base_url + "/chat/completions",
-                    data=json.dumps(payload).encode(), method="POST",
-                    headers={"content-type": "application/json",
-                             "authorization": "Bearer " + key,
-                             "user-agent": "lg-fenced-http/0.1"})
-                try:
-                    with self._opener.open(req, timeout=self.timeout) as r:
-                        code = r.status
-                        raw = r.read(MAX_BODY + 1)
-                except urllib.error.HTTPError as e:
-                    code = e.code
-                    cls = "redirect" if 300 <= e.code < 400 else "http"
-                    raw = None
-                if raw is not None:
-                    if code != 200 or len(raw) > MAX_BODY:
-                        cls = "bad-status-or-size"
-                    else:
-                        d = json.loads(raw)
-                        u = d.get("usage") if isinstance(d, dict) else None
-                        if isinstance(u, dict):
-                            usage = {k: u[k] for k in USAGE_KEYS
-                                     if k in u and _num_ok(u[k])}
-                        cls = "ok-shape"
-                        ch = d["choices"][0]["message"]["content"]
-                        if not isinstance(ch, str) or not ch.strip():
-                            cls = "empty-content"
-                        else:
-                            text = ch
-            except Exception as e:   # malformed body, timeout, socket, shape
-                if cls == "unknown":
-                    cls = "error:" + type(e).__name__
-            cost = (usage or {}).get("cost")
-            cost_known_zero = cost == 0 and isinstance(cost, (int, float))
-            outcome = {"phase": "result", "n": n, "model": self.model,
-                       "status": code, "class": cls, "usage": usage,
-                       "cost_zero": bool(cost_known_zero)}
-            self._append(fh, outcome)
-            if code == 200 and usage:
-                # the request happened and the provider reported usage:
-                # keep that evidence even if the reply is unusable or the
-                # cost check below halts (never reads as "no call")
-                self.last_call = {"origin": "provider", "response_id": None,
-                                  "usage": usage}
-            if code == 200 and not cost_known_zero:
-                self._append(fh, {"phase": "halt", "n": n,
-                                  "why": "cost missing or nonzero"})
-                raise AdapterError("cost not reported as exactly zero; halted")
-            if text is None:
-                raise AdapterError("no usable response (%s)" % cls)
-            self.last_call = {"origin": "provider", "response_id": None,
-                              "usage": usage}
-            try:
-                return parse_response(text)
-            except AdapterError as exc:
-                # no raw model text in the error (it reaches traces) and no
-                # raw= attribute (nothing is preserved from this adapter).
-                # A contract-format failure keeps the runtime's exact
-                # prefix so its ONE bounded format-correction round can
-                # fire; the per-seat call_budget still caps total requests.
-                if str(exc).startswith("model output is not JSON"):
-                    raise AdapterError(
-                        "model output is not JSON: the reply was not one "
-                        "bare object or one json fence (raw text withheld "
-                        "by the fenced adapter)") from None
-                raise AdapterError("response is not the required "
-                                   "structured format") from None
+            rid = secrets.token_hex(8)
+            n = self._check_and_reserve(fh, rid, "complete")
+            return self._record(fh, n, self._io(key, system, prompt),
+                                rid=rid)
         finally:
             fh.close()
+
+    def _parse(self, text):
+        try:
+            return parse_response(text)
+        except AdapterError as exc:
+            # no raw model text in the error (it reaches traces) and no
+            # raw= attribute (nothing is preserved from this adapter).
+            # A contract-format failure keeps the runtime's exact
+            # prefix so its ONE bounded format-correction round can
+            # fire; the per-seat call_budget still caps total requests.
+            if str(exc).startswith("model output is not JSON"):
+                raise AdapterError(
+                    "model output is not JSON: the reply was not one "
+                    "bare object or one json fence (raw text withheld "
+                    "by the fenced adapter)") from None
+            raise AdapterError("response is not the required "
+                               "structured format") from None
