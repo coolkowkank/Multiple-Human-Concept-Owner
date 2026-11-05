@@ -11,9 +11,16 @@ ok = True
 def check(n, c):
     global ok; ok = ok and bool(c); print(("PASS  " if c else "FAIL  ") + n, flush=True)
 def git(r, *a): return subprocess.run(["git", "-C", r, *a], capture_output=True, text=True).stdout
-def attempt(tmp, name, resp):
+def plant_qc_pass(b, r):
+    """Reviewer-skip guard (2026-11-05): DONE needs a fresh QC PASS verdict."""
+    head = git(r, "rev-parse", "HEAD").strip()
+    b.append_log("qc", "verdict", "verdict PASS at head " + head + ": planted")
+    b.commit_all("human: plant QC verdict")
+def attempt(tmp, name, resp, plant=False):
     r = os.path.join(tmp, name); lt.init_repo(r)
-    b = Bus(r, lt.BRANCH); s = Seat(b, "coordinator", instance_id="A")
+    b = Bus(r, lt.BRANCH)
+    if plant: plant_qc_pass(b, r)
+    s = Seat(b, "coordinator", instance_id="A")
     s.adapter.consume = lambda: None
     s._call_adapter = lambda state: dict(resp)
     head, st0 = git(r, "rev-parse", "HEAD"), b.state()
@@ -30,14 +37,14 @@ try:
     r, b, err, h, st0 = attempt(tmp, "b", dict(base, handoff=None))
     check("null handoff with no status_line at all: refused", err and "no turn holder" in err)
     r, b, err, h, st0 = attempt(tmp, "c", dict(base, handoff=None, status_line="DONE: cycle closed"))
-    st = b.state(); check("null handoff with DONE status_line: accepted, status done, no turn holder by design", err is None and st["status"] == "done" and st["turn"] is None)
+    st = b.state(); check("null handoff with DONE status_line but no QC verdict: refused, routed to qc", err is None and st["status"] != "done" and st["turn"] == "qc")
     r, b, err, h, st0 = attempt(tmp, "d", dict(base, handoff="builder", status_line="handing over"))
     check("named seat: accepted, turn moves", err is None and b.state()["turn"] == "builder")
     r, b, err, h, st0 = attempt(tmp, "e", dict(base, handoff="builder", status_line="DONE early"))
     check("DONE with a named seat: refused as ambiguous, no residue, turn stays", err and "ambiguous" in err and git(r, "rev-parse", "HEAD") == h and b.state() == st0 and not os.path.exists(os.path.join(r, ".team/NOTE.md")))
     for form in ("DONE", "DONE.", "DONE - QC pass at head", "DONE: cycle closed", "DONE\tx"):
-        r, b, err, h, st0 = attempt(tmp, "f-" + str(abs(hash(form))), dict(base, handoff=None, status_line=form))
-        check(f"exact DONE form {form!r}: accepted and closes", err is None and b.state()["status"] == "done" and b.state()["turn"] is None)
+        r, b, err, h, st0 = attempt(tmp, "f-" + str(abs(hash(form))), dict(base, handoff=None, status_line=form), plant=True)
+        check(f"exact DONE form {form!r}: accepted and closes with a fresh QC verdict", err is None and b.state()["status"] == "done" and b.state()["turn"] is None)
     for form in ("DONEZO", "DONE2", "DONE_not", "DONEBUT keep going", "done", " DONE", "NOT DONE"):
         r, b, err, h, st0 = attempt(tmp, "g-" + str(abs(hash(form))), dict(base, handoff=None, status_line=form))
         check(f"{form!r} is not DONE: null handoff refused, no residue", err and "no turn holder" in err and b.state() == st0)

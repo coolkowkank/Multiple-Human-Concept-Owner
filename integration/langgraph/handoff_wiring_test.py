@@ -14,11 +14,18 @@ ok = True
 def check(n, c):
     global ok; ok = ok and bool(c); print(("PASS  " if c else "FAIL  ") + n, flush=True)
 def git(r, *a): return subprocess.run(["git", "-C", r, *a], capture_output=True, text=True).stdout.strip()
-def turn(tmp, name, resp, pre=None, patch=None, push_fail_once=False):
+def plant_qc_pass(b, r):
+    """Reviewer-skip guard (2026-11-05): DONE needs a fresh QC PASS verdict."""
+    head = git(r, "rev-parse", "HEAD").strip()
+    b.append_log("qc", "verdict", "verdict PASS at head " + head + ": planted")
+    b.commit_all("human: plant QC verdict")
+def turn(tmp, name, resp, pre=None, patch=None, push_fail_once=False, plant=False):
     r = os.path.join(tmp, name); lt.init_repo(r)
     if pre:
         for p, c in pre.items(): os.makedirs(os.path.dirname(os.path.join(r, p)), exist_ok=True); open(os.path.join(r, p), "w").write(c)
-    b = Bus(r, lt.BRANCH); s = Seat(b, "coordinator", instance_id="A"); s.adapter.consume = lambda: None
+    b = Bus(r, lt.BRANCH)
+    if plant: plant_qc_pass(b, r)
+    s = Seat(b, "coordinator", instance_id="A"); s.adapter.consume = lambda: None
     calls = {"n": 0}
     def call(state): calls["n"] += 1; return dict(resp)
     s._call_adapter = call
@@ -49,7 +56,7 @@ try:
     check("declared write observed and not undeclared; bus files excluded", [e["path"] for e in rec["facts"]["observed"]["items"]] == [".team/NOTE.md"] and rec["facts"]["undeclared"]["count"] == 0)
     check("claims are length+hash only: summary text is not in the record", "did x" not in json.dumps(rec) and rec["claims"]["summary_len"] == 5)
     # DONE
-    r, b, err, n, base = turn(tmp, "d", dict(rsp, handoff=None, status_line="DONE - closed"))
+    r, b, err, n, base = turn(tmp, "d", dict(rsp, handoff=None, status_line="DONE - closed"), plant=True)
     row = last_handoff(b); rec = row["record"]
     check("DONE turn: record next None, status done, STATE turn None, check_commit match", rec["facts"]["next"] is None and rec["facts"]["status"] == "done" and b.state()["turn"] is None and hr.check_commit(r, git(r, "rev-parse", "HEAD"), rec)["status"] == "match")
     # gate

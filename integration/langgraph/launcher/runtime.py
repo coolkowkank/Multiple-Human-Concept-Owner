@@ -142,6 +142,49 @@ except ImportError:   # absent: handoffs are logged without a record
 _DONE_RE = _re.compile(r"DONE(?![A-Za-z0-9_])")
 
 
+_VERDICT_ROW_RE = _re.compile(r"^verdict (PASS|FAIL|NONE) at head ([0-9a-f]{40})\b")
+_EVIDENCE_ROLES = ("reviewer", "qc", "records")
+
+
+def _qc_seats(roster):
+    return [n for n, spec in roster.get("seats", {}).items()
+            if isinstance(spec, dict) and spec.get("role") == "qc"]
+
+
+def _evidence_prefixes(roster):
+    """Paths outside the work a verdict rules on: the bus itself plus the
+    review/archive seats' allowed paths. A commit touching only these
+    never stales a verdict; a commit touching anything else (application
+    work) does."""
+    pref = [".team/"]
+    for spec in roster.get("seats", {}).values():
+        if isinstance(spec, dict) and spec.get("role") in _EVIDENCE_ROLES:
+            for p in spec.get("allowed_paths") or []:
+                if isinstance(p, str) and p and p not in (".", "/"):
+                    pref.append(p)
+    return tuple(pref)
+
+
+def _verdict_fresh(repo, verdict_head, prefixes):
+    """True when verdict_head is an ancestor of HEAD and every commit
+    since touches only evidence paths. A verdict that predates newer
+    application work is stale and cannot carry a DONE."""
+    if not verdict_head:
+        return False
+    r = subprocess.run(["git", "-C", repo, "cat-file", "-e",
+                        verdict_head + "^{commit}"], capture_output=True)
+    if r.returncode != 0:
+        return False
+    r = subprocess.run(["git", "-C", repo, "merge-base", "--is-ancestor",
+                        verdict_head, "HEAD"], capture_output=True)
+    if r.returncode != 0:
+        return False
+    changed = subprocess.run(["git", "-C", repo, "diff", "--name-only",
+                              verdict_head, "HEAD"],
+                             capture_output=True, text=True).stdout.split()
+    return all(any(p.startswith(pre) for pre in prefixes) for p in changed)
+
+
 def is_done_status(status_line):
     """True for a status_line that starts with the word DONE (exactly
     "DONE", or DONE followed by a non-word character such as space, ':'
@@ -891,6 +934,42 @@ class Seat:
                 "commit guard would reject them after the mutation. "
                 "Move scratch outside the repo (or under .team/) first.")
 
+    def _record_qc_verdict(self, response):
+        """A QC turn leaves a machine-checkable verdict row. The outcome
+        is the PASS/FAIL word in the status_line; the head is the
+        committed head the verdict rules on (this turn's own writes are
+        not committed yet, matching 'verify re-run at the named
+        commit')."""
+        head0 = subprocess.run(["git", "-C", self.bus.repo, "rev-parse",
+                                "HEAD"], capture_output=True,
+                               text=True).stdout.strip()
+        sl = response.get("status_line") or ""
+        has_fail = bool(_re.search(r"\bFAIL\b", sl))
+        has_pass = bool(_re.search(r"\bPASS\b", sl))
+        outcome = "FAIL" if has_fail else "PASS" if has_pass else "NONE"
+        self.bus.append_log(self.name, "verdict",
+                            f"verdict {outcome} at head {head0}: "
+                            f"{(response.get('summary') or '')[:200]}")
+
+    def _fresh_qc_pass(self):
+        """(ok, qc_seats). ok only when the bus holds a verdict-kind row
+        from a roster QC seat with outcome PASS whose head is still
+        fresh (no application work committed since)."""
+        roster = self.bus.roster()
+        qc = _qc_seats(roster)
+        if not qc:
+            return False, qc
+        prefixes = _evidence_prefixes(roster)
+        for e in reversed(self.bus.log(kinds=["verdict"])):
+            if e.get("seat") not in qc:
+                continue
+            m = _VERDICT_ROW_RE.match(str(e.get("body", "")))
+            if not m or m.group(1) != "PASS":
+                continue
+            if _verdict_fresh(self.bus.repo, m.group(2), prefixes):
+                return True, qc
+        return False, qc
+
     def _apply(self, state, response):
         validate_response_shape(self.name, response)
         writes = response.get("writes") or {}
@@ -996,6 +1075,30 @@ class Seat:
         # decide next/status BEFORE the row so the record carries the same
         # values STATE gets (DONE closes: next None; DONE+handoff is refused)
         done = is_done_status(response.get("status_line"))
+        if self.role == "qc":
+            self._record_qc_verdict(response)
+        done_refusal = None
+        if done:
+            verdict_ok, qc_seats = self._fresh_qc_pass()
+            if not verdict_ok:
+                # Reviewer-skip guard: a DONE claim is never accepted on
+                # the claimant's word alone. Route the turn to a QC seat,
+                # or park it on a human gate when the roster has nobody
+                # who can review.
+                done = False
+                head0 = subprocess.run(
+                    ["git", "-C", self.bus.repo, "rev-parse", "HEAD"],
+                    capture_output=True, text=True).stdout.strip()
+                done_refusal = ("no fresh QC PASS verdict at head "
+                                + str(head0)[:12])
+                if qc_seats:
+                    handoff = qc_seats[0]
+                    done_refusal += f"; turn routed to {qc_seats[0]}"
+                else:
+                    handoff = None
+                    self.bus.open_gate(self.name,
+                                       "no QC seat to review DONE claim")
+                    done_refusal += "; no QC seat in roster, human gate opened"
         nxt = None if done else handoff
         final_status = ("done" if done else
                         "running" if state["status"] == "forming" else state["status"])
@@ -1009,16 +1112,21 @@ class Seat:
         if verify_cmd:
             body += (f" | verify: `{verify_cmd}` exit={exit_code}"
                      + (f" | tail: {' / '.join(tail)}" if tail else ""))
+        if done_refusal is not None:
+            body += " | " + done_refusal
         self.bus.append_log(self.name, "handoff", body, turn_seq=seq, **record_kw)
+        if done_refusal is not None:
+            self.bus.append_log(self.name, "review-required",
+                                f"DONE claim by {self.name} refused: {done_refusal}")
 
         state["turn_seq"] = seq
-        state["turn"] = handoff
+        state["turn"] = None if done else handoff
         state["turn_since"] = _now()
         if response.get("status_line"):
-            state["status_line"] = response["status_line"]
-        if is_done_status(response.get("status_line")):
+            state["status_line"] = (response["status_line"] if done_refusal is None
+                                    else "DONE refused - " + done_refusal)
+        if done:
             state["status"] = "done"
-            state["turn"] = None
         elif state["status"] == "forming":
             state["status"] = "running"
         self.bus.write_state(state)

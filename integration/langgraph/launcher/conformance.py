@@ -15,7 +15,8 @@ import json
 import os
 
 VALID_KINDS = {"message", "handoff", "finding", "verdict", "gate",
-               "answer", "status", "error", "restart", "stall"}
+               "answer", "status", "error", "restart", "stall",
+               "review-required"}
 STATE_KEYS = {"turn", "turn_seq", "turn_since", "status", "status_line",
               "leases"}
 SEAT_KEYS = {"role", "allowed_paths", "adapter"}
