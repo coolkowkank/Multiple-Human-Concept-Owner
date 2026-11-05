@@ -153,3 +153,18 @@ class HostileTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class EstimateRobustness(unittest.TestCase):
+    def test_malformed_estimate_fields_do_not_raise(self):
+        for bad in ('x', None, 1.5, [1], {'a': 1}, True, -3, 10**12):
+            rows = [{'event': 'adapter_call_start', 'call_id': 'a',
+                     'audit': {'system': {'est_tokens_chars_div_4': bad},
+                               'task': {'est_tokens_chars_div_4': 1}}},
+                    {'event': 'adapter_call_returned', 'call_id': 'a'}]
+            r = join(rows, [])
+            self.assertEqual(r['rows'][0]['status'], 'no_usage_record')
+            self.assertIsNone(r['rows'][0]['est_tokens_chars_div_4'] if bad is not None else None)
+        for audit in ('str', [1]):
+            r = join([{'event': 'adapter_call_start', 'call_id': 'a', 'audit': audit},
+                      {'event': 'adapter_call_returned', 'call_id': 'a'}], [])
+            self.assertIsNone(r['rows'][0]['est_tokens_chars_div_4'])

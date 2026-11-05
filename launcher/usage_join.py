@@ -74,8 +74,10 @@ def join(audit_rows, usage_rows):
         if ev == 'adapter_call_start':
             c['start'] += 1
             a = r.get('audit') or {}
-            c['est'] = ((a.get('system') or {}).get('est_tokens_chars_div_4', 0)
-                        + (a.get('task') or {}).get('est_tokens_chars_div_4', 0))
+            sysv = _int(((a.get('system') if isinstance(a.get('system'), dict) else {}) or {}).get('est_tokens_chars_div_4', 0)) if isinstance(a, dict) else None
+            taskv = _int(((a.get('task') if isinstance(a.get('task'), dict) else {}) or {}).get('est_tokens_chars_div_4', 0)) if isinstance(a, dict) else None
+            # heuristic only; malformed parts make the estimate None, never raise
+            c['est'] = sysv + taskv if sysv is not None and taskv is not None else None
         elif ev in TERMINAL:
             c['terminal'].append(ev)
     usage = {}
