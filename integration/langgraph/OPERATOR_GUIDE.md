@@ -151,6 +151,15 @@ PY
 
 Then set `expected_min_reserves` to the printed `reserves` value. Never point
 `anchor_file` at a file that was not produced by a verified preflight.
+- The anchor covers only the log files named in it, each up to the line count and
+  chain tip it recorded. It does not cover the whole ledger. A log that is not in
+  the snapshot (a new epoch file, or a file deleted before the snapshot) is not
+  checked against it, and a rewrite that keeps the anchored prefix is not seen.
+  `expected_min_reserves` is the second check: it catches a drop in the total, not
+  a swap. Neither is tamper-proof, since the same account can edit the ledger, the
+  anchor and the config. Keep `expected_min_reserves` at the last verified total
+  for this account (7 at the last real preflight; confirm against the ledger, it
+  is not a universal number).
 - After a run, if the ledger verifies against the old anchor, `live` replaces the
   anchor atomically with a fresh snapshot. It never raises
   `expected_min_reserves`; do that yourself.
