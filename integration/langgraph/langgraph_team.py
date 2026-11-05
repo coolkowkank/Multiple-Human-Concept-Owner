@@ -247,6 +247,30 @@ def _seat_scope(roster: dict, seat: str) -> list:
     return scope
 
 
+def _context_digest(repo: str, roster: dict, seat: str) -> str:
+    """Digest of the COMMITTED context this seat was constructed and
+    prompted from: the brief bytes and the seat's FULL roster spec
+    (adapter params, allowed paths, everything - not just the type).
+    Captured at construction and re-compared at every boundary check.
+    A committed brief edit with no instruction_seq bump, or a committed
+    spec change (e.g. allowed_paths emptied), lands legally in git and
+    passes the dirty fence - but the seat still holds the OLD prompt
+    and adapter, so applying its response would act on stale context.
+    The digest mismatch refuses exactly that. Queue files are NOT in
+    the digest: mid-turn queue commits are ordinary, and the queue
+    `_queue` binding checks own queue staleness."""
+    import hashlib
+    proc = subprocess.run(["git", "-C", repo, "show",
+                           "HEAD:.team/brief.md"],
+                          capture_output=True, text=True)
+    brief = proc.stdout if proc.returncode == 0 else None
+    body = {"brief": brief,
+            "spec": roster.get("seats", {}).get(seat)}
+    return hashlib.sha256(json.dumps(body, sort_keys=True,
+                                     ensure_ascii=True).encode()
+                          ).hexdigest()
+
+
 def _scoped_dirty(repo: str, paths) -> str:
     """'' if every scoped input matches HEAD, else a short reason.
 
@@ -484,11 +508,18 @@ class GuardedAdapter:
     nothing in this turn has committed yet when the guard raises.
     """
 
-    def __init__(self, inner, bus: Bus, seat: str, instruction_seq: int):
+    def __init__(self, inner, bus: Bus, seat: str, instruction_seq: int,
+                 context_digest=None):
         self._inner = inner
         self._bus = bus
         self._seat = seat
         self._instruction_seq = instruction_seq
+        if context_digest is None:
+            roster = _committed_json(bus.repo, ".team/roster.json")
+            if not isinstance(roster, dict):
+                roster = {}
+            context_digest = _context_digest(bus.repo, roster, seat)
+        self._context_digest = context_digest
 
     def __getattr__(self, name):  # consume(), attributes: pass through
         return getattr(self._inner, name)
@@ -521,6 +552,14 @@ class GuardedAdapter:
             if dirty:
                 raise SeatError(
                     f"{self._seat} refused at seat boundary: {dirty}")
+            now_digest = _context_digest(self._bus.repo, roster,
+                                         self._seat)
+        if now_digest != self._context_digest:
+            raise SeatError(
+                f"{self._seat} refused at seat boundary: committed "
+                f"context changed since construction (brief or seat "
+                f"spec moved without an instruction_seq bump) - this "
+                f"response was produced against stale context")
         if live.get("status") != "running":
             raise SeatError(
                 f"{self._seat} refused at seat boundary: bus status "
@@ -624,7 +663,8 @@ def seat_node(seat: str, state: TeamState) -> dict:
     # Boundary guard: re-validates status/turn/control/adapter at the
     # actual adapter call, after the lease claim (see GuardedAdapter).
     guard = GuardedAdapter(
-        adapter, bus, seat, read_control(repo)["instruction_seq"])
+        adapter, bus, seat, read_control(repo)["instruction_seq"],
+        context_digest=_context_digest(repo, committed_roster, seat))
     seat_obj.adapter = guard
     # Accepted upstream pre_apply hook (e881384): runs INSIDE the seat
     # transaction - after the under-lock fresh state re-read and the
