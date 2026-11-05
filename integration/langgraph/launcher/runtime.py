@@ -22,7 +22,7 @@ import uuid
 
 from . import prompts
 from .adapters import AdapterError, QueueAdapter, build_adapter
-from .bus import Bus, BusError, LOG
+from .bus import Bus, BusError, LOG, STATE, GATES_PENDING, GATES_ANSWERS
 
 
 class SeatError(Exception):
@@ -825,6 +825,22 @@ class Seat:
             capture_output=True, text=True).stdout
         allowed = [a.rstrip("/") for a in self.allowed_paths]
         bad = []
+        # Uncommitted BUS state is the signature of a process killed
+        # between apply and commit: the working tree then carries an
+        # advanced turn/seq that no commit holds. Starting another turn
+        # on it spends a model call whose commit the guard rejects and
+        # builds on state nobody committed. Refuse; never auto-discard.
+        ctrl = {STATE, LOG, GATES_PENDING, GATES_ANSWERS}
+        torn = sorted({l[3:].split(" -> ")[-1] for l in out.splitlines()
+                       if l[3:].split(" -> ")[-1] in ctrl})
+        if torn:
+            raise SeatError(
+                f"{self.name} refuses to start: uncommitted coordination "
+                f"state {torn} - a previous process was probably killed "
+                "between apply and commit. No model call was made. An "
+                "operator must inspect `git status`/`git diff` and either "
+                "commit or discard it (see OPERATOR_GUIDE: crash residue); "
+                "nothing is discarded automatically.")
         for line in out.splitlines():
             path = line[3:].split(" -> ")[-1]
             if path.startswith(".team/"):

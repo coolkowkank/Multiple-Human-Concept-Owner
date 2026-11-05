@@ -255,3 +255,14 @@ are refused before any write, as is any path whose existing component is a symli
 file is opened with O_NOFOLLOW). A batch naming a file and a path under it is refused, as is a target under an existing non-directory or one that is an existing directory. An unexpected OS error during a write becomes a SeatError, but earlier writes of that batch are NOT rolled back. This is a
 check-then-open on a same-user filesystem: it is not descriptor-relative, so a symlink swapped in
 between the check and the write by another process is not covered. Not a sandbox.
+
+## Crash residue (observed with real SIGKILL in scratch lanes)
+
+`crash_recovery_test.py` kills a seat subprocess (mock adapter, scratch lane) at four points and records what a restart does:
+
+- Before the adapter call: nothing changed; restart takes the turn.
+- After apply, before commit: HEAD is unmoved but the working tree holds an advanced, uncommitted `.team/STATE.json`/`LOG.jsonl`. Before this fix the next seat built on that state and spent a model call whose commit the guard then rejected (a spending seat would lose a reserve). Now any seat refuses to start while `.team/STATE.json`, `LOG.jsonl` or `gates/*` are uncommitted, before any call. Nothing is discarded automatically: an operator inspects `git status`/`git diff` and commits or discards.
+- After commit: the commit landed. Without a remote the push is a no-op; with one, the next transaction pushes.
+- During verify: in-domain files remain, a stale `.git/lg-live-<seat>.json` declaration stays until the next turn clears it, and a restart re-runs the turn (a replayed turn can replay a model call).
+
+Not covered: a kill during the push itself (needs a remote, which the test does not create), `index.lock` residue, kills of a real adapter or http call, `bus.transact` has no rollback, and no unattended claim.
