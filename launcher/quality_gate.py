@@ -126,20 +126,42 @@ def _canon(obj):
     return json.dumps(obj, sort_keys=True, separators=(',', ':')).encode()
 
 
-def sign(key, payload):
-    """Operator-side: authenticate a report/result. key is bytes held outside the seats."""
-    return {'payload': payload, 'sig': hmac.new(key, _canon(payload), hashlib.sha256).hexdigest()}
+KIND_GATE = 'quality-gate-report/v2'
+KIND_OPERATOR = 'operator-check-result/v1'
+HASH_SCHEME = 'artifact_sha256/v1'   # hash over the FULL files dict; a per-file hash is not accepted
+_KINDS = (KIND_GATE, KIND_OPERATOR)
 
 
-def verify(key, signed):
-    """Return the payload if the signature is valid, else None. Never raises."""
+def sign(key, payload, kind):
+    """Operator-side: authenticate a report/result under an explicit domain `kind`.
+    The kind is inside the MAC, so a gate signature cannot be replayed as an
+    operator result or vice versa. key is bytes held by the operator only (never
+    in a seat's env, messages, sandbox or the repo); use an ephemeral key in tests.
+    Signatures carry no expiry: they bind to an artifact revision, not to time."""
+    if kind not in _KINDS:
+        raise ValueError('unknown signature kind')
+    return {'kind': kind, 'payload': payload,
+            'sig': hmac.new(key, _canon({'kind': kind, 'payload': payload}), hashlib.sha256).hexdigest()}
+
+
+def sign_gate(key, report):
+    return sign(key, report, KIND_GATE)
+
+
+def sign_operator(key, result):
+    return sign(key, result, KIND_OPERATOR)
+
+
+def verify(key, signed, kind):
+    """Return the payload if the signature is valid for `kind`, else None. Never raises."""
     try:
-        if not isinstance(key, (bytes, bytearray)) or len(key) < 16 or not isinstance(signed, dict):
+        if kind not in _KINDS or not isinstance(key, (bytes, bytearray)) or len(key) < 16 \
+                or not isinstance(signed, dict) or signed.get('kind') != kind:
             return None
         p, sig = signed.get('payload'), signed.get('sig')
         if not isinstance(p, dict) or not isinstance(sig, str):
             return None
-        want = hmac.new(bytes(key), _canon(p), hashlib.sha256).hexdigest()
+        want = hmac.new(bytes(key), _canon({'kind': kind, 'payload': p}), hashlib.sha256).hexdigest()
         return p if hmac.compare_digest(want, sig) else None
     except Exception:
         return None
@@ -185,7 +207,7 @@ def run_gate(source_files, test_files, run_tests, target, run_tests_optimized=No
     files = dict(source_files); files.update(test_files)
     base = run_tests(files)
     rep = {'schema': 'quality-gate/v1', 'target': target, 'baseline': base,
-           'artifact_sha256': artifact_sha256(files), 'checker_id': checker_id(),
+           'artifact_sha256': artifact_sha256(files), 'hash_scheme': HASH_SCHEME, 'checker_id': checker_id(),
            'runner_id': runner_id,
            'o_policy': 'checked' if run_tests_optimized is not None else 'not_checked',
            'killed': 0, 'survived': 0, 'inconclusive': 0, 'survivors': [],
@@ -256,9 +278,11 @@ def evaluate_done(cycle_complete, signed_gate, qc=None, current_artifact_sha256=
     quality = 'unproven'
     op_state = gate_state = None
     if signed_operator_result is not None:
-        p = verify(operator_key, signed_operator_result)
+        p = verify(operator_key, signed_operator_result, KIND_OPERATOR)
         if p is None:
             reasons.append('operator result not authenticated (bad or missing signature/key)')
+        elif p.get('hash_scheme') != HASH_SCHEME:
+            reasons.append('operator result does not bind the full-artifact hash scheme')
         elif cur is None or p.get('artifact_sha256') != cur:
             reasons.append('operator result is for a different or unknown artifact revision')
         elif expected_operator_checker_id is None or p.get('checker_id') != expected_operator_checker_id:
@@ -270,9 +294,11 @@ def evaluate_done(cycle_complete, signed_gate, qc=None, current_artifact_sha256=
         else:
             reasons.append('operator result is not a clean accept or reject')
     if signed_gate is not None:
-        g = verify(operator_key, signed_gate)
+        g = verify(operator_key, signed_gate, KIND_GATE)
         if g is None:
             reasons.append('gate report not authenticated (bad or missing signature/key)')
+        elif g.get('hash_scheme') != HASH_SCHEME:
+            reasons.append('gate report does not bind the full-artifact hash scheme')
         elif cur is None or g.get('artifact_sha256') != cur:
             reasons.append('gate report is stale: artifact revision changed or unknown')
         elif g.get('checker_id') != checker_id():

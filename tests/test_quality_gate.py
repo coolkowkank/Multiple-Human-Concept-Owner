@@ -2,7 +2,8 @@ import copy
 import functools
 import unittest
 from launcher.quality_gate import (generate_mutants, harvest_expected_constants, run_gate,
-                                    evaluate_done, artifact_sha256, sign, verify, checker_id)
+                                    evaluate_done, artifact_sha256, sign, sign_gate, sign_operator, verify, checker_id,
+                                    KIND_GATE, KIND_OPERATOR)
 
 KEY = b'k' * 32
 SRC = 'def add(a, b):\n    """Add."""\n    return a + b\n'
@@ -39,12 +40,12 @@ def gate(test=STRONG, src=SRC, o=True, **kw):
 def done(g, cur=None, *, cycle=True, qc=None, op=None, key=KEY, **kw):
     kw.setdefault('expected_target', 'src/app.py')
     kw.setdefault('expected_operator_checker_id', OPCK)
-    return evaluate_done(cycle, sign(KEY, g) if g is not None else None, qc,
+    return evaluate_done(cycle, sign_gate(KEY, g) if g is not None else None, qc,
                          cur or (g or {}).get('artifact_sha256'), op, operator_key=key, **kw)
 
 
 def op(cur, accepted=True, state=None, checker=OPCK):
-    return sign(KEY, {'artifact_sha256': cur, 'accepted': accepted, 'checker_id': checker,
+    return sign_operator(KEY, {'hash_scheme': 'artifact_sha256/v1', 'artifact_sha256': cur, 'accepted': accepted, 'checker_id': checker,
                       'state': state or ('accepted' if accepted else 'rejected')})
 
 
@@ -138,18 +139,18 @@ class Policy(unittest.TestCase):
 
     def test_unsigned_or_wrong_key_dict_cannot_pass(self):
         g = gate()
-        for signed in (g, {'payload': g, 'sig': 'x'}, sign(b'z' * 32, g), {'payload': g}, None, 5):
+        for signed in (g, {'payload': g, 'sig': 'x'}, sign_gate(b'z' * 32, g), {'payload': g}, None, 5):
             d = evaluate_done(True, signed, None, g['artifact_sha256'], None, operator_key=KEY,
                               expected_target='src/app.py')
             self.assertFalse(d['terminal_done'], signed)
         for key in (None, b'short', 'str'):
-            self.assertFalse(evaluate_done(True, sign(KEY, g), None, g['artifact_sha256'], None, operator_key=key,
+            self.assertFalse(evaluate_done(True, sign_gate(KEY, g), None, g['artifact_sha256'], None, operator_key=key,
                                            expected_target='src/app.py')['terminal_done'])
-        self.assertIsNone(verify(KEY, 'junk'))
+        self.assertIsNone(verify(KEY, 'junk', KIND_GATE))
 
     def test_tampered_after_signing_detected(self):
         g = gate(WEAK)
-        s = sign(KEY, g); s['payload']['verdict'] = 'passed'
+        s = sign_gate(KEY, g); s['payload']['verdict'] = 'passed'
         self.assertFalse(evaluate_done(True, s, None, g['artifact_sha256'], None, operator_key=KEY,
                                        expected_target='src/app.py')['terminal_done'])
 
@@ -164,7 +165,7 @@ class Policy(unittest.TestCase):
         other = artifact_sha256({'src/app.py': 'def add(a, b):\n    return 5\n', 'tests/t.py': STRONG})
         self.assertFalse(done(g, other)['terminal_done'])
         for cur in (None, '', 'short', 5):
-            d = evaluate_done(True, sign(KEY, g), None, cur, None, operator_key=KEY, expected_target='src/app.py')
+            d = evaluate_done(True, sign_gate(KEY, g), None, cur, None, operator_key=KEY, expected_target='src/app.py')
             self.assertFalse(d['terminal_done'])
 
     def test_target_checker_runner_and_O_binding(self):
@@ -189,7 +190,7 @@ class Policy(unittest.TestCase):
     def test_operator_result_rules(self):
         cur = gate()['artifact_sha256']
         def ev(o, g=None, **kw):
-            return evaluate_done(True, sign(KEY, g) if g else None, None, cur, o, operator_key=KEY,
+            return evaluate_done(True, sign_gate(KEY, g) if g else None, None, cur, o, operator_key=KEY,
                                  expected_target='src/app.py', expected_operator_checker_id=OPCK, **kw)
         self.assertEqual(ev(op(cur))['quality'], 'operator_check_passed')
         self.assertTrue(ev(op(cur))['terminal_done'])
@@ -200,7 +201,7 @@ class Policy(unittest.TestCase):
         d = ev(op(cur, accepted=False), gate())
         self.assertEqual((d['quality'], d['terminal_done']), ('failed', False))
         g = gate(WEAK)
-        d = evaluate_done(True, sign(KEY, g), None, g['artifact_sha256'], op('d' * 64), operator_key=KEY,
+        d = evaluate_done(True, sign_gate(KEY, g), None, g['artifact_sha256'], op('d' * 64), operator_key=KEY,
                           expected_target='src/app.py', expected_operator_checker_id=OPCK)
         self.assertFalse(d['terminal_done'])
 
@@ -208,6 +209,27 @@ class Policy(unittest.TestCase):
         cur = 'a' * 64
         d = evaluate_done(True, None, None, cur, op(cur), operator_key=KEY)
         self.assertFalse(d['terminal_done'])
+
+    def test_domain_separation_and_hash_scheme(self):
+        g = gate(); cur = g['artifact_sha256']
+        o = {'hash_scheme': 'artifact_sha256/v1', 'artifact_sha256': cur, 'accepted': True,
+             'checker_id': OPCK, 'state': 'accepted'}
+        # a gate signature replayed as an operator result, and vice versa, is not accepted
+        self.assertIsNone(verify(KEY, sign_gate(KEY, o), KIND_OPERATOR))
+        self.assertIsNone(verify(KEY, sign_operator(KEY, g), KIND_GATE))
+        self.assertFalse(done(None, cur, op=sign_gate(KEY, o))['terminal_done'])
+        forged = sign_gate(KEY, g); forged['kind'] = KIND_OPERATOR
+        self.assertIsNone(verify(KEY, forged, KIND_OPERATOR))
+        self.assertFalse(evaluate_done(True, sign_operator(KEY, g), None, cur, None, operator_key=KEY,
+                                       expected_target='src/app.py')['terminal_done'])
+        with self.assertRaises(ValueError):
+            sign(KEY, g, 'other')
+        # per-file hash or missing scheme is not the full-artifact binding
+        for bad in (dict(o, hash_scheme='sha256-of-one-file'), {k: v for k, v in o.items() if k != 'hash_scheme'}):
+            self.assertFalse(done(None, cur, op=sign_operator(KEY, bad))['terminal_done'])
+        self.assertTrue(done(None, cur, op=sign_operator(KEY, o))['terminal_done'])
+        g2 = dict(g, hash_scheme='per-file')
+        self.assertFalse(done(g2)['terminal_done'])
 
 
 if __name__ == '__main__':
