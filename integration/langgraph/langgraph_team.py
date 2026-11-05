@@ -72,6 +72,8 @@ from launcher.cli import default_roster
 from launcher.demo import _scripts
 from launcher.runtime import Seat, SeatError
 from launcher.adapters import HttpAdapter, MockAdapter, QueueAdapter
+import fenced_http
+from fenced_http import FencedHttpAdapter
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
@@ -102,7 +104,7 @@ MARKER_SUFFIX = ".lg-demo-fresh"
 # an adapter this graph will execute - no registry lookup, no spec
 # string that could resolve to a provider-calling class.
 SAFE_CONSTRUCTORS = {"mock": MockAdapter, "queue": QueueAdapter,
-                     "http": HttpAdapter}
+                     "http": FencedHttpAdapter}
 ALLOWED_ADAPTERS = set(SAFE_CONSTRUCTORS)
 
 # The "http" type is NOT open: a seat spec is accepted only if it is the
@@ -121,7 +123,7 @@ HTTP_MAX_BUDGET = 8
 HTTP_MAX_TOKENS = 8000
 HTTP_SPEC_KEYS = {"type", "base_url", "model", "api_key_env", "timeout",
                   "max_tokens", "reasoning_effort", "call_budget",
-                  "usage_log", "require_zero_cost"}
+                  "usage_log", "log_epoch", "require_zero_cost"}
 
 
 def _http_spec_refusal(spec: dict, repo: str) -> str:
@@ -150,13 +152,11 @@ def _http_spec_refusal(spec: dict, repo: str) -> str:
         return "timeout must be an int in 1..300"
     if ad.get("reasoning_effort", "low") not in ("low", "medium", "high"):
         return "invalid reasoning_effort"
-    ul = ad.get("usage_log")
-    if not isinstance(ul, str) or not os.path.isabs(ul):
-        return "usage_log must be an absolute path"
-    real = os.path.realpath(ul)
-    root = os.path.realpath(repo)
-    if real == root or real.startswith(root + os.sep):
-        return "usage_log must be outside the repo"
+    ep = ad.get("log_epoch")
+    if not isinstance(ep, str) or not fenced_http.EPOCH_RE.match(ep):
+        return "log_epoch must match [a-z0-9-]{1,32}"
+    if ad.get("usage_log") != fenced_http.log_path(ad["model"], ep):
+        return "usage_log must be the fixed derived path for model+epoch"
     return ""
 
 # Operator control plane. ONE channel: .team/CONTROL.json inside the git
@@ -724,6 +724,18 @@ def seat_node(seat: str, state: TeamState) -> dict:
                               f"{why}"}
     seat_obj = Seat(bus, seat)
     adapter = getattr(seat_obj, "adapter", None)
+    if spec_type == "http":
+        # The runtime built the generic HttpAdapter from the spec; it is
+        # never called. Replace it with the fenced single-request adapter.
+        if type(adapter) is not HttpAdapter:
+            return {"seat_error": f"{seat} refused at execution: unexpected "
+                                  f"constructed adapter for http spec"}
+        ad = spec["adapter"]
+        adapter = FencedHttpAdapter(
+            HTTP_FREE_BASE, ad["model"], ad["api_key_env"], ad["log_epoch"],
+            ad["call_budget"], ad["max_tokens"], ad.get("timeout", 300),
+            ad.get("reasoning_effort", "low"))
+        seat_obj.adapter = adapter
     if (adapter is None
             or type(adapter) is not SAFE_CONSTRUCTORS[spec_type]):
         return {"seat_error": f"{seat} refused at execution: constructed "
@@ -954,9 +966,10 @@ def main(argv) -> int:
         init_repo(repo, http_seats={seat: {
             "type": "http", "base_url": HTTP_FREE_BASE, "model": model,
             "api_key_env": HTTP_KEY_ENV, "require_zero_cost": True,
-            "call_budget": 4, "max_tokens": 6000, "timeout": 280,
+            "call_budget": 2, "max_tokens": 6000, "timeout": 280,
             "reasoning_effort": "low",
-            "usage_log": os.path.abspath(usage_log)}})
+            "log_epoch": usage_log,
+            "usage_log": fenced_http.log_path(model, usage_log)}})
         return 0
     if phase == "run":
         run_graph(repo, db, stop_after, thread_id)
