@@ -25,8 +25,16 @@ PROVENANCE = ('fake', 'provider_unverified')
 def _read(path):
     if not os.path.exists(path):
         return []
+    rows = []
     with open(path, encoding='utf-8') as fh:
-        return [json.loads(l) for l in fh if l.strip()]
+        for n, l in enumerate(fh, 1):
+            if l.strip():
+                try:
+                    rows.append(json.loads(l))
+                except ValueError:
+                    raise ValueError(f'audit file line {n} is not valid JSON; '
+                                     'refusing to continue (fail-closed)') from None
+    return rows
 
 
 def run_builder_call(context, adapter, audit_path, record_path, provenance):
@@ -40,9 +48,14 @@ def run_builder_call(context, adapter, audit_path, record_path, provenance):
         raise ValueError(f'provenance must be one of {PROVENANCE}')
     if provenance == 'provider_unverified' and getattr(type(adapter), 'REPORTS_PROVIDER_USAGE', False) is not True:
         raise ValueError('provider_unverified requires an adapter class declaring REPORTS_PROVIDER_USAGE')
+    before = len(_read(audit_path))  # corrupt audit file refuses before any call
+    # Exclusive reservation: a concurrent or repeated run cannot pass this point.
+    try:
+        os.close(os.open(record_path + '.reserve', os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
+    except FileExistsError:
+        raise FileExistsError('record already reserved or written; refusing to rerun') from None
     if os.path.exists(record_path):
         raise FileExistsError('record already exists; refusing to rerun')
-    before = len(_read(audit_path))
     system, task, _ = render_audited_prompt(**context)
     wrapped = PromptAuditAdapter(adapter, audit_path, lambda: dict(context))
     error_type = None

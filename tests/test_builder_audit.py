@@ -53,6 +53,24 @@ class T(unittest.TestCase):
             run_builder_call(ctx(), ad, self.a, self.r, 'fake')
         self.assertEqual(len(n), 1)
 
+    def test_reservation_blocks_second_run_even_without_record(self):
+        n = []
+        ad = ProviderInjectedTransportAdapter(lambda s, p: n.append(1) or {'kind': 'ok', 'content': OK}, trust_provider_transport=True)
+        open(self.r + '.reserve', 'w').close()  # as if another run holds it or crashed after reserving
+        with self.assertRaises(FileExistsError):
+            run_builder_call(ctx(), ad, self.a, self.r, 'fake')
+        self.assertEqual(n, [])
+
+    def test_corrupt_audit_file_refuses_before_call(self):
+        n = []
+        ad = ProviderInjectedTransportAdapter(lambda s, p: n.append(1) or {'kind': 'ok', 'content': OK}, trust_provider_transport=True)
+        open(self.a, 'w').write('{bad json\n')
+        with self.assertRaises(ValueError) as cx:
+            run_builder_call(ctx(), ad, self.a, self.r, 'fake')
+        self.assertIn('line 1', str(cx.exception))
+        self.assertEqual(n, [])
+        self.assertFalse(os.path.exists(self.r + '.reserve'))
+
     def test_failure_recorded_by_type_and_reraised(self):
         ad = ProviderInjectedTransportAdapter(lambda s, p: {'kind': 'http', 'code': 402}, trust_provider_transport=True)
         with self.assertRaises(AdapterError):

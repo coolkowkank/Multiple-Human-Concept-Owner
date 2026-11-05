@@ -263,6 +263,7 @@ class HttpAdapter(Adapter):
             return 0
 
     def complete(self, system, prompt):
+        self.last_call = None  # first line: pre-request failures never carry old evidence
         key = os.environ.get(self.api_key_env)
         if not key:
             raise AdapterError(f"missing API key env var {self.api_key_env}")
@@ -287,7 +288,6 @@ class HttpAdapter(Adapter):
                 # Python-urllib user agent; send an explicit one.
                 "user-agent": "team-launcher-http-adapter/0.1",
             })
-        self.last_call = None  # cleared so a failed call never leaks a stale id
         data = self._post(req)
         # Provider-REPORTED fields of the last successful response (raw, kept in
         # memory only). Reported, not verified; consumers must sanitize.

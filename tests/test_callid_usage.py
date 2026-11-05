@@ -151,3 +151,32 @@ class Boundary(unittest.TestCase):
         rep = join(rows, usage_from_audit(rows) + extra)
         self.assertEqual(rep['rows'][0]['status'], 'error:duplicate_usage')
         self.assertIsNone(rep['provider_prompt_tokens'])
+
+
+class StaleBeforeRequest(unittest.TestCase):
+    def test_missing_key_after_prior_call_carries_no_old_evidence(self):
+        os.environ['CK2'] = 'k'
+        a = HttpAdapter('http://x.invalid', 'm', 'CK2')
+        with mock.patch('urllib.request.urlopen', return_value=Resp(body(id='cmpl-1', usage={'prompt_tokens': 4, 'completion_tokens': 2}))):
+            a.complete('s', 'p')
+        self.assertIsNotNone(a.last_call)
+        del os.environ['CK2']
+        with mock.patch('urllib.request.urlopen') as uo:
+            with self.assertRaises(Exception):
+                a.complete('s', 'p')
+            uo.assert_not_called()  # no provider attempt
+        self.assertIsNone(a.last_call)
+        # through the audit wrapper: the error row has no reported evidence, nothing joins
+        d = tempfile.mkdtemp()
+        from launcher.prompt_audit import PromptAuditAdapter, render_audited_prompt
+        c = ctx(); path = os.path.join(d, 'a.jsonl')
+        w = PromptAuditAdapter(a, path, lambda: dict(c))
+        sysp, task, _ = render_audited_prompt(**c)
+        with self.assertRaises(Exception):
+            w.complete(sysp, task)
+        rows = [json.loads(l) for l in open(path)]
+        shutil.rmtree(d, True)
+        self.assertEqual(rows[-1]['event'], 'adapter_call_error')
+        self.assertNotIn('reported', rows[-1])
+        rep = join(rows, usage_from_audit(rows))
+        self.assertIsNone(rep['provider_prompt_tokens'])
