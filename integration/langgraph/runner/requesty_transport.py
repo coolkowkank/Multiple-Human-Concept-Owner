@@ -194,6 +194,7 @@ def guarded_post_factory(allowed, env="REQUESTY_API_KEY", opener=None,
         except (OSError, http.client.HTTPException) as e:
             return unk("connect-or-send", "network", e)
         with resp:
+            resp_status = getattr(resp, "status", None)
             ctype = (resp.headers.get("content-type", "") or "").split(";")[0]
             try:
                 raw = resp.read(max_body + 1)
@@ -218,7 +219,13 @@ def guarded_post_factory(allowed, env="REQUESTY_API_KEY", opener=None,
             ch = data["choices"][0]
             content = ch["message"]["content"]
         except (KeyError, IndexError, TypeError, AttributeError) as e:
-            return unk("response-shape", "malformed", e, raw, ctype)
+            r = unk("response-shape", "malformed", e, raw, ctype)
+            r["diag"] = rc.clean_diag(dict(
+                r["diag"], status=resp_status, **rc.shape_probe(data)))
+            ur = data.get("usage") if isinstance(data, dict) else None
+            r["usage"], r["usage_flag"] = rc.sanitize_usage(ur)
+            r["cost_signal"] = rc.cost_signal(ur)
+            return r
         usage_raw = data.get("usage")
         usage, uflag = rc.sanitize_usage(usage_raw)
         csig = rc.cost_signal(usage_raw)

@@ -1521,7 +1521,47 @@ def redact(text, n=200, secret=None):
 # Structural only: no response-body text is ever persisted.
 DIAG_KEYS = ("stage", "class", "error_type", "status", "content_type",
              "elapsed_s", "body_len", "body_kind", "finish_reason",
-             "reasoning_present")
+             "reasoning_present", "shape", "msg_keys", "has_error_obj", "error_origin")
+
+
+MSG_KEY_VOCAB = ("role", "content", "reasoning", "reasoning_content",
+                 "tool_calls", "refusal", "function_call", "name")
+
+
+def shape_probe(data):
+    """Structural-only probe of a parsed response that failed the
+    choices[0].message.content path. Returns fixed-vocabulary enums and a
+    key subset drawn from MSG_KEY_VOCAB: never values, text or raw keys."""
+    out = {"has_error_obj": int(isinstance(data, dict)
+                                and "error" in data)}
+    if out["has_error_obj"]:
+        eo = data["error"].get("origin") if isinstance(
+            data["error"], dict) else None
+        out["error_origin"] = eo if eo in ("router", "provider") \
+            else "unknown"
+    if not isinstance(data, dict):
+        out["shape"] = "not-object"
+        return out
+    ch = data.get("choices")
+    if ch is None:
+        out["shape"] = "no-choices"
+    elif not isinstance(ch, list):
+        out["shape"] = "choices-not-list"
+    elif not ch:
+        out["shape"] = "choices-empty"
+    elif not isinstance(ch[0], dict):
+        out["shape"] = "choice-not-object"
+    else:
+        m = ch[0].get("message")
+        if m is None:
+            out["shape"] = "no-message"
+        elif not isinstance(m, dict):
+            out["shape"] = "message-not-object"
+        else:
+            out["msg_keys"] = ",".join(k for k in MSG_KEY_VOCAB if k in m)
+            out["shape"] = ("no-content-key" if "content" not in m
+                            else "other")
+    return out
 
 
 def body_kind(raw):
@@ -1541,6 +1581,14 @@ def body_kind(raw):
         return "binary"
 
 
+_ENUM_DIAG = {
+    "shape": ("not-object", "no-choices", "choices-not-list",
+              "choices-empty", "choice-not-object", "no-message",
+              "message-not-object", "no-content-key", "other"),
+    "error_origin": ("router", "provider", "unknown"),
+}
+
+
 def clean_diag(d):
     """Only allowlisted keys, bounded, scalars only."""
     if not isinstance(d, dict):
@@ -1552,6 +1600,27 @@ def clean_diag(d):
             fe = finish_enum(v)
             if fe is not None:
                 out[k] = fe
+            continue
+        if k in _ENUM_DIAG:
+            if isinstance(v, str) and v in _ENUM_DIAG[k]:
+                out[k] = v
+            continue
+        if k == "has_error_obj":
+            if isinstance(v, (bool, int)) and v in (0, 1):
+                out[k] = int(v)
+            continue
+        if k == "msg_keys":
+            if isinstance(v, str):
+                parts = v.split(",") if v else []
+                canon = [m for m in MSG_KEY_VOCAB if m in parts]
+                if sorted(parts) == sorted(canon) and \
+                        len(set(parts)) == len(parts):
+                    out[k] = ",".join(canon)
+            continue
+        if k == "status":
+            if isinstance(v, int) and not isinstance(v, bool) \
+                    and 100 <= v <= 599:
+                out[k] = v
             continue
         if isinstance(v, (int, float)) and not isinstance(v, bool):
             out[k] = round(v, 2) if isinstance(v, float) else v

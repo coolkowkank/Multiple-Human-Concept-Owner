@@ -6,14 +6,14 @@ runner's historical envelope/halt were self-imposed project controls,
 not an owner veto.
 
 Integrated accepted chain (2026-11-05): upstream tip
-ab79bf970e3a8b18007c26c742e56bda35bf1d3a (append-only window
+eef61c620308dc9e086a5bc6fe08152607824e1f (append-only window
 succession: validated actual prior bind, same lineage + claim-set
 fingerprint, strictly verifier-only max_requests 1, shared
 runtime/builder validator; independently reviewed and accepted by
 main, builder+runtime), vendored BYTE-EXACT into runner/:
-  - ryan_cycle.py       md5 74e848eec01ad9b97aaa62649d6789c2
+  - ryan_cycle.py       md5 ae08fb3c6dae3744e4a505ebc2428d8c
   - model_resources.py  md5 148d1e609f466332ebb1d6ce85ccf40d
-  - requesty_transport.py md5 701321b3a753b82365575b0b40f2acfd
+  - requesty_transport.py md5 974fbbfdcffd7b648d4552a063495fea
   - make_allowance.py   md5 4f3d08fe51e428089c6f62517820758c
 Run config: run-config/assignments.json is the SANITIZED public form
 of the operator assignment (main-approved 2026-11-05): verifier
@@ -103,9 +103,9 @@ from langgraph.graph import END, START, StateGraph
 # md5 pins of the accepted, independently reviewed vendored files.
 # Verified before ANY runner/transport use.
 VENDORED_MD5 = {
-    "ryan_cycle.py": "74e848eec01ad9b97aaa62649d6789c2",
+    "ryan_cycle.py": "ae08fb3c6dae3744e4a505ebc2428d8c",
     "model_resources.py": "148d1e609f466332ebb1d6ce85ccf40d",
-    "requesty_transport.py": "701321b3a753b82365575b0b40f2acfd",
+    "requesty_transport.py": "974fbbfdcffd7b648d4552a063495fea",
     "make_allowance.py": "4f3d08fe51e428089c6f62517820758c",
 }
 

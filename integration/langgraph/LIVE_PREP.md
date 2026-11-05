@@ -12,13 +12,14 @@ operation on the project, not an owner approval question.
 
 ## Integrated accepted chain (2026-11-05)
 
-Upstream tip `ab79bf970e3a8b18007c26c742e56bda35bf1d3a` (independently
-reviewed, accepted by main: 402 tests including changed-claims builder
-refusal and an honest A1->A2 single runtime pass; bounded
-transport/boundary from the earlier accepted chain) is vendored
+Upstream tip `eef61c620308dc9e086a5bc6fe08152607824e1f` (independently
+reviewed offline: 407 tests plus 95 adversarial forged-field cases; adds
+structural-only diagnostics on the malformed choices/message/content path:
+HTTP status, fixed shape/origin enums, message-key vocabulary, sanitized usage.
+No fallback parse, no cause claimed, no new call authority) is vendored
 BYTE-EXACT into `runner/` and md5-pinned in `live_lane.VENDORED_MD5`:
 
-- `ryan_cycle.py` (74e848eec01ad9b97aaa62649d6789c2) - envelope 7
+- `ryan_cycle.py` (ae08fb3c6dae3744e4a505ebc2428d8c) - envelope 7
   (historic reserves are never reset; after the leanstral attempt the
   executor root holds 5, so the gemma run is at most the 6th of 7),
   verifier max_tokens 4096, pre-I/O boundary under store.lock
@@ -34,7 +35,7 @@ BYTE-EXACT into `runner/` and md5-pinned in `live_lane.VENDORED_MD5`:
   actual succession, never to a body's own "succeeds" claim.
 - `model_resources.py` (148d1e609f466332ebb1d6ce85ccf40d) - unchanged
   from the previously accepted chain.
-- `requesty_transport.py` (701321b3a753b82365575b0b40f2acfd) - the
+- `requesty_transport.py` (974fbbfdcffd7b648d4552a063495fea) - the
   reviewed guarded transport: exact free-ID allowlist (subset of
   FREE_IDS with an evidenced listing ceiling), fixed endpoint
   (https://router.requesty.ai/v1/chat/completions, constant-verified,
