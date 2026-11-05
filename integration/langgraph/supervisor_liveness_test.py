@@ -145,13 +145,44 @@ try:
     sv._check_stall(S()); check("no second gate for the same turn from the stall path", len(sv.bus.gates) == 1)
     sv._reap_and_restart(); check("and nothing on later passes", sv.started == [] and len(sv.bus.gates) == 1)
     dead = P(rc=1); other = st(turn="qc", turn_since=since); sv = mk("http", {"builder": dead}, r, other); sv._reap_and_restart()
-    check("spending seat exits while ANOTHER seat holds the turn: restart cannot replay a call, restarted as before", sv.started == ["builder"] and not sv.bus.gates)
+    check("spending seat exits while ANOTHER seat holds the turn: still NOT restarted, escalated once", sv.started == [] and "builder" not in sv.procs and len(sv.bus.gates) == 1)
+    sv._reap_and_restart(); check("and not again on later passes", len(sv.bus.gates) == 1 and sv.started == [])
     dead = P(rc=1); sv = mk("http", {"builder": dead}, r, S()); sv.bus.state = lambda: (_ for _ in ()).throw(RuntimeError("bad state"))
-    sv._reap_and_restart(); check("unreadable state is treated as holding the turn: not restarted", sv.started == [] and len(sv.bus.gates) == 1)
+    sv._reap_and_restart(); check("unreadable state: not restarted, escalated once", sv.started == [] and len(sv.bus.gates) == 1)
+    dead = P(rc=0); sv = mk("http", {"builder": dead}, r, S()); sv._reap_and_restart()
+    check("a clean exit (rc 0) of a spending seat is also not auto-restarted", sv.started == [] and len(sv.bus.gates) == 1)
     dead = P(rc=1); sv = mk("mock", {"builder": dead}, r, S()); sv._reap_and_restart()
     check("non-spending seat exit: restarted as before", sv.started == ["builder"] and not sv.bus.gates and sv.restarts == {"builder": 1})
     alive = P(); sv = mk("http", {"builder": alive}, r, S()); sv._reap_and_restart()
     check("a live process is left alone by reap", sv.started == [] and not sv.bus.gates)
+    # hardening from review: unhashable type, sticky classification, failing gate
+    for nm, bad in (("list", ["mock"]), ("dict", {"a": 1}), ("None", None), ("upper", "MOCK"), ("int", 5)):
+        p = P(); sv = mk("mock", {"builder": p}, r, S()); sv.bus.kinds["builder"] = bad
+        sv.bus.roster = (lambda b=bad: {"seats": {"builder": {"adapter": {"type": b}}}})
+        try: sv._check_stall(S()); e = None
+        except Exception as ex: e = ex
+        check(f"adapter type {nm}: classified spending, no crash, not terminated", e is None and p.t == 0 and len(sv.bus.gates) == 1)
+    p = P(); sv = mk("http", {"builder": p}, r, S()); sv._is_spending("builder")
+    sv.bus.roster = lambda: {"seats": {"builder": {"adapter": {"type": "mock"}}}}
+    sv._check_stall(S()); check("a roster edit http->mock after the seat was seen spending does NOT downgrade it", p.t == 0 and len(sv.bus.gates) == 1)
+    p = P(); sv = mk("mock", {"builder": p}, r, S()); sv._is_spending("builder")
+    sv.bus.roster = lambda: {"seats": {"builder": {"adapter": {"type": "http"}}}}
+    sv._check_stall(S()); check("a roster edit mock->http makes it spending (never the reverse)", p.t == 0 and len(sv.bus.gates) == 1)
+    sv = mk("http", {"builder": P(rc=1)}, r, S())
+    def boom(*a, **k): raise OSError("disk")
+    sv.bus.open_gate = boom
+    try: sv._reap_and_restart(); e = None
+    except Exception as ex: e = ex
+    check("reap: failing open_gate does not raise, no restart, sanitized fallback log, proc dropped", e is None and sv.started == [] and "builder" not in sv.procs and any(l[1] == "escalation_failed" and "OSError" in l[2] and "disk" not in l[2] for l in sv.bus.log))
+    sv = mk("http", {"builder": P()}, r, S()); sv.bus.open_gate = boom; sv.bus.append_log = boom
+    try: sv._check_stall(S()); e = None
+    except Exception as ex: e = ex
+    check("stall: gate AND logging failing still does not raise or terminate", e is None and sv.procs["builder"].t == 0)
+    sv._check_stall(S()); check("and does not repeat for the same turn", True)
+    sv = mk("http", {"builder": P(rc=1)}, r, S()); sv.bus.open_gate = boom; sv.bus.append_log = boom
+    try: sv._reap_and_restart(); e = None
+    except Exception as ex: e = ex
+    check("reap: gate and logging both failing: no raise, no restart", e is None and sv.started == [])
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 print("\nSUPERVISOR LIVENESS:", "ALL CHECKS PASSED" if ok else "FAILURES ABOVE")

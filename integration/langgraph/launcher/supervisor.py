@@ -47,12 +47,22 @@ class Supervisor:
     NON_SPENDING_TYPES = {"mock", "queue", "interactive"}
 
     def _is_spending(self, seat):
+        """Conservative, sticky classification. A seat is spending unless
+        its roster adapter type is a known non-spending string. Once a seat
+        has EVER been seen as spending/unknown it stays spending: a later
+        roster edit (a model may write the worktree) cannot downgrade it."""
+        seen = getattr(self, "_spend_seen", None)
+        if seen is None:
+            seen = self._spend_seen = set()
         try:
             spec = self.bus.roster().get("seats", {}).get(seat)
-            kind = (spec or {}).get("adapter", {}).get("type")
+            kind = spec["adapter"]["type"]
+            cur = not (isinstance(kind, str) and kind in self.NON_SPENDING_TYPES)
         except Exception:
-            return True
-        return kind not in self.NON_SPENDING_TYPES
+            cur = True
+        if cur:
+            seen.add(seat)
+        return seat in seen
 
     def automated_seats(self):
         roster = self.bus.roster().get("seats", {})
@@ -62,6 +72,7 @@ class Supervisor:
 
     def start_seat(self, name):
         import os
+        self._is_spending(name)   # pin the classification from the config we start
         pkg_parent = os.path.dirname(os.path.dirname(
             os.path.abspath(__file__)))
         env = dict(os.environ)
@@ -123,25 +134,27 @@ class Supervisor:
             if proc.poll() is None:
                 continue
             if self._is_spending(name):
+                # Conservative policy: a spending seat that exited is NEVER
+                # restarted automatically, whoever holds the turn now. A
+                # snapshot of "another seat holds the turn" is not proof a
+                # restart cannot replay a call later; an operator decides.
+                del self.procs[name]
                 try:
                     st = self.bus.state()
                     holds = st.get("turn") == name
                 except Exception:
-                    st, holds = {}, True   # unreadable state: assume it holds the turn
-                if holds:
-                    # a restart would re-enter act_once and replay the call
-                    del self.procs[name]
+                    st, holds = {}, False
+                if holds:   # the stall path must not raise a second gate
                     self._stalled_seats = {(name, st.get("turn_seq"), st.get("turn_since"))}
-                    self.bus.append_log(
-                        "supervisor", "exit",
-                        f"seat {name} exited {proc.returncode} holding the "
-                        "turn; spending seat: NOT restarted")
-                    self._escalate_spending(
-                        f"spending seat {name} exited ({proc.returncode}) "
-                        "while holding the turn. Not restarted: a restart "
-                        "replays the model call. Inspect the process, the "
-                        "state and the lease (launcher lease) first.")
-                    continue
+                self._safe_log("exit",
+                    f"seat {name} exited {proc.returncode}; spending seat: "
+                    "NOT restarted")
+                self._escalate_spending(
+                    f"spending seat {name} exited ({proc.returncode}). Not "
+                    "restarted automatically: a restart can replay a model "
+                    "call and spend a request. Inspect the process, the "
+                    "state and the lease (launcher lease), then decide.")
+                continue
             count = self.restarts.get(name, 0)
             if count >= self.restart_limit:
                 self._escalate(
@@ -185,8 +198,7 @@ class Supervisor:
         if self._is_spending(turn):
             # never terminate/restart/replay a spending seat on elapsed time
             # or uncertain liveness: escalate for an operator decision
-            self.bus.append_log(
-                "supervisor", "stall",
+            self._safe_log("stall",
                 f"turn stalled on {turn} ({reason}); spending seat: NOT "
                 "terminated or restarted")
             self._escalate_spending(
@@ -204,11 +216,31 @@ class Supervisor:
                 f"turn stalled on interactive seat {turn}; "
                 "a human must nudge or re-open that session")
 
+    def _safe_log(self, kind, body):
+        try:
+            self.bus.append_log("supervisor", kind, body)
+        except Exception:
+            pass
+
     def _escalate_spending(self, text):
-        self.bus.open_gate("supervisor", text,
-                           options=["inspect first, then decide", "stop the team"],
-                           recommendation="inspect first; do not restart blindly")
-        self.bus.commit_all("supervisor: escalation (spending seat, no auto-restart)")
+        """Never raises: a failing gate or commit must neither kill the
+        supervisor loop nor turn into a restart. Fallback is a sanitized
+        log line; if that fails too the seat simply stays not restarted."""
+        try:
+            self.bus.open_gate(
+                "supervisor", text,
+                options=["inspect first, then decide", "stop the team"],
+                recommendation="inspect first; do not restart blindly")
+            self.bus.commit_all(
+                "supervisor: escalation (spending seat, no auto-restart)")
+        except Exception as exc:
+            try:
+                self.bus.append_log(
+                    "supervisor", "escalation_failed",
+                    f"escalation gate could not be recorded ({type(exc).__name__}); "
+                    "spending seat left NOT restarted")
+            except Exception:
+                pass
 
     def _escalate(self, text):
         self.bus.open_gate("supervisor", text,
