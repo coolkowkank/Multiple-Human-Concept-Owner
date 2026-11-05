@@ -54,7 +54,7 @@ It reports what the files say. It resolves nothing: an unknown outcome stays unk
 1. Run section 1 on the exact commit you were handed. Record the head and the result.
 2. Run `handover_check.py env` in your real environment and fix every blocking line.
 3. Read OPERATOR_GUIDE.md sections "Prerequisites", "Reserve preflight and the anchor", "Spending seats and the supervisor", "Runner roles through the shared fence".
-4. Receive the private state by the private route. Run section 4 against it. Compare the head, hashes and counts with what the previous operator told you. Differences are a stop, not something to repair.
+4. If the previous operator hands you the private state through a private route, run section 4 against it. If none is provided, you start without it: do not rebuild it from memory or from this repository, and do not treat a missing history as a clean one. Compare the head, hashes and counts with what the previous operator told you. Differences are a stop, not something to repair.
 5. Do not run anything model-backed until the owner of the project has made the budget and permit decisions for your window in the project's decision channel, and you have supplied your own keys.
 
 ## 6. Roles and jobs
@@ -62,6 +62,8 @@ It reports what the files say. It resolves nothing: an unknown outcome stays unk
 The team roster, blueprints and lifecycle rules are in `docs/team/` on the `team-launcher` branch (registry.md, lifecycle.md, blueprints). The registry is a name and role list. It does not by itself authorize models, spending or merges, and its status column is not a qualification. Model selection for each role belongs to the project's coordinator under the owner's instruction. No model route is recorded as qualified for any role.
 
 ## 7. Limits of this handover
+
+- The previous operator's chat history, prompts, accounts and vault are not part of this handover and are not exported. Only the project code, tests and sanitized state summaries are.
 
 - Tested offline in one environment. Not tested on another machine, with another person, or with another AI operator.
 - `handover_check.py` is a report. It does not detect tampering with same-user files.
