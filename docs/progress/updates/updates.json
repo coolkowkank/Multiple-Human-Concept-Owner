@@ -1,7 +1,13 @@
 {
- "asOf": "2026-11-05T15:50",
+ "asOf": "2026-11-05T15:59",
  "note": "Project-only status, newest first. This page replaces routine chat reports. It is edited by hand when the project changes; nothing here is a live feed, and it does not claim live, unattended or independently verified operation.",
  "items": [
+  {
+   "at": "2026-11-05T15:59",
+   "title": "Coordination bus: unknown push outcome fix is in review",
+   "status": "in review",
+   "body": "Reading the code showed that the LangGraph coordination bus (execution line d4a7485) can drop a commit that did land: if a push errors and the remote then cannot be read, it reset its commit and retried, which could repeat a batch of work. This was reproduced offline in disposable local repositories (6 checks fail on the old code). A fix draft is on branch live/p1-bus-ambiguous-push at b0abb19 (https://github.com/coolkowkank/Multiple-Human-Concept-Owner/commit/b0abb19aa22e5a9d5d83b5ae4196dd8e0b075c7d): an unreadable remote now keeps the commit and stops with a distinct error, with no reset and no retry, and retry stays only when the remote is read and provably lacks the commit. It passed its own tests and all 29 offline test files in one sandbox, run by the author. An independent review of that exact commit is pending, so it is not accepted. Not a rollout. Also corrected: the earlier plan said the push-gate executor fix needed integration into the LangGraph runtime. The runtime does not contain or call that executor, so nothing is integrated and no integration progress is claimed."
+  },
   {
    "at": "2026-11-05T15:50",
    "title": "Push gate: race found and fixed on a review branch, reviewed offline",
