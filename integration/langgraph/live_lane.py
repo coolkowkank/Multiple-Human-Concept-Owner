@@ -45,6 +45,9 @@ _HERE = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(_HERE, "runner"))
 
 import ryan_cycle as rc  # vendored, byte-exact accepted chain
+from typing import Annotated, TypedDict
+import operator as op
+from langgraph.graph import END, START, StateGraph
 import model_resources as mr  # vendored, byte-exact accepted chain
 
 REVIEWED_TRANSPORT_ATTR = "REVIEWED_TRANSPORT_ID"  # provisional name
@@ -104,3 +107,29 @@ def bounded_live_step(root: str, listing, record, post_factory, *,
                    listing if callable(listing) else (lambda: listing),
                    now if now is not None else time.time(), record,
                    clock=clock)
+
+
+def build_live_runner_graph(root, listing, record, post_factory, *,
+                            allowlist, transport_id, now=None, clock=None):
+    """A minimal LangGraph graph wrapping ONE bounded live runner step -
+    the shape main requires for the bounded verifier qualification:
+    driven through the ACTUAL compiled graph, not a direct rc.step call.
+    All boundary guarantees come from the accepted runner + reviewed
+    transport; this graph adds nothing but orchestration. No
+    checkpointer: no resume claim. Inert until main wires the accepted
+    chain and says go."""
+    class LiveRunnerState(TypedDict):
+        results: Annotated[list, op.add]
+
+    def node(state: LiveRunnerState) -> dict:
+        out = bounded_live_step(root, listing, record, post_factory,
+                                allowlist=allowlist,
+                                transport_id=transport_id,
+                                now=now, clock=clock)
+        return {"results": [out]}
+
+    g = StateGraph(LiveRunnerState)
+    g.add_node("bounded_live_step", node)
+    g.add_edge(START, "bounded_live_step")
+    g.add_edge("bounded_live_step", END)
+    return g.compile()
