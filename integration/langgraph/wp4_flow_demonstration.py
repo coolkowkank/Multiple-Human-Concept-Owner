@@ -14,8 +14,9 @@ Checks (written before the run):
  R2 seat order coordinator,builder,reviewer,qc,records,coordinator and
     turn_seq +1 per turn.
  R3 a QC-seat verdict row 'verdict PASS at head <sha>' exists, and the
-    application (src/ + tests/) is IDENTICAL between that head and the
-    final HEAD - Reviewer and QC ruled on the same application pin.
+    application (src/ + tests/) is IDENTICAL between the QC verdict head
+    and the final HEAD. The Reviewer's pin is NOT checked: no Reviewer
+    verdict names a head (a scripted-demo limit, kept visible).
  R4 the close was guarded, not bypassed: no review-required rows, no
     error/restart rows, no pending gates.
  R5 evidence files exist and the final verify test passes when re-run.
@@ -100,7 +101,7 @@ def main():
       "R2_order_ok": seats == expect,
       "R2_seq_plus1": all(b - a == 1 for a, b in zip(seqs, seqs[1:])),
       "R3_qc_pass_row": bool(m), "R3_verdict_head": m.group(1) if m else None,
-      "R3_same_application_pin": same_pin,
+      "R3_qc_head_matches_final": same_pin,
       "R4_review_required_rows": sum(1 for e in log if e.get("kind") == "review-required"),
       "R4_error_rows": sum(1 for e in log if e.get("kind") == "error"),
       "R4_restart_rows": sum(1 for e in log if e.get("kind") == "restart"),
@@ -113,7 +114,7 @@ def main():
       "lane": r, "supervisor_out_tail": so.strip().splitlines()[-3:],
     }
     res["SUCCESS"] = (res["R1_supervisor_done"] and res["R2_order_ok"] and res["R2_seq_plus1"]
-        and res["R3_qc_pass_row"] and res["R3_same_application_pin"]
+        and res["R3_qc_pass_row"] and res["R3_qc_head_matches_final"]
         and res["R4_review_required_rows"] == 0 and res["R4_error_rows"] == 0
         and res["R4_restart_rows"] == 0 and res["R4_pending_gates"] == 0
         and res["R5_files_ok"] and res["R5_final_verify_ok"])

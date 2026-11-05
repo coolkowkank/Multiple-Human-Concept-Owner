@@ -16,13 +16,14 @@ Reviewer and QC judgment on the same application pin, unattended - stays
 blocked on a model-backed route, which needs its own grounding and
 authority.
 
-Run 2026-11-05 (~21s wall): SUCCESS, all pre-registered flow checks:
+Run 2026-11-05 (~21s wall): SUCCESS, all pre-registered flow checks
+(flow checks, not acceptance criteria):
 - R1 unattended close: supervisor done, status done, no turn holder.
 - R2 seat order coordinator,builder,reviewer,qc,records,coordinator,
   turn_seq +1 per turn.
-- R3 QC verdict row "verdict PASS at head dc98bd07..."; src/ and tests/
-  are byte-identical between the verdict head and the final HEAD, so
-  Reviewer and QC ruled on the same application pin.
+- R3 QC verdict row "verdict PASS at head <40-hex>"; src/ and tests/
+  are byte-identical between the QC verdict head and the final HEAD.
+  The Reviewer's pin is not checked - no Reviewer verdict names a head.
 - R4 guarded close, not a bypass: zero review-required, error and
   restart rows; zero pending gates.
 - R5 evidence files present (app, test, findings, QC verdict, archive,
