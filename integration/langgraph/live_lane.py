@@ -111,7 +111,7 @@ from langgraph.graph import END, START, StateGraph
 # md5 pins of the vendored files (a tamper check, not an approval).
 # Verified before ANY runner/transport use.
 VENDORED_MD5 = {
-    "ryan_cycle.py": "7aa68e610e7e9da3659b592fb98a96f2",
+    "ryan_cycle.py": "09cdaae1b857231f15fa49cf770ebaa8",
     "model_resources.py": "148d1e609f466332ebb1d6ce85ccf40d",
     "requesty_transport.py": "974fbbfdcffd7b648d4552a063495fea",
     "make_allowance.py": "e81caf38b546ee4b94f1de34dea4ac42",

@@ -149,8 +149,30 @@ if rc.next_action(q2) == "verifier":
 else:
     print("SKIP  make_allowance build (fixture item not at verifier step: %s)" % rc.next_action(q2))
 
+
+# --- forward constants and the exact tiny allowlist id -----------------------
+import fenced_http as fh, requesty_transport as rt, langgraph_team as lt
+TINY, LAG = "novita/inclusionai/ling-3.0-tiny", "poolside/laguna-m.1"
+check("constants: QUESTION_BUDGET 7, ENVELOPE_TOTAL 8, shared cap 10", (rc.QUESTION_BUDGET, rc.ENVELOPE_TOTAL, fh.HTTP_LIFETIME_CAP) == (7, 8, 10))
+def gate_after(n):
+    d = fx.root_with(mkq(), fx.ASSIGN, tmp); st = rc.Store(d)
+    for i in range(n):
+        t = rc.iso(T0 - 200000 + i); st.append(dict(res(i, "verifier", "m%d" % i), ts=t)); st.append({"phase": "result", "rid": "r%d" % i, "outcome": "ok", "ts": t})
+    return rc.ledger_gate(st, T0, "q2")[0]
+check("envelope: 7 reserves (one slot left) -> ok; 8 -> wait", gate_after(7) == "ok" and gate_after(8) == "wait")
+check("allowlist: tiny id is on the fenced allowlist, laguna is not", TINY in lt.HTTP_FREE_MODELS and LAG not in lt.HTTP_FREE_MODELS)
+check("transport: tiny admitted with a listed ceiling >= the verifier ceiling; laguna has none", rt.LISTING_MAX_OUT[TINY] >= rc.CEILINGS["verifier"] and LAG not in rt.LISTING_MAX_OUT)
+try:
+    rt.guarded_post_factory(frozenset({TINY})); ok_t = True
+except Exception: ok_t = False
+try:
+    rt.guarded_post_factory(frozenset({LAG})); ok_l = True
+except Exception: ok_l = False
+check("transport: factory builds for tiny, refuses laguna (guard not weakened)", ok_t and not ok_l)
+check("allowlist: no other id was added to HTTP_FREE_MODELS", set(lt.HTTP_FREE_MODELS) == {fx.NEM, fx.LING, TINY})
+
 # --- pins ---------------------------------------------------------------------
-check("pin: patched ryan_cycle.py md5", md5("runner/ryan_cycle.py") == "7aa68e610e7e9da3659b592fb98a96f2")
+check("pin: patched ryan_cycle.py md5", md5("runner/ryan_cycle.py") == "09cdaae1b857231f15fa49cf770ebaa8")
 check("pin: patched make_allowance.py md5", md5("runner/make_allowance.py") == "e81caf38b546ee4b94f1de34dea4ac42")
 shutil.rmtree(tmp, ignore_errors=True)
 print("ALL PASS" if not fails else "FAILED: %s" % fails); sys.exit(1 if fails else 0)

@@ -240,7 +240,7 @@ def adapter_tests():
         # lifetime cap across epochs
         MODE.update(kind="ok", cost=0, content="x")
         hits0 = len(HITS)
-        for i in range(10):
+        for i in range(14):
             tryc(mk(base, "cap%d" % i, budget=8))
         check("lifetime cap holds across epochs (%d requests)" % (len(HITS) - hits0),
               len(HITS) - hits0 == fenced_http.HTTP_LIFETIME_CAP)

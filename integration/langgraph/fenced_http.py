@@ -38,7 +38,7 @@ import urllib.request
 from launcher.adapters import Adapter, AdapterError, parse_response
 
 HTTP_LOG_DIR = os.path.join(os.path.expanduser("~"), ".lg-http-usage")
-HTTP_LIFETIME_CAP = 8
+HTTP_LIFETIME_CAP = 10   # 8 -> 10, forward-only: 8 historic + at most 2 new
 MAX_BODY = 2_000_000
 EPOCH_RE = re.compile(r"^[a-z0-9-]{1,32}$")
 USAGE_KEYS = ("prompt_tokens", "completion_tokens", "total_tokens", "cost")

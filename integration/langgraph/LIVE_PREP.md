@@ -18,7 +18,7 @@ HTTP status, fixed shape/origin enums, message-key vocabulary, sanitized usage.
 No fallback parse, no cause claimed, no new call authority) is vendored
 BYTE-EXACT into `runner/` and md5-pinned in `live_lane.VENDORED_MD5`:
 
-- `ryan_cycle.py` (ae08fb3c6dae3744e4a505ebc2428d8c at that time; now a patched vendor, md5 7aa68e610e7e9da3659b592fb98a96f2, see OPERATOR_GUIDE 'Patched vendor delta') - envelope 7
+- `ryan_cycle.py` (ae08fb3c6dae3744e4a505ebc2428d8c at that time; now a patched vendor, md5 09cdaae1b857231f15fa49cf770ebaa8, see OPERATOR_GUIDE 'Patched vendor delta') - envelope 7
   (historic reserves are never reset; the project-internal reserve cap of 7
   is a self-imposed bookkeeping control, not an owner limit; its count
   is read from the authoritative ledger at run time, never from this doc),

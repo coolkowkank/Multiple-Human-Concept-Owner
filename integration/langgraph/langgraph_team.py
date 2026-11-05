@@ -118,7 +118,8 @@ ALLOWED_ADAPTERS = set(SAFE_CONSTRUCTORS)
 # qualification of the model.
 HTTP_FREE_BASE = "https://router.requesty.ai/v1"
 HTTP_FREE_MODELS = frozenset({"nvidia/nemotron-3-ultra-550b-a55b",
-                              "novita/ling-3.1-flash"})
+                              "novita/ling-3.1-flash",
+                              "novita/inclusionai/ling-3.0-tiny"})
 HTTP_KEY_ENV = "REQUESTY_API_KEY"
 HTTP_MAX_BUDGET = 8
 HTTP_MAX_TOKENS = 8000

@@ -65,10 +65,13 @@ CEILINGS = {"researcher": 2048, "verifier": 4096, "ryan": 2048}
 EFFORT = {"researcher": "low", "verifier": "none", "ryan": "low"}
 EFFORT_VALUES = ("none", "min", "low", "medium", "high")
 ROLE_CAP = {"researcher": 2, "verifier": 2, "ryan": 2}  # per question
-QUESTION_BUDGET = 5  # <= 5 requests per question; clean path = 3
-ENVELOPE_TOTAL = 7   # envelope: ALL reserves ever (incl. the allocation
+QUESTION_BUDGET = 7  # <= 7 requests per question; clean path = 3 (5 -> 7:
+                     # forward-only project edit for one verifier + one ryan
+                     # request on a lineage with 5 used; history unchanged)
+ENVELOPE_TOTAL = 8   # envelope: ALL reserves ever (incl. the allocation
                      # attempt). 6 -> 7 = 4 historic + at most 3 new
-                     # requests (operator edit, 2026-11-05). The historic
+                     # requests (operator edit, 2026-11-05); 7 -> 8 = 6
+                     # historic + at most 2 new (forward-only). The historic
                      # ledger is never reset or rewritten.
 DAILY_CAP = 24      # 4 cycles x 6 requests, all three roles combined
 CYCLES_PER_DAY = 4

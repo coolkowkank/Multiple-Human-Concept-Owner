@@ -293,7 +293,7 @@ Queue-assisted lanes: the operator's "response queued" commit sits between the r
 `runner_lane.FencedRunner` + `live_runner_step` let the Ryan runner roles
 (researcher, verifier, ryan) make a request ONLY through the shared
 fenced adapter: reserve-before-I/O, hash chain, shared halt and
-`HTTP_LIFETIME_CAP` (8) in `~/.lg-http-usage`. `ryan_cycle.http_post_factory`
+`HTTP_LIFETIME_CAP` (10; was 8) in `~/.lg-http-usage`. `ryan_cycle.http_post_factory`
 is not used (a test checks the lane never references it). The vendored
 runner is unchanged (md5 pin intact). Nothing here calls a real provider;
 the shipped lane `post` is still the refusing one.
@@ -312,10 +312,11 @@ Two histories, both kept, neither rewritten:
 - Runner ledger (`docs/team/ryan/ledger.jsonl`, envelope `ENVELOPE_TOTAL`,
   own halt/allowance state): 6 historical reserves, made through the
   independent path, so NOT in the shared 8.
-- Shared fenced log: 8 of 8 reserves consumed.
+- Shared fenced log: 8 reserves consumed of a lifetime cap now 10 (was 8; forward-only edit, the 8 stay).
 A new runner request counts in BOTH (one runner reserve, one shared
 reserve); either refusing stops it. They are different counters, not 8
-requests in total. No cap, envelope or halt is changed by this code.
+requests in total. This runner code changes no cap, envelope or halt; the
+constant edits are documented under "Patched vendor delta".
 
 Outcomes: raw HTTP 200 with content and explicit zero cost = `ok`
 (parsed-JSON validity is still the runner's own format precheck). 4xx =
@@ -374,9 +375,14 @@ route record).
 ## Patched vendor delta (successor window shape)
 
 `runner/ryan_cycle.py` and `runner/make_allowance.py` are no longer byte-exact
-copies of upstream. Offline source change only; no constant, cap, envelope,
-question budget, allowlist, assignment, key or ledger line is changed by it.
-Pins: ryan_cycle.py md5 `7aa68e610e7e9da3659b592fb98a96f2` (was
+copies of upstream. Offline source change only. The successor-shape change touches no
+constant. A second step changes constants, forward-only and with history
+kept: `QUESTION_BUDGET` 5 -> 7, `ENVELOPE_TOTAL` 7 -> 8,
+`fenced_http.HTTP_LIFETIME_CAP` 8 -> 10, and the exact id
+`novita/inclusionai/ling-3.0-tiny` is added to `langgraph_team.HTTP_FREE_MODELS`
+(it is already in the transport's FREE_IDS with a listed ceiling of 32768).
+No assignment, key, signing, ledger line or provider request is part of it.
+Pins: ryan_cycle.py md5 `09cdaae1b857231f15fa49cf770ebaa8` (successor shape only: `7aa68e610e7e9da3659b592fb98a96f2`; was
 `ae08fb3c6dae3744e4a505ebc2428d8c`), make_allowance.py md5
 `e81caf38b546ee4b94f1de34dea4ac42` (was `4f3d08fe51e428089c6f62517820758c`).
 `runner_succession_test.py` pins both md5 values so a later accidental edit is

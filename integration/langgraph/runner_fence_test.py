@@ -88,21 +88,27 @@ check("F1 success: one request, runner reserved+result ok", len(HITS) == 1 and p
 check("F1 shared log has reserve+exec+result (same single request), used 1", [e["phase"] for e in sl] == ["reserve", "exec", "result"] and r["shared"] == {"before_used": 0, "after_used": 1})
 check("F1 step applied from raw content", r["step"] is not None and r["step"].get("action") != "needs-human")
 
-d, att, post = fresh("cap"); seed_shared(8)
+d, att, post = fresh("cap"); seed_shared(fh.HTTP_LIFETIME_CAP)
 r = run(d, att, post)
-check("F2 shared cap 8 -> preflight refuses: no runner reserve, no request", r["refused"] and HITS == [] and phases(d) == [])
+check("F2 shared cap reached -> preflight refuses: no runner reserve, no request", r["refused"] and HITS == [] and phases(d) == [])
+
+d, att, post = fresh("capm1"); seed_shared(fh.HTTP_LIFETIME_CAP - 1)
+r = run(d, att, post)
+check("F2c one slot below the cap: exactly one request, shared used reaches the cap", len(HITS) == 1 and r["shared"]["after_used"] == fh.HTTP_LIFETIME_CAP)
+r2 = run(d, att, post)
+check("F2c the next request is refused at the cap (no second request)", len(HITS) == 1 and r2["refused"])
 
 d, att, post = fresh("shalt"); seed_shared(1, halt=True)
 r = run(d, att, post)
 check("F2b shared halt -> preflight refuses, no request", r["refused"] and HITS == [] and phases(d) == [])
 
 d, att, post = fresh("race1")
-def poison(): seed_shared(8)
+def poison(): seed_shared(fh.HTTP_LIFETIME_CAP)
 r = run(d, att, post, before_io=poison)
 led = rc.Store(d).ledger()
 check("F3 cap lost after preflight, before gate: gate reserve refuses, runner records factual not_sent, 0 requests, no shared reserve",
       HITS == [] and [e["phase"] for e in led] == ["reserved", "halt", "result", "halt"] and led[2]["outcome"] == "not_sent"
-      and att[0]["known_not_sent"] is True and r["shared"]["after_used"] == 8)
+      and att[0]["known_not_sent"] is True and r["shared"]["after_used"] == fh.HTTP_LIFETIME_CAP)
 
 d, att, post = fresh("race1b")
 def poison_halt(): seed_shared(1, halt=True)
@@ -113,7 +119,7 @@ check("F3b shared halt appears after preflight: not_sent, 0 requests", HITS == [
 d, att, post = fresh("race2")
 inner = post.post
 def racing(*a, **k):
-    seed_shared(8); return inner(*a, **k)   # lost AFTER the shared reserve
+    seed_shared(fh.HTTP_LIFETIME_CAP); return inner(*a, **k)   # lost AFTER the shared reserve
 post.post = racing
 r = run(d, att, post)
 check("F4 cap exhaustion after the reserve does not block the reserved request (halt would, see F18); exactly one request", len(HITS) == 1 and phases(d)[:2] == ["reserved", "result"])
