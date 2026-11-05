@@ -275,8 +275,20 @@ def graph_test():
         except BaseException as e:
             print("  (run ended: %s)" % type(e).__name__)
         check("graph seat: requests <= budget (hits %d)" % len(HITS), 0 < len(HITS) <= 2)
+        check("format-correction round fires for a fenced seat (budget 2: initial + one correction = 2 requests)", len(HITS) == 2)
         lg = open(os.path.join(fenced_http.HTTP_LOG_DIR, os.listdir(fenced_http.HTTP_LOG_DIR)[0])).read()
         check("no key or model text in log", "fake-key" not in lg and "not structured" not in lg)
+        shutil.rmtree(tmp); tmp = tempfile.mkdtemp()
+        fenced_http.HTTP_LOG_DIR = os.path.join(tmp, "logs")
+        spec1 = dict(spec, call_budget=1, log_epoch="g3", usage_log=fenced_http.log_path(GOOD["model"], "g3"))
+        repo, db = os.path.join(tmp, "lane1"), os.path.join(tmp, "db1.sqlite")
+        lt.init_repo(repo, http_seats={"coordinator": spec1})
+        del HITS[:]
+        try:
+            lt.run_graph(repo, db, 1, "t3")
+        except BaseException:
+            pass
+        check("budget 1: the correction round cannot overspend (1 request)", len(HITS) == 1)
         shutil.rmtree(tmp); tmp = tempfile.mkdtemp()
         fenced_http.HTTP_LOG_DIR = os.path.join(tmp, "logs")
         bad = dict(spec, base_url="http://127.0.0.1:9/v1")

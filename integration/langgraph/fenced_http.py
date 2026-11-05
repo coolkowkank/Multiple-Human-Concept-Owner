@@ -202,8 +202,17 @@ class FencedHttpAdapter(Adapter):
                               "usage": usage}
             try:
                 return parse_response(text)
-            except AdapterError:
-                # no raw model text in the error (it reaches traces)
+            except AdapterError as exc:
+                # no raw model text in the error (it reaches traces) and no
+                # raw= attribute (nothing is preserved from this adapter).
+                # A contract-format failure keeps the runtime's exact
+                # prefix so its ONE bounded format-correction round can
+                # fire; the per-seat call_budget still caps total requests.
+                if str(exc).startswith("model output is not JSON"):
+                    raise AdapterError(
+                        "model output is not JSON: the reply was not one "
+                        "bare object or one json fence (raw text withheld "
+                        "by the fenced adapter)") from None
                 raise AdapterError("response is not the required "
                                    "structured format") from None
         finally:
