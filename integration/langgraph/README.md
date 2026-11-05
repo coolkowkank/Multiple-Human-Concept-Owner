@@ -263,6 +263,9 @@ e881384dbfb99748359a19a944cb6575b4961f63 (the reviewed chain - not
 pip install langgraph==1.2.19 langgraph-checkpoint-sqlite==3.1.3
 ```
 
+Order matters: `parallel_team.py` expects lanes a, b and c to exist, so run all
+three `init` lines first (it fails without them).
+
 ```
 python integration/langgraph/langgraph_team.py init /tmp/demo/lane-a /tmp/demo/db-a.sqlite
 python integration/langgraph/langgraph_team.py run  /tmp/demo/lane-a /tmp/demo/db-a.sqlite 2 team-demo-a   # graceful stop after 2
@@ -321,3 +324,20 @@ Reported status of that private checker (reviewer's account, not independently r
 - ptrace attach and protocol-breaking candidates: rejected.
 - Infinite loop and stdout bomb: not allowed (exit 2).
 Not all cases are refusals: the correct add() and the blocked-write correct add() are allowed by design. Scope: this is bounded evidence for one add function inside finalize's same-user bwrap model, not general quality. A new host must re-probe /proc mem, fd and ptrace capability before trusting this boundary. The runtime bus DONE is still cycle-only.
+
+## Quickstart: reproducible multi-seat live run (free route, operator-run)
+
+Never run inside a seat. Needs Python >= 3.10, the pinned pip packages above, `bwrap`, and a Requesty key in a file only you can read. Not run by any test against the real provider; the tests use a local fake router.
+
+```
+export LG_VERIFY_SANDBOX=1                    # forces seat verify commands through the bwrap shim
+python integration/langgraph/langgraph_team.py init /ops/lane /ops/db.sqlite
+cp integration/langgraph/examples/live_config.example.json /ops/live.json && chmod 600 /ops/live.json   # edit paths, seats, epochs
+chmod 600 /ops/requesty.key /ops/brief_rules.md   # brief rules: start from examples/brief_reply_rules.md
+LG_OPERATOR_CONFIG=/ops/operator.json python integration/langgraph/langgraph_team.py live /ops/lane /ops/db.sqlite /ops/live.json my-thread
+python integration/langgraph/langgraph_team.py status /ops/lane      # quality status; no record = unproven
+```
+
+What `live` does, in order, refusing before any seat change or request on any failure: config and key files must be 0600 regular files owned by you, outside the lane; the verify sandbox must be ready; every seat must exist and use only keys `model, epoch, budget[, max_tokens]`; every model must be on the fixed allowlist and the router's current `/models` listing must show input and output price exactly 0 for it (a listing fact, not billing proof; prepaid billing is separate); only then are seat routes written to the roster and optional reply rules appended to the brief (once). The key is held in this process's environment only during the run and is never printed or written. The lifetime call budget lives in `fenced_http` and cannot be raised here. Seats you do not configure stay on their scripted mock adapters. Different models per seat are allowed (the allowlist has two ids); that is a configuration, not an independence qualification, and model quality is unqualified. At the end, if the bus is done it runs the operator closeout described above (`LG_OPERATOR_CONFIG`; exit 3 when quality is unproven).
+
+Not covered here: any reserve-ledger preflight across runs (planned as a read-only check), qualification of any model, and a general quality checker (one checker per artifact type).

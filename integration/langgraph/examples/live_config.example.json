@@ -1,0 +1,9 @@
+{
+  "key_file": "/OPERATOR/PRIVATE/requesty.key",
+  "brief_extra_file": "/OPERATOR/PRIVATE/brief_rules.md",
+  "stop_after": 2,
+  "seats": {
+    "builder":     {"model": "nvidia/nemotron-3-ultra-550b-a55b", "epoch": "b1", "budget": 1, "max_tokens": 6000},
+    "reviewer":    {"model": "novita/ling-3.1-flash",             "epoch": "r1", "budget": 1, "max_tokens": 6000}
+  }
+}

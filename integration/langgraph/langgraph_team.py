@@ -58,6 +58,7 @@ Phases (separate OS processes on purpose, to prove restart):
 from __future__ import annotations
 
 import json
+import urllib.request
 import operator
 import os
 import sqlite3
@@ -463,6 +464,14 @@ def operator_update_instructions(repo: str, text: str,
     return c["instruction_seq"]
 
 
+def _http_seat_spec(model, epoch, budget, max_tokens=6000):
+    return {"type": "http", "base_url": HTTP_FREE_BASE, "model": model,
+            "api_key_env": HTTP_KEY_ENV, "require_zero_cost": True,
+            "call_budget": budget, "max_tokens": max_tokens, "timeout": 280,
+            "reasoning_effort": "low", "log_epoch": epoch,
+            "usage_log": fenced_http.log_path(model, epoch)}
+
+
 def operator_set_http_seat(repo: str, seat: str, model: str, epoch: str,
                            budget: int, max_tokens: int = 6000) -> None:
     """Operator roster commit: make `seat` a fenced http seat. The spec is
@@ -470,11 +479,7 @@ def operator_set_http_seat(repo: str, seat: str, model: str, epoch: str,
     lifetime cap and log identity live in fenced_http, so this cannot
     create budget. Seat-only: other seats are untouched."""
     repo = os.path.abspath(repo)
-    spec = {"type": "http", "base_url": HTTP_FREE_BASE, "model": model,
-            "api_key_env": HTTP_KEY_ENV, "require_zero_cost": True,
-            "call_budget": budget, "max_tokens": max_tokens, "timeout": 280,
-            "reasoning_effort": "low", "log_epoch": epoch,
-            "usage_log": fenced_http.log_path(model, epoch)}
+    spec = _http_seat_spec(model, epoch, budget, max_tokens)
     why = _http_spec_refusal({"adapter": spec}, repo)
     if why:
         raise SystemExit(f"refused: {why}")
@@ -1005,6 +1010,158 @@ def verify(repo: str, checkpoint_db: str, thread_id: str,
     return ok
 
 
+# ---------- reproducible multi-seat live entry --------------------------------
+# `langgraph_team.py live LANE DB CONFIG [THREAD]`. Operator-owned, never run
+# inside a seat. Refuses BEFORE any seat change or request unless: the config
+# is a private file outside the lane, the verify sandbox is ready, every
+# seat model is on the fixed allowlist and the router's CURRENT listing shows
+# price 0 for it. The key is read from a private file, held only in this
+# process's environment during the run, never printed, written or exported.
+# Lifetime budget cannot be created here (fenced_http owns it).
+
+LIVE_CFG_KEYS = {"key_file", "seats", "brief_extra_file", "stop_after"}
+LIVE_SEAT_KEYS = {"model", "epoch", "budget", "max_tokens"}
+
+
+def _private_regular(path, what):
+    import stat as _s
+    st = os.lstat(path)
+    if (not _s.S_ISREG(st.st_mode) or st.st_uid != os.getuid()
+            or st.st_mode & 0o077):
+        raise SystemExit(f"refused: {what} must be a regular file owned by "
+                         f"the operator with mode 0600")
+
+
+def _fresh_free_listing(key, models):
+    """GET <router>/models with the key and require, for each model, a row
+    whose input and output price are exactly 0. Returns {model: (in, out)}."""
+    import math
+    req = urllib.request.Request(
+        HTTP_FREE_BASE + "/models",
+        headers={"Authorization": "Bearer " + key, "Accept": "application/json"})
+    try:
+        with fenced_http._opener().open(req, timeout=30) as r:
+            body = r.read(8 * 1024 * 1024 + 1)
+    except Exception as exc:
+        raise SystemExit("refused: could not read the router listing "
+                         f"({type(exc).__name__})")
+    if len(body) > 8 * 1024 * 1024:
+        raise SystemExit("refused: listing too large")
+    try:
+        rows = json.loads(body.decode("utf-8"))["data"]
+        by_id = {m["id"]: m for m in rows if isinstance(m, dict)}
+    except Exception:
+        raise SystemExit("refused: listing not in the expected shape")
+    out = {}
+    for m in sorted(models):
+        row = by_id.get(m)
+        if row is None:
+            raise SystemExit(f"refused: {m} is not in the current listing")
+        prices = []
+        for f in ("input_price", "output_price"):
+            try:
+                v = float(row[f])
+            except (KeyError, TypeError, ValueError):
+                raise SystemExit(f"refused: {m} has no usable {f}")
+            if not math.isfinite(v) or v != 0.0:
+                raise SystemExit(f"refused: {m} is not price 0 in the "
+                                 f"current listing")
+            prices.append(v)
+        out[m] = tuple(prices)
+    return out
+
+
+def _closeout(repo):
+    """End-of-run operator closeout (shared by run and live)."""
+    import done_gate
+    st = done_gate.finalize(repo, BRANCH, os.environ.get("LG_OPERATOR_CONFIG"))
+    print("closeout: " + json.dumps(st, sort_keys=True), flush=True)
+    if st["closeout_allowed"] or os.environ.get("LG_ALLOW_UNPROVEN") == "1":
+        return 0
+    return 3   # cycle ended but closeout is NOT allowed (quality unproven)
+
+
+def live_entry(repo, db, config_path, thread_id="live-1") -> int:
+    from launcher.runtime import verify_sandbox_ready
+    repo = os.path.abspath(repo)
+    roster_path = os.path.join(repo, ".team", "roster.json")
+    if not os.path.isfile(roster_path):
+        raise SystemExit("refused: lane not initialized (run init first)")
+    lane = os.path.realpath(repo) + os.sep
+    _private_regular(config_path, "config")
+    with open(config_path, encoding="utf-8") as fh:
+        cfg = json.load(fh)
+    if not isinstance(cfg, dict) or set(cfg) - LIVE_CFG_KEYS or "seats" not in cfg \
+            or "key_file" not in cfg:
+        raise SystemExit("refused: config keys must be a subset of "
+                         f"{sorted(LIVE_CFG_KEYS)} and include key_file, seats")
+    for pth in (config_path, cfg["key_file"], cfg.get("brief_extra_file") or config_path):
+        if (os.path.realpath(pth) + os.sep).startswith(lane):
+            raise SystemExit("refused: config, key and brief file must be outside the lane")
+    _private_regular(cfg["key_file"], "key_file")
+    if not verify_sandbox_ready():
+        raise SystemExit("refused: the verify sandbox is not ready "
+                         "(set LG_VERIFY_SANDBOX=1 with the shim present)")
+    with open(roster_path) as fh:
+        roster = json.load(fh)
+    seats = cfg["seats"]
+    if not isinstance(seats, dict) or not seats:
+        raise SystemExit("refused: seats must be a non-empty object")
+    specs = {}
+    for seat, s in seats.items():
+        if seat not in roster["seats"]:
+            raise SystemExit(f"refused: unknown seat {seat!r}")
+        if not isinstance(s, dict) or set(s) - LIVE_SEAT_KEYS \
+                or not {"model", "epoch", "budget"} <= set(s):
+            raise SystemExit(f"refused: seat {seat!r} needs model, epoch, budget "
+                             f"(optional max_tokens) and nothing else")
+        specs[seat] = _http_seat_spec(s["model"], s["epoch"], s["budget"],
+                                      s.get("max_tokens", 6000))
+        why = _http_spec_refusal({"adapter": specs[seat]}, repo)
+        if why:
+            raise SystemExit(f"refused: seat {seat!r}: {why}")
+    extra = None
+    if cfg.get("brief_extra_file"):
+        _private_regular(cfg["brief_extra_file"], "brief_extra_file")
+        with open(cfg["brief_extra_file"], encoding="utf-8") as fh:
+            extra = fh.read(16385)
+        if len(extra) > 16384:
+            raise SystemExit("refused: brief_extra_file over 16KB")
+    stop_after = cfg.get("stop_after", 0)
+    if not isinstance(stop_after, int) or isinstance(stop_after, bool) or stop_after < 0:
+        raise SystemExit("refused: stop_after must be a non-negative int")
+    with open(cfg["key_file"], encoding="utf-8") as fh:
+        key = fh.read().strip()
+    if not key:
+        raise SystemExit("refused: empty key")
+    listing = _fresh_free_listing(key, {sp["model"] for sp in specs.values()})
+    for m, (i, o) in listing.items():
+        print(f"live: listing {m} input_price={i} output_price={o} "
+              f"(router listing, not billing proof)", flush=True)
+    for seat, sp in specs.items():          # only now touch the lane
+        if roster["seats"][seat].get("adapter") != sp:
+            s = seats[seat]
+            operator_set_http_seat(repo, seat, s["model"], s["epoch"],
+                                   s["budget"], s.get("max_tokens", 6000))
+    if extra:
+        with open(os.path.join(repo, ".team", "brief.md"), encoding="utf-8") as fh:
+            brief = fh.read()
+        if extra not in brief:
+            operator_update_instructions(repo, brief + extra,
+                                         note="operator reply rules")
+    os.environ[HTTP_KEY_ENV] = key
+    try:
+        run_graph(repo, db, stop_after, thread_id)
+    finally:
+        os.environ.pop(HTTP_KEY_ENV, None)
+    bus_state = Bus(repo, BRANCH).state().get("status")
+    if bus_state != "done":
+        print(f"live: run stopped with bus status {bus_state!r}; no closeout evaluated",
+              flush=True)
+        return 0
+    return _closeout(repo)
+
+
 def status_cmd(argv) -> int:
     """Safe closeout status. Default (no operator record) = quality unproven,
     exit 1. With --record/--key-file/--checker-id/--path it delegates to
@@ -1027,6 +1184,9 @@ def status_cmd(argv) -> int:
 
 
 def main(argv) -> int:
+    if len(argv) > 4 and argv[1] == "live":
+        return live_entry(argv[2], argv[3], argv[4],
+                          argv[5] if len(argv) > 5 else "live-1")
     if len(argv) > 2 and argv[1] == "status":
         return status_cmd(argv[2:])
     phase, repo, db = argv[1], argv[2], argv[3]
@@ -1050,14 +1210,8 @@ def main(argv) -> int:
         run_graph(repo, db, stop_after, thread_id)
         # Operator-owned closeout. LG_OPERATOR_CONFIG is a PATH to an operator
         # config outside the lane (never the key). Unset = quality unproven.
-        import json as _j
-        import done_gate
         if not (stop_after and Bus(os.path.abspath(repo), BRANCH).state().get("status") != "done"):
-            st = done_gate.finalize(repo, BRANCH, os.environ.get("LG_OPERATOR_CONFIG"))
-            print("closeout: " + _j.dumps(st, sort_keys=True), flush=True)
-            if st["closeout_allowed"] or os.environ.get("LG_ALLOW_UNPROVEN") == "1":
-                return 0
-            return 3   # cycle ended but closeout is NOT allowed (quality unproven)
+            return _closeout(repo)
         return 0
     if phase == "verify":
         return 0 if verify(repo, db, thread_id, expect_resume=True) else 1
