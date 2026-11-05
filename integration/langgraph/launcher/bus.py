@@ -46,6 +46,15 @@ class BusError(Exception):
     pass
 
 
+EXIT_PUSH_UNKNOWN = 76   # seat/CLI exit: push outcome unknown, never auto-restarted
+
+
+class BusPushUnknown(BusError):
+    """A push returned an error and the remote state could not be read.
+    The local commit is kept: it may already have landed. Nothing is reset
+    or retried, so no batch of external effects is repeated."""
+
+
 def _git(repo, *args, check=True):
     proc = subprocess.run(
         ["git", "-C", repo, *args],
@@ -162,8 +171,14 @@ class Bus:
                 self.push()
                 return result
             except BusError:
-                if self._confirm_landed():
+                landed = self._confirm_landed()
+                if landed is True:
                     return result
+                if landed is None:
+                    raise BusPushUnknown(
+                        f"push to {self.branch} failed and the remote state "
+                        "could not be read: the commit is kept locally and "
+                        "may have landed; not reset, not retried")
                 _git(self.repo, "reset", "--hard", "HEAD~1", check=False)
                 if attempt == self.retries - 1:
                     raise BusError(f"lost {self.retries} commit races on {self.branch}")
@@ -259,22 +274,71 @@ class Bus:
                 # (missing ack != no execution). Check before retrying,
                 # or a retry would duplicate the batch's external
                 # effects (model calls, verify runs).
-                if self._confirm_landed():
+                landed = self._confirm_landed()
+                if landed is True:
                     return result
+                if landed is None:
+                    raise BusPushUnknown(
+                        f"push to {self.branch} failed and the remote state "
+                        "could not be read: the commit is kept locally and "
+                        "may have landed; not reset, not retried")
                 _git(self.repo, "reset", "--hard", "HEAD~1", check=False)
                 if attempt == self.retries - 1:
                     raise BusError(f"lost {self.retries} commit races on {self.branch}")
         return result
 
+    def _push_urls(self):
+        """Every URL `git push origin` writes to (pushurl entries, else
+        the fetch URL). None when they cannot be read."""
+        proc = _git(self.repo, "remote", "get-url", "--push", "--all",
+                    "origin", check=False)
+        urls = [u for u in proc.stdout.split("\n") if u.strip()]
+        return urls if proc.returncode == 0 and urls else None
+
+    def _landed_at(self, url, head, ref):
+        """True / False (provably absent) / None (unknown) for ONE push
+        destination. Absence needs a clean read of that exact URL: ls-remote
+        patterns match path suffixes, so only an output line whose refname
+        is exactly `ref` counts, and a failed read proves nothing."""
+        ls = _git(self.repo, "ls-remote", url, ref, check=False)
+        if ls.returncode != 0:
+            return None
+        shas = []
+        for line in ls.stdout.splitlines():
+            parts = line.split()
+            if len(parts) == 2 and parts[1] == ref:
+                shas.append(parts[0])
+        if len(shas) > 1:
+            return None
+        if not shas:
+            return False  # read fine; exact ref absent (decoy suffixes ignored)
+        if shas[0] == head:
+            return True
+        if _git(self.repo, "fetch", url, ref, check=False).returncode != 0:
+            return None
+        rc = _git(self.repo, "merge-base", "--is-ancestor", head,
+                  shas[0], check=False).returncode
+        return True if rc == 0 else (False if rc == 1 else None)
+
     def _confirm_landed(self):
-        """True when the remote already contains our local HEAD commit."""
+        """True: our HEAD is on EVERY push destination. False: every push
+        destination was read and provably lacks it. None: unknown (any
+        destination unreadable, or destinations disagree: some have it, some
+        do not). A failed fetch or stale local ref is never evidence of
+        absence, and the fetch URL is not assumed to be the push URL."""
         if not self.has_remote():
             return True  # local-only bus: the commit itself is the record
         head = _git(self.repo, "rev-parse", "HEAD").stdout.strip()
-        _git(self.repo, "fetch", "origin", self.branch, check=False)
-        proc = _git(self.repo, "merge-base", "--is-ancestor",
-                    head, f"origin/{self.branch}", check=False)
-        return proc.returncode == 0
+        urls = self._push_urls()
+        if urls is None:
+            return None
+        states = {self._landed_at(u, head, f"refs/heads/{self.branch}")
+                  for u in urls}
+        if states == {True}:
+            return True
+        if states == {False}:
+            return False
+        return None
 
     # -- state -----------------------------------------------------------
 
