@@ -206,6 +206,10 @@ def preflight(planned_calls, *, log_dir=None, cap=None, anchor=None, allow_fresh
         bad = _check_budgets(epoch_budgets)
         if bad:
             out["problems"].append(bad); return out
+        if epoch_budgets is not None and planned_calls != sum(epoch_budgets.values()):
+            out["problems"].append("ambiguous input: planned_calls %d != sum of epoch_budgets %d"
+                                   % (planned_calls, sum(epoch_budgets.values())))
+            return out
         out["epoch_budgets"] = dict(epoch_budgets) if epoch_budgets is not None else None
         dd, dc = (log_dir, cap)
         if dd is None or dc is None:
@@ -334,6 +338,9 @@ def main(argv):
         eb = {}
         for item in a.epoch_budget:
             k, _, v = item.rpartition("=")
+            if k in eb:        # a repeated key must never widen or replace a budget
+                print(json.dumps({"status": "refuse", "problems": ["duplicate --epoch-budget key: " + k]}))
+                return 1
             try:
                 eb[k] = int(v)
             except ValueError:

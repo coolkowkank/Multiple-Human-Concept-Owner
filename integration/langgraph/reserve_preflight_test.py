@@ -195,21 +195,28 @@ check("epoch budgets charge only what remains per epoch: needed 9 -> ok_to_plan"
       r["status"] == "ok_to_plan" and r["needed_calls"] == 9 and r["remaining"] == 9)
 EB2 = dict(EB, **{"rev-m.r1.jsonl": 3})
 check("one more real call than remaining -> still over_cap (never lowers real demand)",
-      rp.preflight(11, log_dir=d, cap=20, epoch_budgets=EB2)["status"] == "over_cap")
+      rp.preflight(12, log_dir=d, cap=20, epoch_budgets=EB2)["status"] == "over_cap")
+check("planned_calls that disagrees with the budget sum is ambiguous -> refuse",
+      rp.preflight(11, log_dir=d, cap=20, epoch_budgets=EB2)["status"] == "refuse")
+check("planned_calls 0 with budgets is ambiguous too (never silently ignored)",
+      rp.preflight(0, log_dir=d, cap=20, epoch_budgets=EB)["status"] == "refuse")
 check("a spent epoch is not credited to another epoch file",
-      rp.preflight(0, log_dir=d, cap=20, epoch_budgets={"coord-m.c2.jsonl": 3, "build-m.b1.jsonl": 4,
+      rp.preflight(13, log_dir=d, cap=20, epoch_budgets={"coord-m.c2.jsonl": 3, "build-m.b1.jsonl": 4,
                    "rev-m.r1.jsonl": 3, "qc-m.q1.jsonl": 3})["needed_calls"] == 12)
 check("over-spent epoch counts zero, never negative",
-      rp.preflight(0, log_dir=d, cap=20, epoch_budgets={"old-model.h1.jsonl": 2})["needed_calls"] == 0)
+      rp.preflight(2, log_dir=d, cap=20, epoch_budgets={"old-model.h1.jsonl": 2})["needed_calls"] == 0)
 for bad in ({}, {"x": 3}, {"coord-m.c1.jsonl": -1}, {"coord-m.c1.jsonl": True}, {"coord-m.c1.jsonl": None}, []):
     check("malformed epoch_budgets %r refuses" % (bad,), rp.preflight(1, log_dir=d, cap=20, epoch_budgets=bad)["status"] == "refuse")
+check("duplicate --epoch-budget key refused by the CLI",
+      rp.main(["--planned", "6", "--log-dir", d, "--cap", "20", "--epoch-budget", "coord-m.c1.jsonl=3",
+               "--epoch-budget", "coord-m.c1.jsonl=3"]) == 1)
 write(d, "build-m.b1.jsonl", [{"phase": "reserve", "n": 1, "model": "build/m"}, {"phase": "halt", "n": 1}])
 check("a halt line still refuses with epoch budgets", rp.preflight(1, log_dir=d, cap=20, epoch_budgets=EB)["status"] == "refuse")
 d = newdir()
 check("fresh dir, epoch budgets, allow_fresh -> needed is the sum",
-      rp.preflight(5, log_dir=os.path.join(d, "none"), cap=20, allow_fresh=True, epoch_budgets=EB)["needed_calls"] == 11)
+      rp.preflight(11, log_dir=os.path.join(d, "none"), cap=20, allow_fresh=True, epoch_budgets=EB)["needed_calls"] == 11)
 d = newdir(); write(d, "coord-m.c1.jsonl", seq(1, "coord/m"))
-check("CLI: --epoch-budget accepted, exit 0", rp.main(["--planned", "9", "--log-dir", d, "--cap", "3", "--epoch-budget", "coord-m.c1.jsonl=3"]) == 0)
+check("CLI: --epoch-budget accepted, exit 0", rp.main(["--planned", "3", "--log-dir", d, "--cap", "3", "--epoch-budget", "coord-m.c1.jsonl=3"]) == 0)
 check("CLI: malformed budget refuses", rp.main(["--planned", "1", "--log-dir", d, "--cap", "3", "--epoch-budget", "coord-m.c1.jsonl=abc"]) == 1)
 check("without epoch_budgets behaviour is unchanged (no needed_calls key effect)",
       rp.preflight(3, log_dir=d, cap=3)["status"] == "over_cap")
