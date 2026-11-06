@@ -12,6 +12,10 @@ def check(n, c):
     print(("PASS " if c else "FAIL ") + n)
     if not c: FAIL.append(n)
 tmp = tempfile.mkdtemp(); os.environ["WK"] = "x"
+def _seed():
+    g = fh.WINDOW_GATE; fh.WINDOW_GATE = False       # seed one reserve line only; the wrapper binds the run itself
+    try: fh.FencedHttpAdapter("http://127.0.0.1:1", "m-a", "WK", "e1", 9, 16, 1, None).reserve()
+    finally: fh.WINDOW_GATE = g
 def mk(tag):
     d = os.path.join(tmp, tag); os.makedirs(d, mode=0o700); return d
 L = mk("L"); fh.HTTP_LOG_DIR = L
@@ -26,7 +30,7 @@ def run(st, planned=1):
     return br.run(st, touch, 5, planned=planned, log_dir=L, cap=fh.HTTP_LIFETIME_CAP)
 st = mk("S1")
 fh.open_window(L, 2, nonce, CFG, rh, "0")
-a = fh.FencedHttpAdapter("http://127.0.0.1:1", "m-a", "WK", "e1", 9, 16, 1, None); a.reserve()
+_seed()
 r = run(st)
 check("window open but receipt missing locally: refused, no spawn", r[0] == "refused" and "receipt missing" in r[1]["reason"] and not os.path.exists(MARK))
 open(os.path.join(st, "window-receipt-%s.json" % nonce), "wb").write(b"tampered")
@@ -36,14 +40,14 @@ check("receipt hash mismatch refused", r[0] == "refused" and "hash does not matc
 for tag, kw in (("argv", dict(argv_sha256="0" * 64)), ("planned", dict(planned=2)), ("kind", dict(kind="x"))):
     L2 = mk("F" + tag); fh.HTTP_LOG_DIR = L2
     rc = mkreceipt(**kw); fh.open_window(L2, 2, nonce, CFG, hashlib.sha256(rc).hexdigest(), "0")
-    fh.FencedHttpAdapter("http://127.0.0.1:1", "m-a", "WK", "e1", 9, 16, 1, None).reserve()
+    _seed()
     s2 = mk("FS" + tag); open(os.path.join(s2, "window-receipt-%s.json" % nonce), "wb").write(rc)
     r = br.run(s2, touch, 5, planned=1, log_dir=L2, cap=fh.HTTP_LIFETIME_CAP)
     check("receipt field binding refuses (%s) with matching hash, no spawn" % tag, r[0] == "refused" and "window gate" in r[1]["reason"] and not os.path.exists(MARK))
 for tag, kw in (("seq", dict(seq=2)), ("k", dict(k=3)), ("config", dict(config_hash="1" * 64)), ("prev", dict(prev_receipt_hash="2" * 64))):
     L2 = mk("G" + tag); fh.HTTP_LOG_DIR = L2
     rc = mkreceipt(**kw); fh.open_window(L2, 2, nonce, CFG, hashlib.sha256(rc).hexdigest(), "0")
-    fh.FencedHttpAdapter("http://127.0.0.1:1", "m-a", "WK", "e1", 9, 16, 1, None).reserve()
+    _seed()
     s2 = mk("GS" + tag); open(os.path.join(s2, "window-receipt-%s.json" % nonce), "wb").write(rc)
     r = br.run(s2, touch, 5, planned=1, log_dir=L2, cap=fh.HTTP_LIFETIME_CAP)
     check("receipt window-line binding refuses (%s)" % tag, r[0] == "refused" and "differs" in r[1]["reason"] and not os.path.exists(MARK))
@@ -71,7 +75,7 @@ open(cfgp, "w").write(json.dumps({"seats": {"s1": {"model": "m/x", "epoch": "e1"
 CH = br.live_config_hash(lane, cfgp)
 Lc = mk("Lc"); fh.HTTP_LOG_DIR = Lc
 rc = mkreceipt(config_hash=CH); fh.open_window(Lc, 2, nonce, CH, hashlib.sha256(rc).hexdigest(), "0")
-fh.FencedHttpAdapter("http://127.0.0.1:1", "m-a", "WK", "e1", 9, 16, 1, None).reserve()
+_seed()
 sc = mk("Sc"); open(os.path.join(sc, "window-receipt-%s.json" % nonce), "wb").write(rc)
 open(cfgp, "w").write(json.dumps({"seats": {"s1": {"model": "m/x", "epoch": "e1", "budget": 1}}, }) + " ")   # content edit after the window
 r = br.run(sc, touch, 5, planned=1, log_dir=Lc, cap=fh.HTTP_LIFETIME_CAP, config_hash_fn=lambda: br.live_config_hash(lane, cfgp))

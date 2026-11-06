@@ -424,7 +424,7 @@ def window_gate(state_dir, log_dir, planned, argv=None, epoch_budgets=None, conf
     prove the upload). Skipped only when fh.WINDOW_GATE is False (tests)."""
     if not fh.WINDOW_GATE:
         return None
-    ok, why, info = fh.window_status(log_dir)
+    ok, why, info = fh.window_status(log_dir, check_run=False)
     if not ok:
         return why
     sm = fh.ledger_summary(log_dir)
@@ -561,6 +561,13 @@ def run(state_dir, argv, deadline, *, planned=None, epoch_budgets=None,
                 "argv_sha256": hashlib.sha256("\0".join(argv).encode()).hexdigest(),
                 "deadline_s": deadline, "child_pid": None, "child_pgid": None,
                 "started_at": time.time()}
+        if fh.WINDOW_GATE:
+            try:
+                w_ = fh.read_control(log_dir or fh.HTTP_LOG_DIR)["windows"][-1]
+                fh.bind_run(log_dir or fh.HTTP_LOG_DIR, w_["nonce"], run_id, os.path.join(state_dir, "lock"))
+            except (fh.FenceRefused, OSError, IndexError) as exc:
+                _subreaper_off()
+                return refuse("run bind refused: %s" % str(exc)[:80])
         _write_state(state_dir, dict(base, state="starting"))      # BEFORE spawn
         cenv = dict(env if env is not None else os.environ)
         cenv[ENV_KEY] = run_id

@@ -30,6 +30,7 @@ import math
 import os
 import re
 import secrets
+import stat
 import threading
 import time
 import urllib.error
@@ -85,7 +86,7 @@ def read_control(dirpath):
     many are unknown vs settled and which epoch files it covers) and
     'window-open' (see open_window)."""
     out = {"problems": [], "floor": 0, "floor_line": None, "windows": [],
-           "tip": "0", "tips_ok": True, "burnt": 0}
+           "tip": "0", "tips_ok": True, "burnt": 0, "runbinds": {}}
     p = os.path.join(dirpath, CONTROL_NAME)
     if not os.path.lexists(p):
         return out
@@ -153,6 +154,16 @@ def read_control(dirpath):
                 nonces.add(e["nonce"]); out["windows"].append(e)
                 if k == "window-burn":
                     out["burnt"] += e["k"]
+        elif k == "run-bind":
+            lw = out["windows"][-1] if out["windows"] else None
+            if not (lw and lw["kind"] == "window-open" and e.get("window_nonce") == lw["nonce"]
+                    and lw["nonce"] not in out["runbinds"]
+                    and isinstance(e.get("run_id"), str) and re.match(r"^[0-9a-f]{16}$", e["run_id"])
+                    and isinstance(e.get("path"), str) and e["path"].startswith("/") and len(e["path"]) <= 512
+                    and _isint(e.get("ino"), 0, 2 ** 63) and _isint(e.get("dev"), 0, 2 ** 63)):
+                out["problems"].append("malformed or unmatched run-bind line %d" % (i + 1))
+            else:
+                out["runbinds"][lw["nonce"]] = e
         else:
             out["problems"].append("unknown control kind at line %d" % (i + 1))
         if out["problems"]:
@@ -270,7 +281,64 @@ def _log_scan(dirpath):
     return res, halted, ok, hs, tips
 
 
-def window_status(dirpath, check_token=True):
+RUN_ID_ENV = "LG_BOUNDED_RUN_ID"
+
+
+def _lock_held(path):
+    """(inode, dev, held) for a lock file: held is True when another open
+    file description holds it (a shared probe fails). None if unusable."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError:
+        return None
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            return None
+        try:
+            fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            held = False
+        except OSError:
+            held = True
+        return st.st_ino, st.st_dev, held
+    finally:
+        os.close(fd)
+
+
+def _run_alive(c, w):
+    """Reason string, or None when this process belongs to the live run the
+    wrapper bound to this window: same run id in env, same lock file
+    (path + inode + device, so deletion or replacement fails closed), and
+    that lock is currently held (the child inherits it, so it stays held
+    while any run process lives and is free once all are dead). A lock held
+    by someone unrelated on another file never authorizes."""
+    b = c["runbinds"].get(w["nonce"])
+    if not b:
+        return "no live run is bound to this window"
+    if os.environ.get(RUN_ID_ENV) != b["run_id"]:
+        return "run id mismatch (not the run bound to this window)"
+    st = _lock_held(b["path"])
+    if st is None or (st[0], st[1]) != (b["ino"], b["dev"]):
+        return "run lock missing or replaced"
+    if not st[2]:
+        return "run lock not held (owner dead)"
+    return None
+
+
+def bind_run(dirpath, window_nonce, run_id, lock_path):
+    """Wrapper-side, before spawn: bind the OPEN window to this run's lock
+    file (path, inode, device) and run id. Refused unless the lock is held
+    right now and the window is the open last one."""
+    with _DirLock(dirpath):
+        st = _lock_held(lock_path)
+        if st is None or not st[2]:
+            raise FenceRefused("run lock is not a held regular file")
+        _append_control(dirpath, {"kind": "run-bind", "window_nonce": window_nonce, "run_id": run_id,
+                                  "path": os.path.abspath(lock_path), "ino": st[0], "dev": st[1]})
+
+
+def window_status(dirpath, check_token=True, check_run=True):
     """Read-only. -> (ok, why, info). ok means the LAST window is open,
     its history is intact (every recorded log tip is still a line hash of
     its file, total reserves never fell below the window base) and
@@ -291,6 +359,10 @@ def window_status(dirpath, check_token=True):
         tok = os.environ.get(WINDOW_TOKEN_ENV)
         if not tok or hashlib.sha256(tok.encode()).hexdigest() != w["owner_hash"]:
             return False, "window owner token missing or wrong (stale or foreign use)", {}
+    if check_run:
+        why = _run_alive(c, w)
+        if why:
+            return False, why, {}
     res, halted, ok, hs, tips = _log_scan(dirpath)
     if not ok:
         return False, "usage log chain broken", {}

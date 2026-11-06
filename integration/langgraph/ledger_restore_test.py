@@ -6,7 +6,10 @@ import fenced_http as fh, ledger_restore as lr
 import hashlib as _hl
 TOKEN = "test-owner-token"; OWN = _hl.sha256(TOKEN.encode()).hexdigest(); os.environ["FENCE_WINDOW_TOKEN"] = TOKEN
 _ow = fh.open_window
-fh.open_window = lambda *a, **k: _ow(*a, owner_hash=k.pop("owner_hash", OWN), **k)
+import window_test_support as _wts
+def _open(*a, **k):
+    r = _ow(*a, owner_hash=k.pop("owner_hash", OWN), **k); _wts.bind_live_run(a[0]); return r
+fh.open_window = _open
 FAIL = []
 def check(n, c):
     print(("PASS " if c else "FAIL ") + n)
