@@ -119,10 +119,10 @@ check("escaped setsid descendant (env kept) is found and killed; state non-clean
 check("and blocked next", W(st, touch, 5, log_dir=L, cap=5)[0] == "refused" and not os.path.exists(MARK))
 check("human clear works once nothing lives", br.clear(st, "escaped child killed by wrapper, lane untouched")[0])
 # unkillable survivor (simulated): orphans-alive, blocks, clear refused while it persists
-st = mk(); real_wait = br._wait_gone; real_sv = br.survivors
-br._wait_gone = lambda run_id, pgid, secs: [os.getpid() + 7777777]
+st = mk(); real_kt = br.kill_tree; real_sv = br.survivors
+br.kill_tree = lambda *a, **k: [os.getpid() + 7777777]
 r = W(st, [sys.executable, "-c", "pass"], 5, log_dir=L, cap=5)
-br._wait_gone = real_wait
+br.kill_tree = real_kt
 check("survivors that cannot be killed -> orphans-alive, blocks", r[0] == "orphans-alive"
       and br._read_state(st)[0]["state"] == "orphans-alive")
 br.survivors = lambda run_id, pgid: [4242424]
@@ -155,16 +155,128 @@ write_log(L, LOG, [{"phase": "reserve", "n": 1, "model": "m/free", "via": "compl
 check("historic unmatched reserve is baseline, run still clean",
       W(st, touch, 5, log_dir=L, cap=5)[0] == "clean")
 
-# ---- epoch budgets (accounting dependency) through the gate
+# ---- roster-derived epoch budgets through the gate (source-grounded, complete coverage)
+def roster_file(seats):
+    p = os.path.join(mk(), "roster.json"); json.dump({"seats": seats}, open(p, "w")); return p
+def http(model, ep, budget, ul=None):
+    import re
+    slug = re.sub(r"[^a-z0-9]+", "-", model.lower()).strip("-")
+    return {"adapter": {"type": "http", "model": model, "log_epoch": ep, "call_budget": budget,
+                        "usage_log": "/x/" + (ul or "%s.%s.jsonl" % (slug, ep))}}
 st = mk(); L = mk()
 write_log(L, LOG, [{"phase": "reserve", "n": 1, "model": "m/free", "via": "complete"},
                    {"phase": "result", "n": 1, "model": "m/free", "status": 200, "class": "ok-shape", "usage": {"cost": 0}, "cost_zero": True}])
 write_log(L, "o-free.e0.jsonl", [x for i in (1, 2) for x in ({"phase": "reserve", "n": i, "model": "o/free"},
           {"phase": "result", "n": i, "model": "o/free", "status": 200, "class": "ok-shape", "usage": {"cost": 0}, "cost_zero": True})])
-check("resume gate: same-epoch budgets fit remaining (cap 5, 3 used, needs 2)",
-      br.run(st, touch, 5, epoch_budgets={LOG: 3}, log_dir=L, cap=5)[0] == "clean")
-st = mk()
-check("naive planned=3 would have been refused (cap 5, 3 used)", br.run(st, touch, 5, planned=3, log_dir=L, cap=5)[0] == "refused")
+RS = roster_file({"coordinator": http("m/free", "e1", 3), "other": {"adapter": {"type": "mock"}}})
+check("roster gate: budget 3 with 1 used needs 2, fits cap 5 with 3 used", br.run(st, touch, 5, roster=RS, log_dir=L, cap=5)[0] == "clean")
+st = mk(); os.remove(MARK) if os.path.exists(MARK) else None
+RS2 = roster_file({"coordinator": http("m/free", "e1", 4)})
+check("roster that would need 3 more than remaining 2 is refused (no silent undercount)",
+      br.run(st, touch, 5, roster=RS2, log_dir=L, cap=5)[0] == "refused" and not os.path.exists(MARK))
+check("naive planned=3 would have been refused", br.run(st, touch, 5, planned=3, log_dir=L, cap=5)[0] == "refused")
+check("planned AND roster together refused", br.run(st, touch, 5, planned=1, roster=RS, log_dir=L, cap=5)[0] == "refused")
+check("neither planned nor roster refused", br.run(st, touch, 5, log_dir=L, cap=5)[0] == "refused")
+for nm, seats in (("cli adapter type is not covered", {"a": {"adapter": {"type": "cli", "command": ["x"]}}}),
+                  ("unknown adapter type", {"a": {"adapter": {"type": "zzz"}}}),
+                  ("seat without adapter", {"a": {}}),
+                  ("budget 0", {"a": http("m/free", "e1", 0)}), ("budget above 8", {"a": http("m/free", "e1", 9)}),
+                  ("bool budget", {"a": http("m/free", "e1", True)}),
+                  ("usage_log not the derived name", {"a": http("m/free", "e1", 2, "other.e1.jsonl")}),
+                  ("two seats sharing a log file", {"a": http("m/free", "e1", 2), "b": http("m/free", "e1", 2)}),
+                  ("bad epoch", {"a": http("m/free", "E 1", 2)})):
+    check("roster refused: " + nm, br.run(st, touch, 5, roster=roster_file(seats), log_dir=L, cap=5)[0] == "refused" and not os.path.exists(MARK))
+check("missing roster file refused", br.run(st, touch, 5, roster="/nonexistent/roster.json", log_dir=L, cap=5)[0] == "refused")
+check("no-http roster (mock/queue only) is accepted as zero spend, still needs the ledger gate",
+      br.run(mk(), touch, 5, roster=roster_file({"a": {"adapter": {"type": "mock"}}}), log_dir=L, cap=5)[0] == "clean")
+
+# ---- containment: scrubbed + setsid + close_fds descendants (the real sandbox shape)
+SCRUB = ("import subprocess,sys,time;"
+         "p=subprocess.Popen([sys.executable,'-c','import time;time.sleep(40)'],start_new_session=True,env={},close_fds=True);"
+         "open(%r,'w').write(str(p.pid));")
+def gone(pid):
+    time.sleep(0.2); f = br._stat_fields(pid); return f is None or f["state"] in ("Z", "X")
+st, L = mk(), ledger(1); pidf = os.path.join(mk(), "sc")
+r = W(st, [sys.executable, "-c", SCRUB % pidf + "time.sleep(0.2)"], 5, log_dir=L, cap=5)
+sp = int(open(pidf).read())
+check("child exits leaving a setsid+env-scrubbed+close_fds orphan: found via subreaper tree, killed, non-clean",
+      r[0] == "needs-review" and r[1]["state"] == "escaped-descendants-killed" and gone(sp))
+st = mk(); pidf = os.path.join(mk(), "sc2")
+ign = "import signal;signal.signal(signal.SIGTERM, signal.SIG_IGN);"
+t0 = time.monotonic()
+r = W(st, [sys.executable, "-c", ign + SCRUB % pidf + "time.sleep(60)"], 1.0, log_dir=L, cap=5)
+sp = int(open(pidf).read())
+check("deadline: TERM-ignoring child + scrubbed setsid grandchild both dead, state timeout-killed, no survivors",
+      r[0] == "timeout" and gone(sp) and not r[1]["survivors"])
+check("measured envelope stays inside deadline + grace + kill budget + 3s",
+      time.monotonic() - t0 < 1.0 + br.TERM_GRACE + br.KILL_BUDGET + 3)
+check("MAX_DEADLINE + TERM_GRACE + KILL_BUDGET leaves >= 25s under a 120s tool limit",
+      br.MAX_DEADLINE + br.TERM_GRACE + br.KILL_BUDGET <= 95)
+# unsupported containment refuses before spawn
+st = mk(); os.path.exists(MARK) and os.remove(MARK)
+real_on = br._subreaper_on; br._subreaper_on = lambda: False
+r = W(st, touch, 5, log_dir=L, cap=5); br._subreaper_on = real_on
+check("no subreaper support -> refuse before spawn", r[0] == "refused" and "containment" in r[1]["reason"] and not os.path.exists(MARK))
+# in-process use must not kill pre-existing unrelated children of the caller
+other = subprocess.Popen([sys.executable, "-c", "import time;time.sleep(30)"])
+r = W(mk(), touch, 5, log_dir=L, cap=5)
+check("pre-existing child of the caller is left alone", other.poll() is None)
+other.kill(); other.wait()
+
+# ---- fault injection after spawn: contain first, never leave a child
+def inject(fail_on_state=None, fail_scan=False):
+    st, L = mk(), ledger(1); pidf = os.path.join(mk(), "fi")
+    ch = [sys.executable, "-c", SCRUB % pidf + "time.sleep(60)"]
+    real_ws, real_pf = br._write_state, br.rp.preflight
+    calls = {"n": 0}
+    def ws(d, doc):
+        if fail_on_state == "ALL-AFTER-START" and doc.get("state") != "starting":
+            raise OSError("injected state write failure")
+        if fail_on_state and doc.get("state") == fail_on_state:
+            raise OSError("injected state write failure")
+        return real_ws(d, doc)
+    def pf(*a, **k):
+        calls["n"] += 1
+        if fail_scan and calls["n"] == 2:
+            raise RuntimeError("injected post-scan failure")
+        return real_pf(*a, **k)
+    br._write_state, br.rp.preflight = ws, pf
+    try:
+        r = W(st, ch, 20, log_dir=L, cap=5)
+    finally:
+        br._write_state, br.rp.preflight = real_ws, real_pf
+    time.sleep(0.2)
+    return st, r, pidf
+st, r, pidf = inject(fail_on_state="running")
+sp = int(open(pidf).read()) if os.path.exists(pidf) else None
+check("fault at the 'running' marker write: outcome internal, group and grandchild dead, state non-clean",
+      r[0] == "internal" and (sp is None or gone(sp)) and br._read_state(st)[0]["state"] == "internal-error-after-spawn")
+st, r, pidf = inject(fail_on_state="ALL-AFTER-START")
+sp = int(open(pidf).read()) if os.path.exists(pidf) else None
+check("every marker write failing after spawn: still contained, marker left at starting",
+      r[0] == "internal" and (sp is None or gone(sp)) and br._read_state(st)[0]["state"] == "starting")
+check("marker left non-clean (starting) -> next start records wrapper-crashed-unknown and refuses",
+      br._read_state(st)[0]["state"] == "starting" and W(st, touch, 5, log_dir=ledger(1), cap=5)[0] == "refused"
+      and br._read_state(st)[0]["state"] == "wrapper-crashed-unknown")
+st, r, pidf = inject(fail_scan=True)
+check("fault injected in the post-run scan: contained, state internal-error-after-spawn, blocks",
+      r[0] == "internal" and br._read_state(st)[0]["state"] == "internal-error-after-spawn")
+
+# ---- anchor: deletion / truncation / rewrite are conservative blocks
+st = mk(); L = ledger(2)
+r = W(st, py("lines=open(p,'rb').read().split(b'\\n'); open(p,'wb').write(b'\\n'.join(lines[:2])+b'\\n')", L), 5, log_dir=L, cap=9)
+check("child truncates the ledger tail (reserves drop, no new unmatched): needs-review via anchor",
+      r[0] == "needs-review" and "shorter than anchor" in r[1]["reason"])
+st = mk(); L = ledger(2)
+r = W(st, py("os.remove(p)", L), 5, log_dir=L, cap=9)
+check("child deletes a log file: needs-review (not ok, not allow_fresh)", r[0] == "needs-review")
+st = mk(); L = ledger(2)
+r = W(st, touch, 5, log_dir=L, cap=9)
+check("clean run stores an anchor in state", r[0] == "clean" and isinstance(br._read_state(st)[0].get("anchor"), dict))
+os.remove(os.path.join(L, LOG)); write_log(L, LOG, [{"phase": "reserve", "n": 1, "model": "m/free", "via": "complete"},
+          {"phase": "result", "n": 1, "model": "m/free", "status": 200, "class": "ok-shape", "usage": {"cost": 0}, "cost_zero": True}])
+r = W(st, touch, 5, log_dir=L, cap=9)
+check("tail truncated BETWEEN runs: next start refused from the last clean anchor", r[0] == "refused" and "anchor" in " ".join(r[1].get("problems") or []).lower())
 
 # ---- wrapper killed mid-run
 if os.path.exists(MARK): os.remove(MARK)
