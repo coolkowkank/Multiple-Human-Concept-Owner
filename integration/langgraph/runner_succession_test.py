@@ -153,7 +153,7 @@ else:
 # --- forward constants and the exact tiny allowlist id -----------------------
 import fenced_http as fh, requesty_transport as rt, langgraph_team as lt
 TINY, LAG = "novita/inclusionai/ling-3.0-tiny", "poolside/laguna-m.1"
-check("constants: QUESTION_BUDGET 7, ENVELOPE_TOTAL 8, shared cap 10", (rc.QUESTION_BUDGET, rc.ENVELOPE_TOTAL, fh.HTTP_LIFETIME_CAP) == (7, 8, 10))
+check("constants: QUESTION_BUDGET 7, ENVELOPE_TOTAL 8, shared cap 12", (rc.QUESTION_BUDGET, rc.ENVELOPE_TOTAL, fh.HTTP_LIFETIME_CAP) == (7, 8, 12))
 def gate_after(n):
     d = fx.root_with(mkq(), fx.ASSIGN, tmp); st = rc.Store(d)
     for i in range(n):
