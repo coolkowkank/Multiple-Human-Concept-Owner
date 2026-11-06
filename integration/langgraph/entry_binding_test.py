@@ -38,6 +38,31 @@ check("wrapper hash reads the brief file bytes", br.live_config_hash(lane, cp) =
 open(bf, "wb").write(b"task: DIFFERENT"); check("brief edited after window open: wrapper hash changes", br.live_config_hash(lane, cp) != hb)
 open(bf, "wb").write(b"task: assess docs")
 check("entry bind: window hash without brief refuses entry that reads a brief", "differ" in (refused(lambda: lt._bind_entry_content(cfgb, roster, b"task: assess docs")) or ""))
-fh.close_window if False else None
+def refused_any(f):
+    try: f(); return None
+    except Exception as e: return type(e).__name__
+# bounded private read (shared by wrapper and entry)
+def verr(f):
+    try: f(); return None
+    except ValueError as e: return str(e)
+rd = lambda p: rp.read_private_regular(p, "brief_extra_file", 16384)
+check("read ok on exact bytes", rd(bf) == b"task: assess docs")
+fifo = os.path.join(tmp, "fifo"); os.mkfifo(fifo, 0o600)
+import time as _t; t0 = _t.time(); r = verr(lambda: rd(fifo))
+check("FIFO refused without blocking", r and "regular" in r and _t.time() - t0 < 2)
+sl = os.path.join(tmp, "sl"); os.symlink(bf, sl); check("symlink refused (not followed)", "regular" in (verr(lambda: rd(sl)) or ""))
+check("relative path refused", "absolute" in (verr(lambda: rd("brief.txt")) or ""))
+check("missing file -> clean ValueError, not FileNotFoundError", "cannot be read" in (verr(lambda: rd(os.path.join(tmp, "nope"))) or ""))
+big = os.path.join(tmp, "big"); open(big, "wb").write(b"x" * 16385); os.chmod(big, 0o600); check("over 16384 bytes refused", "over" in (verr(lambda: rd(big)) or ""))
+ok16 = os.path.join(tmp, "ok16"); open(ok16, "wb").write(b"x" * 16384); os.chmod(ok16, 0o600); check("exactly 16384 accepted", len(rd(ok16)) == 16384)
+wm = os.path.join(tmp, "wm"); open(wm, "wb").write(b"x"); os.chmod(wm, 0o644); check("mode beyond 0600 refused", "0600" in (verr(lambda: rd(wm)) or ""))
+cfgf = json.dumps({"seats": {"s1": {"model": "m/x", "epoch": "e1", "budget": 1}}, "brief_extra_file": fifo}).encode(); open(cp, "wb").write(cfgf)
+t0 = _t.time(); w = refused_any(lambda: br.live_config_hash(lane, cp)); check("wrapper hash over a FIFO brief: clean ValueError, no block", w == "ValueError" and _t.time() - t0 < 2)
+# entry: missing / relative brief -> clean SystemExit before any other work
+for nm, path in (("missing", os.path.join(tmp, "gone")), ("relative", "brief.txt"), ("fifo", fifo)):
+    cx = json.dumps({"seats": {"s1": {"model": "m/x", "epoch": "e1", "budget": 1}}, "brief_extra_file": path}).encode()
+    cpx = os.path.join(tmp, "cx.json"); open(cpx, "wb").write(cx); os.chmod(cpx, 0o600)
+    t0 = _t.time(); m = refused(lambda: lt.live_entry(lane, os.path.join(tmp, "dbx"), cpx))
+    check("live_entry %s brief: clean SystemExit, no block" % nm, m and m.startswith("refused") and _t.time() - t0 < 2)
 shutil.rmtree(tmp)
 print("FAILED" if FAIL else "ALL PASS"); sys.exit(1 if FAIL else 0)

@@ -1154,9 +1154,11 @@ def live_entry(repo, db, config_path, thread_id="live-1", allow_fresh=False) -> 
         raise SystemExit("refused: config is not a JSON object")
     _brief_bytes = None
     if _bp:
-        _private_regular(_bp, "brief_extra_file")
-        with open(_bp, "rb") as fh:
-            _brief_bytes = fh.read(16385)
+        import reserve_preflight as _rpb
+        try:
+            _brief_bytes = _rpb.read_private_regular(_bp, "brief_extra_file", 16384)
+        except ValueError as exc:
+            raise SystemExit("refused: %s" % exc)
     _bind_entry_content(_cfg_bytes, _roster_bytes, _brief_bytes)   # exact bytes used below
     cfg = json.loads(_cfg_bytes.decode("utf-8"))
     if not isinstance(cfg, dict) or set(cfg) - LIVE_CFG_KEYS or "seats" not in cfg \

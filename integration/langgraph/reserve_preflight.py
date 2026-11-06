@@ -213,6 +213,38 @@ def live_epoch_budgets(cfg_seats, roster_seats, *, strict=False):
     return out, None
 
 
+def read_private_regular(path, what, limit):
+    """Shared bounded read of an operator-private file (wrapper and entry use
+    this one function). ValueError on: relative path, missing, not a regular
+    file (FIFO/symlink/dir), wrong owner, mode beyond 0600, or size > limit.
+    lstat first, then O_NOFOLLOW|O_NONBLOCK open and an fstat identity check,
+    so a FIFO cannot block and a symlink is never followed. Returns the bytes."""
+    import stat as _s
+    if not isinstance(path, str) or not os.path.isabs(path):
+        raise ValueError("%s path must be absolute" % what)
+    try:
+        st = os.lstat(path)
+        if (not _s.S_ISREG(st.st_mode) or st.st_uid != os.getuid() or st.st_mode & 0o077):
+            raise ValueError("%s must be a regular file owned by the operator with mode 0600" % what)
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError as exc:
+        raise ValueError("%s cannot be read (%s)" % (what, type(exc).__name__))
+    try:
+        fs = os.fstat(fd)
+        if (fs.st_ino, fs.st_dev) != (st.st_ino, st.st_dev) or not _s.S_ISREG(fs.st_mode):
+            raise ValueError("%s changed while opening" % what)
+        data = os.read(fd, limit + 1)
+        while len(data) <= limit:
+            more = os.read(fd, limit + 1 - len(data))
+            if not more: break
+            data += more
+    finally:
+        os.close(fd)
+    if len(data) > limit:
+        raise ValueError("%s over %d bytes" % (what, limit))
+    return data
+
+
 def entry_content_hash(config_bytes, roster_bytes, brief_bytes=None):
     """sha256 over the exact config bytes, exact roster bytes and the shared
     epoch-budget computation. Used by BOTH the wrapper (right before spawn)

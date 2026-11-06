@@ -392,7 +392,7 @@ def live_config_hash(lane, config):
     cb = open(config, "rb").read()
     rb = open(os.path.join(lane, ".team", "roster.json"), "rb").read()
     bp = json.loads(cb).get("brief_extra_file")
-    bb = open(bp, "rb").read(16385) if bp else None
+    bb = rp.read_private_regular(bp, "brief_extra_file", 16384) if bp else None
     return rp.entry_content_hash(cb, rb, bb)
 
 
