@@ -64,11 +64,168 @@ def _num_ok(v):
             and math.isfinite(v) and v >= 0)
 
 
+CONTROL_NAME = "_control.ctl"
+FLOOR_PROVENANCE = "operator-reported from transcript; original chain not recovered"
+_LOG_NAME = re.compile(r"^[a-z0-9-]+\.[a-z0-9-]{1,32}\.jsonl$")
+_HEX64 = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _isint(v, lo, hi):
+    return isinstance(v, int) and not isinstance(v, bool) and lo <= v <= hi
+
+
+def read_control(dirpath):
+    """Typed control lines (hash-chained) in dir/_control.ctl. Read-only.
+    -> {"problems": [...], "floor": int, "floor_line": dict|None,
+        "windows": [dict], "tip": sha|"0"}. Any problem means the caller
+    must refuse; nothing here repairs or guesses. A missing or empty file
+    is "no import, no window" (floor 0).
+    Kinds: 'historic-floor' (first and only once: count of reserves from
+    a chain that was NOT recovered, typed as operator-reported, with how
+    many are unknown vs settled and which epoch files it covers) and
+    'window-open' (see open_window)."""
+    out = {"problems": [], "floor": 0, "floor_line": None, "windows": [],
+           "tip": "0", "tips_ok": True}
+    p = os.path.join(dirpath, CONTROL_NAME)
+    if not os.path.lexists(p):
+        return out
+    try:
+        st = os.lstat(p)
+        if not os.path.isfile(p) or os.path.islink(p) or st.st_size > 1_000_000:
+            out["problems"].append("control file is not a plain small file")
+            return out
+        data = open(p, "rb").read()
+    except OSError:
+        out["problems"].append("control file unreadable")
+        return out
+    if data and not data.endswith(b"\n"):
+        out["problems"].append("control file has a partial last line")
+    prev, nonces = "0", set()
+    for i, raw in enumerate(data.split(b"\n")):
+        if not raw.strip():
+            continue
+        try:
+            e = json.loads(raw)
+        except ValueError:
+            out["problems"].append("control line %d is not JSON" % (i + 1))
+            break
+        if not isinstance(e, dict) or e.get("prev") != prev:
+            out["problems"].append("control chain broken at line %d" % (i + 1))
+            break
+        prev = hashlib.sha256(raw.rstrip(b"\n")).hexdigest()
+        k = e.get("kind")
+        if k == "historic-floor":
+            cf = e.get("covered_files")
+            if i != 0 or out["floor_line"] is not None:
+                out["problems"].append("historic-floor must be the first and only floor line")
+            elif not (_isint(e.get("count"), 0, 1000)
+                      and _isint(e.get("unknown"), 0, 1000)
+                      and _isint(e.get("settled"), 0, 1000)
+                      and e["unknown"] + e["settled"] == e["count"]
+                      and e.get("provenance") == FLOOR_PROVENANCE
+                      and isinstance(cf, list) and len(cf) <= 64
+                      and all(isinstance(x, str) and _LOG_NAME.match(x) for x in cf)
+                      and len(set(cf)) == len(cf)):
+                out["problems"].append("malformed historic-floor line")
+            else:
+                out["floor"], out["floor_line"] = e["count"], e
+        elif k == "window-open":
+            ok = (_isint(e.get("seq"), 1, 10 ** 6) and e["seq"] == len(out["windows"]) + 1
+                  and _isint(e.get("k"), 1, HTTP_LIFETIME_CAP)
+                  and _isint(e.get("base"), 0, 10 ** 6)
+                  and isinstance(e.get("nonce"), str) and _HEX64.match(e["nonce"])
+                  and e["nonce"] not in nonces
+                  and all(isinstance(e.get(f), str) and _HEX64.match(e[f])
+                          for f in ("config_hash", "receipt_hash"))
+                  and isinstance(e.get("prev_receipt_hash"), str)
+                  and (e["prev_receipt_hash"] == "0" or _HEX64.match(e["prev_receipt_hash"]))
+                  and isinstance(e.get("tips"), dict)
+                  and all(_LOG_NAME.match(str(a)) and isinstance(b, str) and (b == "0" or _HEX64.match(b))
+                          for a, b in e["tips"].items())
+                  and (not out["windows"] or e["base"] >= out["windows"][-1]["base"]
+                       and e["prev_receipt_hash"] == out["windows"][-1]["receipt_hash"])
+                  and (out["windows"] or e["prev_receipt_hash"] == "0"))
+            if not ok:
+                out["problems"].append("malformed or out-of-sequence window-open line %d" % (i + 1))
+            else:
+                nonces.add(e["nonce"]); out["windows"].append(e)
+        else:
+            out["problems"].append("unknown control kind at line %d" % (i + 1))
+        if out["problems"]:
+            break
+    out["tip"] = prev
+    return out
+
+
+def _append_control(dirpath, entry):
+    """Caller holds the dir lock. Appends one chained control line, fsync."""
+    c = read_control(dirpath)
+    if c["problems"]:
+        raise FenceRefused("control file invalid; refusing")
+    e = dict(entry, prev=c["tip"])
+    fd = os.open(os.path.join(dirpath, CONTROL_NAME), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+    try:
+        os.write(fd, (json.dumps(e, sort_keys=True) + "\n").encode())
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+class _DirLock:
+    """Directory-level exclusive flock (one lock for ALL epoch files and
+    the control file), so cross-file counting and the append are atomic
+    across processes. Lock file is the control file itself (empty = no
+    import)."""
+    def __init__(self, dirpath):
+        os.makedirs(dirpath, mode=0o700, exist_ok=True)
+        self.fd = os.open(os.path.join(dirpath, CONTROL_NAME), os.O_RDWR | os.O_CREAT, 0o600)
+        fcntl.flock(self.fd, fcntl.LOCK_EX)
+
+    def close(self):
+        try:
+            fcntl.flock(self.fd, fcntl.LOCK_UN)
+        finally:
+            os.close(self.fd)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        self.close()
+
+
+def import_historic_floor(dirpath, count, unknown, settled, covered_files):
+    """One-time, offline import of the operator-REPORTED count of reserves
+    from a chain that was lost. It forges no old hash chain and does not
+    claim the old log was recovered: the line carries a fixed provenance
+    string. Refused if any control line or any log already exists (so it
+    can only be the first thing in a fresh ledger dir). Never called by a
+    runtime path. Unknown stays unknown: 'unknown' calls count as spent."""
+    with _DirLock(dirpath):
+        if os.path.getsize(os.path.join(dirpath, CONTROL_NAME)) or any(
+                f.endswith(".jsonl") for f in os.listdir(dirpath)):
+            raise FenceRefused("ledger dir is not fresh; floor import refused")
+        _append_control(dirpath, {"kind": "historic-floor", "count": count,
+                                  "unknown": unknown, "settled": settled,
+                                  "covered_files": sorted(covered_files),
+                                  "provenance": FLOOR_PROVENANCE})
+        c = read_control(dirpath)
+        if c["problems"]:
+            os.truncate(os.path.join(dirpath, CONTROL_NAME), 0)
+            raise FenceRefused("floor line malformed; nothing imported")
+
+
 def _read_all(dirpath):
-    """-> (reserves_total, halted, chain_ok) over every log in the dir."""
+    """-> (reserves_total, halted, chain_ok) over every log in the dir,
+    plus the typed historic floor from the control file. An invalid
+    control file makes chain_ok False."""
     reserves, halted, ok = 0, False, True
     if not os.path.isdir(dirpath):
         return 0, False, True
+    ctl = read_control(dirpath)
+    if ctl["problems"]:
+        ok = False
+    reserves = ctl["floor"]     # imported historic floor counts as spent
     for fn in sorted(os.listdir(dirpath)):
         if not fn.endswith(".jsonl"):
             continue
@@ -303,6 +460,10 @@ class FencedHttpAdapter(Adapter):
             raise FenceRefused("usage log chain broken; refusing")
         if halted:
             raise FenceRefused("adapter halted earlier; refusing")
+        ctl = read_control(HTTP_LOG_DIR)
+        fl = ctl["floor_line"]
+        if fl and os.path.basename(self.path) in fl["covered_files"]:
+            raise FenceRefused("epoch file is covered by the historic floor; new epoch required")
         mine = sum(1 for l in open(self.path, "rb")
                    if b'"phase": "reserve"' in l)
         if mine >= self.call_budget or total >= HTTP_LIFETIME_CAP:

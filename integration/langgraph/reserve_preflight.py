@@ -294,7 +294,14 @@ def preflight(planned_calls, *, log_dir=None, cap=None, anchor=None, allow_fresh
         if len(names) > _MAX_FILES:
             out["problems"].append("too many files in log dir"); return out
         total, halted = 0, False
+        import fenced_http
+        ctl = fenced_http.read_control(dd)
+        out["problems"].extend(ctl["problems"])
+        floor = ctl["floor"]; out["historic_floor"] = ctl["floor_line"]
+        total = floor
         for fn in names:
+            if fn == fenced_http.CONTROL_NAME:
+                continue
             if not fn.endswith(".jsonl"):
                 out["problems"].append("unexpected non-log file in ledger dir: " + fn); continue
             if not _SLUG_EPOCH.match(fn):
