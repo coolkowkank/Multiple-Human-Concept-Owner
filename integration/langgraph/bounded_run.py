@@ -391,13 +391,7 @@ def live_config_hash(lane, config):
     lane = os.path.abspath(lane)
     cb = open(config, "rb").read()
     rb = open(os.path.join(lane, ".team", "roster.json"), "rb").read()
-    eb, why = rp.live_epoch_budgets(json.loads(cb)["seats"], json.loads(rb)["seats"], strict=True)
-    if why:
-        raise ValueError(why)
-    h = hashlib.sha256()
-    for part in (cb, rb, json.dumps(eb, sort_keys=True).encode()):
-        h.update(hashlib.sha256(part).digest())
-    return h.hexdigest()
+    return rp.entry_content_hash(cb, rb)
 
 
 def run_live(state_dir, lane, db, config, deadline, thread="live-1", env=None):

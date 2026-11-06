@@ -1117,6 +1117,25 @@ def _refresh_anchor(anchor_file, old_anchor, emr):
               flush=True)
 
 
+def _bind_entry_content(config_bytes, roster_bytes):
+    """Refuse (SystemExit, before any other work) unless the fence's open,
+    run-bound window carries a config_hash equal to the hash of THESE bytes.
+    Skipped only when fenced_http.WINDOW_GATE is False (offline tests)."""
+    if not fenced_http.WINDOW_GATE:
+        return
+    import reserve_preflight as _rp
+    try:
+        want = _rp.entry_content_hash(config_bytes, roster_bytes)
+    except ValueError as exc:
+        raise SystemExit("refused: %s" % exc)
+    ok, why, _ = fenced_http.window_status(fenced_http.HTTP_LOG_DIR)
+    if not ok:
+        raise SystemExit("refused: window gate: %s" % why)
+    w = fenced_http.read_control(fenced_http.HTTP_LOG_DIR)["windows"][-1]
+    if w["config_hash"] != want:
+        raise SystemExit("refused: config+roster bytes read by the entry differ from the window's config_hash")
+
+
 def live_entry(repo, db, config_path, thread_id="live-1", allow_fresh=False) -> int:
     from launcher.runtime import verify_sandbox_ready
     repo = os.path.abspath(repo)
@@ -1125,8 +1144,12 @@ def live_entry(repo, db, config_path, thread_id="live-1", allow_fresh=False) -> 
         raise SystemExit("refused: lane not initialized (run init first)")
     lane = os.path.realpath(repo) + os.sep
     _private_regular(config_path, "config")
-    with open(config_path, encoding="utf-8") as fh:
-        cfg = json.load(fh)
+    with open(config_path, "rb") as fh:
+        _cfg_bytes = fh.read()
+    with open(roster_path, "rb") as fh:
+        _roster_bytes = fh.read()
+    _bind_entry_content(_cfg_bytes, _roster_bytes)      # exact bytes parsed below
+    cfg = json.loads(_cfg_bytes.decode("utf-8"))
     if not isinstance(cfg, dict) or set(cfg) - LIVE_CFG_KEYS or "seats" not in cfg \
             or "key_file" not in cfg:
         raise SystemExit("refused: config keys must be a subset of "
@@ -1138,8 +1161,7 @@ def live_entry(repo, db, config_path, thread_id="live-1", allow_fresh=False) -> 
     if not verify_sandbox_ready():
         raise SystemExit("refused: the verify sandbox is not ready "
                          "(set LG_VERIFY_SANDBOX=1 with the shim present)")
-    with open(roster_path) as fh:
-        roster = json.load(fh)
+    roster = json.loads(_roster_bytes.decode("utf-8"))
     seats = cfg["seats"]
     if not isinstance(seats, dict) or not seats:
         raise SystemExit("refused: seats must be a non-empty object")

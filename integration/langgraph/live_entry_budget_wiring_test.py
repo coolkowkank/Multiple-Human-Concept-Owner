@@ -5,6 +5,7 @@ import os as _os; _os.environ.setdefault("LG_VERIFY_SANDBOX", "1")
 import hashlib, json, os, sys, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import fenced_http, langgraph_team as lt  # noqa: E402
+fenced_http.WINDOW_GATE = False  # window/entry binding is covered by window_gate_test.py and entry_binding_test.py; this suite tests budget wiring
 ok = True
 def check(n, c):
     global ok; ok &= bool(c); print(("PASS " if c else "FAIL ") + n)

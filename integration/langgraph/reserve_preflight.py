@@ -213,6 +213,24 @@ def live_epoch_budgets(cfg_seats, roster_seats, *, strict=False):
     return out, None
 
 
+def entry_content_hash(config_bytes, roster_bytes):
+    """sha256 over the exact config bytes, exact roster bytes and the shared
+    epoch-budget computation. Used by BOTH the wrapper (right before spawn)
+    and the live entry (over the very bytes it then parses), so a window's
+    config_hash binds what the entry actually reads. ValueError if unreadable."""
+    try:
+        cfg, roster = json.loads(config_bytes), json.loads(roster_bytes)
+        eb, why = live_epoch_budgets(cfg["seats"], roster["seats"], strict=True)
+    except (ValueError, KeyError, TypeError) as exc:
+        raise ValueError("cannot ground the entry content: %s" % type(exc).__name__)
+    if why:
+        raise ValueError(why)
+    h = hashlib.sha256()
+    for part in (config_bytes, roster_bytes, json.dumps(eb, sort_keys=True).encode()):
+        h.update(hashlib.sha256(part).digest())
+    return h.hexdigest()
+
+
 def _needed(planned_calls, epoch_budgets, files):
     """Calls the plan can still make. Without epoch_budgets: planned_calls
     unchanged. With epoch_budgets ({'slug.epoch.jsonl': lifetime budget}):
