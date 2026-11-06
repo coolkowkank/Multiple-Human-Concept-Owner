@@ -227,7 +227,7 @@ try:
     check("--allow-fresh cannot override expected_min_reserves", msg and "unestablished" in msg and clean and not GETS)
     fenced_http.HTTP_LOG_DIR = saved
     # unlisted http seats in the roster count toward the planned total
-    r9, d9 = lane(); lt.operator_set_http_seat(r9, "qc", NEM, "u1", 8)
+    r9, d9 = lane(); lt.operator_set_http_seat(r9, "qc", NEM, "u1", 8); lt.operator_set_http_seat(r9, "records", NEM, "u3", 4)  # cap 12: two unlisted roster seats (8+4)
     msg, clean = attempt(cfg(seats={"coordinator": {"model": NEM, "epoch": "u2", "budget": 1}}, preflight={"anchor_file": anchor_f}), r9, d9)
     check("roster http seat not in the config counts: planned over remaining refused", msg and "over_cap" in msg and not GETS)
     # anchor refresh is atomic and keeps the old file when the ledger does not verify

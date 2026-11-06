@@ -40,7 +40,7 @@ w1 = dict(w1, receipt_hash=RB)
 # nonce reuse / receipt chain / seq
 check("nonce reuse refused", refused(lambda: openw(1, prev=RB, nonce=w1["nonce"])) is not None)
 check("receipt chain break refused", refused(lambda: openw(1, prev=H("wrong"))) is not None)
-check("K over the remaining lifetime cap refused (floor+sum K+K)", refused(lambda: openw(9, prev=w1["receipt_hash"])) is not None)
+check("K over the remaining lifetime cap refused (floor+sum K+K)", refused(lambda: openw(11, prev=w1["receipt_hash"])) is not None)
 openw(3, prev=w1["receipt_hash"])
 w = fh.read_control(fh.HTTP_LOG_DIR)["windows"]
 check("second window continues chain, base = reserves so far", len(w) == 3 and w[2]["base"] == 2 and w[2]["seq"] == 3 and w[1]["kind"] == "window-burn")
