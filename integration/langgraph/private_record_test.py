@@ -104,6 +104,12 @@ check("fork: same seq/total, different valid ledger -> refused as non-extending"
 check("append-only holds for the real next record", pr.check_append_only(rec1["tar"], rec3["tar"]))
 check("append-only: shrinking (newer shorter than older) refused", refused(lambda: pr.check_append_only(rec3["tar"], rec1["tar"])))
 check("append-only: unreadable tar refused", refused(lambda: pr.check_append_only(b"junk", rec1["tar"])))
+import tarfile as _tfm, io as _iom
+_b = _iom.BytesIO()
+with _tfm.open(fileobj=_b, mode="w") as _t:
+    for _ in range(2):
+        _ti = _tfm.TarInfo("_control.ctl"); _ti.size = 1; _t.addfile(_ti, _iom.BytesIO(b"x"))
+check("duplicate tar member names refused", refused(lambda: pr.check_append_only(_b.getvalue(), _b.getvalue())))
 # pending receipt field tightening
 import json as _j
 def pend_mut(**ch):

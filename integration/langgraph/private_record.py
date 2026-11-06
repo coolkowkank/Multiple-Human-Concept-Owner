@@ -127,6 +127,8 @@ def _members(tar_bytes):
             for m in t.getmembers():
                 if not m.isreg() or "/" in m.name:
                     raise RecordRefused("unexpected tar member")
+                if m.name in out:
+                    raise RecordRefused("duplicate tar member name: %s" % m.name)
                 out[m.name] = t.extractfile(m).read()
             return out
     except (tarfile.TarError, OSError):

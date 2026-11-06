@@ -30,7 +30,7 @@ def run(reply_text, tag):
     cd = os.path.join(tmp, "cfg-" + tag); os.makedirs(cd); os.chmod(cd, 0o700)
     kf = os.path.join(cd, "k"); open(kf, "w").write("fake-key\n"); os.chmod(kf, 0o600)
     bf = os.path.join(cd, "brief.md"); open(bf, "wb").write(brief); os.chmod(bf, 0o600)
-    c = {"key_file": kf, "brief_extra_file": bf, "stop_after": 1, "preflight": {}, "seats": {"coordinator": {"model": MODEL, "epoch": "e" + tag, "budget": 1, "max_tokens": 4096}}}
+    c = {"key_file": kf, "brief_extra_file": bf, "stop_after": 1, "preflight": {}, "no_verify_command": True, "seats": {"coordinator": {"model": MODEL, "epoch": "e" + tag, "budget": 1, "max_tokens": 4096}}}
     cp = os.path.join(cd, "c.json"); open(cp, "w").write(json.dumps(c)); os.chmod(cp, 0o600)
     lane = os.path.join(tmp, "lane-" + tag); lt.init_repo(lane)
     try: rc = lt.live_entry(lane, os.path.join(tmp, "db-" + tag), cp, allow_fresh=True)
@@ -53,4 +53,17 @@ check("prose around the JSON: protocol refused, output absent", pack.read_output
 bad_path = json.dumps({"summary": "x", "writes": {"docs/out.json": assessment}, "verify_command": None, "handoff": "builder", "gate": None, "status_line": "x"})
 lane4, rc4 = run(bad_path, "path")
 check("write outside .team/ refused: output absent, one POST only", pack.read_output(lane4) is None and len(BODIES) == 1)
+cmd = json.dumps({"summary": "x", "writes": {pack.OUT_PATH: assessment}, "verify_command": "python3 -c pass", "handoff": "builder", "gate": None, "status_line": "x"})
+lane5, rc5 = run(cmd, "cmd")
+check("no_verify_command: a non-null (even allow-listed) verify_command is refused, nothing written, nothing executed", pack.read_output(lane5) is None and len(BODIES) == 1)
+_c = json.load(open(os.path.join(tmp, "cfg-cmd", "c.json"))); _c["no_verify_command"] = "yes"
+open(os.path.join(tmp, "cfg-cmd", "c2.json"), "w").write(json.dumps(_c)); os.chmod(os.path.join(tmp, "cfg-cmd", "c2.json"), 0o600)
+try: lt.live_entry(os.path.join(tmp, "lane-ok"), os.path.join(tmp, "dbx"), os.path.join(tmp, "cfg-cmd", "c2.json")); _m = "returned"
+except SystemExit as _e: _m = str(_e.code)
+check("no_verify_command must be a bool (non-bool refused before any work)", "no_verify_command must be a bool" in _m)
+import private_record as pr
+big = os.path.join(tmp, "bigout"); subprocess.run(["git", "init", "-q", big]); os.makedirs(os.path.join(big, ".team"))
+open(os.path.join(big, pack.OUT_PATH), "w").write("x" * (pack.MAX_OUTPUT + 1)); subprocess.run(["git", "-C", big, "add", "-A"]); subprocess.run(["git", "-C", big, "-c", "user.name=a", "-c", "user.email=a@b.c", "commit", "-qm", "x"])
+check("read_output refuses a file over the bound without reading it", pack.read_output(big) is None)
+print("LIMITS: WINDOW_GATE is False in this stub (the real gate/run-bind/token path is covered by window_gate_test, entry_binding_test and the wrapper tests, not here).")
 print("FAILED" if FAIL else "ALL PASS"); sys.exit(1 if FAIL else 0)

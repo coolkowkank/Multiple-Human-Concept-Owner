@@ -569,9 +569,15 @@ _VERIFY_CMD_ALLOWED = ("python3", "python", "pytest")
 _VERIFY_CMD_METACHARS = set(";&|`$<>\n\r")
 
 
+_NO_VERIFY_COMMAND = False     # process-local; set by live_entry from the config (task-specific)
+
+
 def _screen_verify_command(cmd, seat: str) -> None:
     if cmd is None:
         return
+    if _NO_VERIFY_COMMAND:
+        raise SeatError(f"{seat} refused response: this task allows no verify_command "
+                        f"(model text is never executed); reply with null")
     if (not isinstance(cmd, str) or not cmd.strip()
             or any(c in _VERIFY_CMD_METACHARS for c in cmd)):
         raise SeatError(
@@ -1020,7 +1026,7 @@ def verify(repo: str, checkpoint_db: str, thread_id: str,
 # process's environment during the run, never printed, written or exported.
 # Lifetime budget cannot be created here (fenced_http owns it).
 
-LIVE_CFG_KEYS = {"key_file", "seats", "brief_extra_file", "stop_after", "preflight"}
+LIVE_CFG_KEYS = {"key_file", "seats", "brief_extra_file", "stop_after", "preflight", "no_verify_command"}
 LIVE_PREFLIGHT_KEYS = {"anchor_file", "expected_min_reserves"}
 LIVE_SEAT_KEYS = {"model", "epoch", "budget", "max_tokens"}
 
@@ -1203,6 +1209,9 @@ def live_entry(repo, db, config_path, thread_id="live-1", allow_fresh=False) -> 
     stop_after = cfg.get("stop_after", 0)
     if not isinstance(stop_after, int) or isinstance(stop_after, bool) or stop_after < 0:
         raise SystemExit("refused: stop_after must be a non-negative int")
+    nvc = cfg.get("no_verify_command", False)
+    if not isinstance(nvc, bool):
+        raise SystemExit("refused: no_verify_command must be a bool")
     # read-only lifetime reserve preflight (reserve_preflight.py). It reserves
     # nothing; Fenced still owns atomic reservation and the cap. NOT atomic
     # across processes: run one live entry at a time (seats run serially).
@@ -1288,8 +1297,11 @@ def live_entry(repo, db, config_path, thread_id="live-1", allow_fresh=False) -> 
                                          note="operator reply rules")
     os.environ[HTTP_KEY_ENV] = key
     try:
+        global _NO_VERIFY_COMMAND
+        _NO_VERIFY_COMMAND = nvc
         run_graph(repo, db, stop_after, thread_id)
     finally:
+        _NO_VERIFY_COMMAND = False
         os.environ.pop(HTTP_KEY_ENV, None)
         _refresh_anchor(pfc.get("anchor_file"), anchor, emr)
     bus_state = Bus(repo, BRANCH).state().get("status")

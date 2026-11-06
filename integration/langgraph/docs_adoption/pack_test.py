@@ -28,4 +28,14 @@ check("more than 8 gaps fails", pack.score(many, texts)["gaps_over_limit"] == 1 
 long_ = json.dumps({"first_brief": "w " * 121, "gaps": [{"file": "docs/operating-rules.md", "quote": sent, "question": "a?"}]})
 check("first_brief over 120 words fails", not pack.score(long_, texts)["pass"])
 check("whitespace-only differences in a quote are tolerated", pack.score(json.dumps({"first_brief": "x", "gaps": [{"file": "docs/operating-rules.md", "quote": sent.replace(" ", "  ", 1), "question": "q?"}]}), texts)["gaps_grounded"] == 1)
+for nm, bad in (("int", 5), ("list", ["x"]), ("null", None), ("object", {"a": 1})):
+    for fld in ("quote", "question", "file"):
+        g = {"file": "docs/operating-rules.md", "quote": sent, "question": "q?"}; g[fld] = bad
+        try: r = pack.score(json.dumps({"first_brief": "x", "gaps": [g]}), texts); okk = r["pass"] is False and r["gaps_ungrounded"] == 1
+        except Exception as e: okk = False
+        check("non-string %s in %s: scored false without throwing" % (nm, fld), okk)
+for nm, bad in (("gaps null", {"first_brief": "x", "gaps": None}), ("gaps object", {"first_brief": "x", "gaps": {}}), ("first_brief int", {"first_brief": 3, "gaps": []}), ("gap is a string", {"first_brief": "x", "gaps": ["s"]}), ("top-level list", [1])):
+    try: r = pack.score(json.dumps(bad), texts); okk = r["pass"] is False
+    except Exception: okk = False
+    check("shape %s: false without throwing" % nm, okk)
 print("FAILED" if FAIL else "ALL PASS"); sys.exit(1 if FAIL else 0)

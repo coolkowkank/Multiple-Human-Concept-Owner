@@ -46,9 +46,15 @@ def build(repo, commit):
     return b, texts
 
 
+MAX_OUTPUT = 32768
+
+
 def read_output(lane_repo, commit="HEAD"):
     """The assessment is the file the model wrote into the lane (committed by the runner).
     Returns its text, or None if absent. The reply summary is NOT stored (hash only)."""
+    sz = subprocess.run(["git", "-C", lane_repo, "cat-file", "-s", "%s:%s" % (commit, OUT_PATH)], capture_output=True)
+    if sz.returncode != 0 or not sz.stdout.strip().isdigit() or int(sz.stdout) > MAX_OUTPUT:
+        return None                      # absent, or over the bound: never read it
     r = subprocess.run(["git", "-C", lane_repo, "show", "%s:%s" % (commit, OUT_PATH)], capture_output=True)
     return r.stdout.decode("utf-8", "replace") if r.returncode == 0 else None
 
@@ -73,6 +79,8 @@ def score(answer_text, texts):
     if not out["keys_ok"]:
         return out
     out["first_brief_words"] = len(a["first_brief"].split())
+    if not isinstance(a["gaps"], list):
+        return out
     normtexts = {p: _norm(t) for p, t in texts.items()}
     seen = set()
     for g in a["gaps"][:MAX_GAPS]:
@@ -81,7 +89,7 @@ def score(answer_text, texts):
               and all(isinstance(g[k], str) for k in g) and g["file"] in normtexts
               and len(_norm(g["quote"])) >= 12 and _norm(g["quote"]) in normtexts[g["file"]]
               and len(g["question"].split()) <= 25)
-        key = (g.get("file"), _norm(g.get("quote", ""))) if isinstance(g, dict) else None
+        key = (g["file"], _norm(g["quote"])) if ok else None
         if ok and key in seen:
             out["gaps_duplicate"] += 1
         elif ok:
