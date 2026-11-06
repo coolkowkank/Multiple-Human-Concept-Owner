@@ -213,7 +213,7 @@ def live_epoch_budgets(cfg_seats, roster_seats, *, strict=False):
     return out, None
 
 
-def entry_content_hash(config_bytes, roster_bytes):
+def entry_content_hash(config_bytes, roster_bytes, brief_bytes=None):
     """sha256 over the exact config bytes, exact roster bytes and the shared
     epoch-budget computation. Used by BOTH the wrapper (right before spawn)
     and the live entry (over the very bytes it then parses), so a window's
@@ -226,7 +226,10 @@ def entry_content_hash(config_bytes, roster_bytes):
     if why:
         raise ValueError(why)
     h = hashlib.sha256()
-    for part in (config_bytes, roster_bytes, json.dumps(eb, sort_keys=True).encode()):
+    # brief_bytes: exact bytes of brief_extra_file (None = no brief, a distinct
+    # marker). The key file is deliberately NOT hashed (secret, separate auth fact).
+    brief_part = b"\x00no-brief" if brief_bytes is None else b"\x01brief:" + brief_bytes
+    for part in (config_bytes, roster_bytes, json.dumps(eb, sort_keys=True).encode(), brief_part):
         h.update(hashlib.sha256(part).digest())
     return h.hexdigest()
 

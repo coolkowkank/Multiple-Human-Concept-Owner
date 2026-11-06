@@ -1117,7 +1117,7 @@ def _refresh_anchor(anchor_file, old_anchor, emr):
               flush=True)
 
 
-def _bind_entry_content(config_bytes, roster_bytes):
+def _bind_entry_content(config_bytes, roster_bytes, brief_bytes=None):
     """Refuse (SystemExit, before any other work) unless the fence's open,
     run-bound window carries a config_hash equal to the hash of THESE bytes.
     Skipped only when fenced_http.WINDOW_GATE is False (offline tests)."""
@@ -1125,7 +1125,7 @@ def _bind_entry_content(config_bytes, roster_bytes):
         return
     import reserve_preflight as _rp
     try:
-        want = _rp.entry_content_hash(config_bytes, roster_bytes)
+        want = _rp.entry_content_hash(config_bytes, roster_bytes, brief_bytes)
     except ValueError as exc:
         raise SystemExit("refused: %s" % exc)
     ok, why, _ = fenced_http.window_status(fenced_http.HTTP_LOG_DIR)
@@ -1148,7 +1148,16 @@ def live_entry(repo, db, config_path, thread_id="live-1", allow_fresh=False) -> 
         _cfg_bytes = fh.read()
     with open(roster_path, "rb") as fh:
         _roster_bytes = fh.read()
-    _bind_entry_content(_cfg_bytes, _roster_bytes)      # exact bytes parsed below
+    try:
+        _bp = json.loads(_cfg_bytes.decode("utf-8")).get("brief_extra_file")
+    except (ValueError, AttributeError):
+        raise SystemExit("refused: config is not a JSON object")
+    _brief_bytes = None
+    if _bp:
+        _private_regular(_bp, "brief_extra_file")
+        with open(_bp, "rb") as fh:
+            _brief_bytes = fh.read(16385)
+    _bind_entry_content(_cfg_bytes, _roster_bytes, _brief_bytes)   # exact bytes used below
     cfg = json.loads(_cfg_bytes.decode("utf-8"))
     if not isinstance(cfg, dict) or set(cfg) - LIVE_CFG_KEYS or "seats" not in cfg \
             or "key_file" not in cfg:
@@ -1181,8 +1190,12 @@ def live_entry(repo, db, config_path, thread_id="live-1", allow_fresh=False) -> 
     extra = None
     if cfg.get("brief_extra_file"):
         _private_regular(cfg["brief_extra_file"], "brief_extra_file")
-        with open(cfg["brief_extra_file"], encoding="utf-8") as fh:
-            extra = fh.read(16385)
+        if len(_brief_bytes) > 16384:
+            raise SystemExit("refused: brief_extra_file over 16KB")
+        try:
+            extra = _brief_bytes.decode("utf-8")      # the very bytes that were hashed
+        except UnicodeDecodeError:
+            raise SystemExit("refused: brief_extra_file is not UTF-8")
         if len(extra) > 16384:
             raise SystemExit("refused: brief_extra_file over 16KB")
     stop_after = cfg.get("stop_after", 0)

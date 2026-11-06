@@ -391,7 +391,9 @@ def live_config_hash(lane, config):
     lane = os.path.abspath(lane)
     cb = open(config, "rb").read()
     rb = open(os.path.join(lane, ".team", "roster.json"), "rb").read()
-    return rp.entry_content_hash(cb, rb)
+    bp = json.loads(cb).get("brief_extra_file")
+    bb = open(bp, "rb").read(16385) if bp else None
+    return rp.entry_content_hash(cb, rb, bb)
 
 
 def run_live(state_dir, lane, db, config, deadline, thread="live-1", env=None):
