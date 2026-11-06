@@ -383,6 +383,23 @@ def live_binding(lane, db, config, thread="live-1"):
     return argv, eb, None
 
 
+def live_config_hash(lane, config):
+    """sha256 over the CONTENT the live entry will read: the config file
+    bytes, the lane roster bytes, and the shared epoch-budget computation.
+    Recomputed from disk at each call (the wrapper calls it right before
+    spawn), so an edit after the window was opened is caught."""
+    lane = os.path.abspath(lane)
+    cb = open(config, "rb").read()
+    rb = open(os.path.join(lane, ".team", "roster.json"), "rb").read()
+    eb, why = rp.live_epoch_budgets(json.loads(cb)["seats"], json.loads(rb)["seats"], strict=True)
+    if why:
+        raise ValueError(why)
+    h = hashlib.sha256()
+    for part in (cb, rb, json.dumps(eb, sort_keys=True).encode()):
+        h.update(hashlib.sha256(part).digest())
+    return h.hexdigest()
+
+
 def run_live(state_dir, lane, db, config, deadline, thread="live-1", env=None):
     """The supported path: bounded `langgraph_team.py live`, ledger = the
     entry's own default dir/cap, accounting from the entry's own inputs. No
@@ -391,10 +408,11 @@ def run_live(state_dir, lane, db, config, deadline, thread="live-1", env=None):
     if why:
         return "refused", {"reason": "entry binding: " + why}
     return run(state_dir, argv, deadline, epoch_budgets=eb if eb else None,
-               planned=None if eb else 0, env=env, cwd=HERE)
+               planned=None if eb else 0, env=env, cwd=HERE,
+               config_hash_fn=lambda: live_config_hash(lane, config))
 
 
-def window_gate(state_dir, log_dir, planned, argv=None, epoch_budgets=None):
+def window_gate(state_dir, log_dir, planned, argv=None, epoch_budgets=None, config_hash_fn=None):
     """None or the reason to refuse BEFORE spawn. Requires the fence's own
     verified open window with room for the planned calls, and a local copy
     of the pending-window receipt that is PARSED and compared field by
@@ -431,6 +449,13 @@ def window_gate(state_dir, log_dir, planned, argv=None, epoch_budgets=None):
     for f in ("seq", "k", "nonce", "config_hash", "prev_receipt_hash"):
         if r.get(f) != w[f]:
             return "receipt field %s differs from the window line" % f
+    if config_hash_fn is not None:      # live entry: window config_hash must equal the content hash NOW
+        try:
+            now = config_hash_fn()
+        except (OSError, ValueError, KeyError, TypeError):
+            return "cannot recompute the config+roster content hash"
+        if w["config_hash"] != now:
+            return "config+roster content changed since the window was opened"
     if r.get("argv_sha256") != hashlib.sha256("\0".join(argv or []).encode()).hexdigest():
         return "receipt argv binding differs from this run"
     if epoch_budgets is not None:
@@ -461,7 +486,8 @@ def close_window(log_dir, run_id):
 
 # --------------------------------------------------------------------- run
 def run(state_dir, argv, deadline, *, planned=None, epoch_budgets=None,
-        log_dir=None, cap=None, allow_fresh=False, env=None, cwd=None):
+        log_dir=None, cap=None, allow_fresh=False, env=None, cwd=None,
+        config_hash_fn=None):
     """Returns (outcome, detail dict). Never spawns unless every gate passed.
     Exactly one of planned (a flat call count) or epoch_budgets must be
     given. Generic argv is for tests/operators and makes no claim that the
@@ -515,7 +541,7 @@ def run(state_dir, argv, deadline, *, planned=None, epoch_budgets=None,
         if pf["status"] != "ok_to_plan":
             _subreaper_off()
             return refuse("preflight %s" % pf["status"], problems=pf.get("problems"))
-        why = window_gate(state_dir, log_dir or fh.HTTP_LOG_DIR, planned, argv, epoch_budgets)
+        why = window_gate(state_dir, log_dir or fh.HTTP_LOG_DIR, planned, argv, epoch_budgets, config_hash_fn)
         if why:
             _subreaper_off()
             return refuse("window gate: " + why)

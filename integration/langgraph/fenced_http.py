@@ -318,10 +318,13 @@ def open_window(dirpath, k, nonce, config_hash, receipt_hash, prev_receipt_hash)
                                      if not (w["kind"] == "window-burn" and w["supersedes"]))
         if committed + k > HTTP_LIFETIME_CAP:
             raise FenceRefused("window K exceeds the remaining lifetime cap")
+        if c["windows"] and c["windows"][-1]["kind"] == "window-open":
+            # an unclosed window still holds liability (its unspent K): it must be
+            # typed-closed (burn_window) first, never silently replaced
+            raise FenceRefused("previous window is not closed; close or burn it first")
         if c["windows"]:
             okw, why, _ = window_status(dirpath)
-            if not okw and why not in ("window exhausted",) and not (
-                    why == "no window open" and c["windows"][-1]["kind"] == "window-burn"):
+            if not okw and why != "no window open":
                 raise FenceRefused("previous window unusable: " + why)
         _append_control(dirpath, {"kind": "window-open", "seq": len(c["windows"]) + 1,
                                   "k": k, "base": res + c["floor"] + c["burnt"], "nonce": nonce,
@@ -368,6 +371,37 @@ def burn_window(dirpath, nonce, config_hash, receipt_hash, prev_receipt_hash, *,
                                   "config_hash": config_hash, "receipt_hash": receipt_hash,
                                   "prev_receipt_hash": prev_receipt_hash, "supersedes": sup,
                                   "tips": tips})
+
+
+def ledger_summary(dirpath):
+    """The ONE accounting formula (readers and tests use this).
+    spent     = log reserves + historic floor + burnt K (spent-unknown)
+    committed = floor + K of every window-open + K of every NON-superseding
+                burn (a pending receipt burnt whole). A superseding burn is
+                the unspent remainder of a window already counted in
+                committed, so it is in 'spent' but never added to
+                'committed' again (no double count).
+    Invariants: spent <= committed (a window cannot spend beyond its K);
+    when the last window is closed/burnt, spent == committed (nothing
+    forgotten: every committed K is accounted as spent or burnt);
+    committed <= HTTP_LIFETIME_CAP. 'consistent' reports all three."""
+    c = read_control(dirpath)
+    if c["problems"]:
+        return {"ok": False, "problems": c["problems"]}
+    res, halted, ok, hs, tips = _log_scan(dirpath)
+    spent = res + c["floor"] + c["burnt"]
+    committed = c["floor"] + sum(w["k"] for w in c["windows"]
+                                 if not (w["kind"] == "window-burn" and w["supersedes"]))
+    last_open = bool(c["windows"]) and c["windows"][-1]["kind"] == "window-open"
+    consistent = (ok and spent <= committed + 0 and committed <= HTTP_LIFETIME_CAP
+                  and (last_open or not c["windows"] or spent == committed))
+    if not c["windows"]:
+        consistent = bool(ok)
+    return {"ok": ok, "log_reserves": res, "historic_floor": c["floor"], "burnt_unknown": c["burnt"],
+            "spent": spent, "committed": committed, "windows": [
+                {"seq": w["seq"], "kind": w["kind"], "k": w["k"], "supersedes": w.get("supersedes")}
+                for w in c["windows"]], "last_window_open": last_open, "consistent": bool(consistent),
+            "halted": halted}
 
 
 def _read_all(dirpath):

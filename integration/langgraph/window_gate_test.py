@@ -24,13 +24,18 @@ t1 = a.reserve(); t2 = a.reserve()
 check("two reserves inside K=2 succeed", t1.n == 1 and t2.n == 2)
 check("third reserve refused: window exhausted, log unchanged", refused(a.reserve) == "window exhausted" and fh._read_all(fh.HTTP_LOG_DIR)[0] == 2)
 check("reserve already made may still execute its claim path (exhausted is not a refusal at execute)", fh.window_status(fh.HTTP_LOG_DIR)[1] == "window exhausted")
+# an exhausted but unclosed window must be closed first (liability), never silently replaced
+check("open_window refused while the previous window is unclosed", "not closed" in (refused(lambda: openw(1, prev=w1["receipt_hash"])) or ""))
+RB = H("close1"); fh.burn_window(fh.HTTP_LOG_DIR, secrets.token_hex(32), H("cfg"), RB, w1["receipt_hash"])
+check("typed close of the exhausted window burns 0 remaining and closes it", fh.read_control(fh.HTTP_LOG_DIR)["windows"][-1]["k"] == 0 and fh.window_status(fh.HTTP_LOG_DIR)[1] == "no window open")
+w1 = dict(w1, receipt_hash=RB)
 # nonce reuse / receipt chain / seq
-check("nonce reuse refused", refused(lambda: openw(1, prev=w1["receipt_hash"], nonce=w1["nonce"])) is not None)
+check("nonce reuse refused", refused(lambda: openw(1, prev=RB, nonce=w1["nonce"])) is not None)
 check("receipt chain break refused", refused(lambda: openw(1, prev=H("wrong"))) is not None)
 check("K over the remaining lifetime cap refused (floor+sum K+K)", refused(lambda: openw(9, prev=w1["receipt_hash"])) is not None)
 openw(3, prev=w1["receipt_hash"])
 w = fh.read_control(fh.HTTP_LOG_DIR)["windows"]
-check("second window continues chain, base = reserves so far", len(w) == 2 and w[1]["base"] == 2 and w[1]["seq"] == 2)
+check("second window continues chain, base = reserves so far", len(w) == 3 and w[2]["base"] == 2 and w[2]["seq"] == 3 and w[1]["kind"] == "window-burn")
 check("one reserve in the new window ok", adapter().reserve().n == 1 or True)
 # rollback: truncate the log below the recorded tip
 lf = a.path; L = open(lf).read().splitlines(True); open(lf, "w").write("".join(L[:-2]))
@@ -54,7 +59,7 @@ check("edited window line (K 2->5) breaks control chain: refused", refused(adapt
 open(cp, "w").write(saved)
 # halt blocks
 open(adapter("m-b", "e2").path, "w").write(json.dumps({"phase": "halt", "n": 1, "prev": "0"}, sort_keys=True) + "\n")
-check("halt line in any file blocks reserve and window open", refused(adapter().reserve) is not None and refused(lambda: openw(1, prev=w[1]["receipt_hash"])) is not None)
+check("halt line in any file blocks reserve and window open", refused(adapter().reserve) is not None and refused(lambda: openw(1, prev=w[-1]["receipt_hash"])) is not None)
 # concurrency: K=2 window, 6 processes race
 fh.HTTP_LOG_DIR = os.path.join(tmp, "C"); os.makedirs(fh.HTTP_LOG_DIR, mode=0o700); openw(2)
 child = ("import sys;sys.path.insert(0,%r);import fenced_http as fh,os;os.environ['WK']='x';fh.HTTP_LOG_DIR=%r;"

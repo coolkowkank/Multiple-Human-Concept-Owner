@@ -160,7 +160,7 @@ def seat_report(audit_rows, link_rows=(), usage_rows=()):
     }
 
 
-def run_report(audit_dir):
+def run_report(audit_dir, ledger_dir=None):
     _verify_pin()
     if not os.path.isdir(audit_dir) or os.path.islink(audit_dir):
         raise ReportError("audit dir must be a real directory")
@@ -225,6 +225,11 @@ def run_report(audit_dir):
                  "file, not authenticated provider identity; no cost data; no per-cycle breakdown (audit rows carry no cycle field)"),
     }
     # content digest ignores seat names, so a renamed copy of the same data matches
+    if ledger_dir is not None:      # separate from provider-joined call totals: reserves, not usage
+        import fenced_http
+        rep["ledger"] = dict(fenced_http.ledger_summary(ledger_dir),
+                             note="reserve accounting from the fence ledger: historic floor and burnt K are operator-reported or "
+                                  "spent-unknown calls; they are never counted as zero and never as provider-joined usage")
     rep["content_digest"] = hashlib.sha256(json.dumps(sorted(json.dumps(v, sort_keys=True) for v in out.values()), separators=(",", ":")).encode()).hexdigest()
     rep["digest"] = digest(rep)
     return rep

@@ -9,7 +9,7 @@ network or to storage; it cannot prove that the private File holds the
 latest revision, only that the tar equals what the caller says it holds.
 Never overwrites a non-empty destination. Never repairs or resets.
 """
-import hashlib, io, json, os, re, stat, tarfile
+import fcntl, hashlib, io, json, os, re, stat, tarfile
 
 import fenced_http as fh
 
@@ -73,9 +73,6 @@ def restore(tar_bytes, dest_dir, *, expected_sha256, expected_receipt_hash,
         raise RestoreRefused("bundle missing or too large")
     if hashlib.sha256(tar_bytes).hexdigest() != expected_sha256:
         raise RestoreRefused("bundle sha256 does not match the private record")
-    if os.path.lexists(dest_dir) and (os.path.islink(dest_dir) or not os.path.isdir(dest_dir)
-                                      or os.listdir(dest_dir)):
-        raise RestoreRefused("destination exists and is not an empty directory")
     files = {}
     try:
         with tarfile.open(fileobj=io.BytesIO(bytes(tar_bytes)), mode="r:") as t:
@@ -90,7 +87,22 @@ def restore(tar_bytes, dest_dir, *, expected_sha256, expected_receipt_hash,
         raise RestoreRefused("not a readable tar")
     if "_control.ctl" not in files:
         raise RestoreRefused("no control file in bundle")
-    os.makedirs(dest_dir, mode=0o700, exist_ok=True)
+    # claim the destination atomically: mkdir fails if it exists (no clobber); an
+    # existing EMPTY dir is accepted only under an exclusive non-blocking flock
+    # taken before writing, so two restores cannot interleave.
+    try:
+        os.mkdir(dest_dir, 0o700)
+        claim = os.open(dest_dir, os.O_RDONLY)
+    except FileExistsError:
+        if os.path.islink(dest_dir) or not os.path.isdir(dest_dir):
+            raise RestoreRefused("destination exists and is not an empty directory")
+        claim = os.open(dest_dir, os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY)
+    try:
+        fcntl.flock(claim, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        os.close(claim); raise RestoreRefused("destination is being restored by another process")
+    if os.listdir(dest_dir):
+        os.close(claim); raise RestoreRefused("destination exists and is not an empty directory")
     os.chmod(dest_dir, 0o700)
     try:
         for fn, data in files.items():
@@ -137,8 +149,12 @@ def restore(tar_bytes, dest_dir, *, expected_sha256, expected_receipt_hash,
                                burn["receipt_hash"], prev_r)
         except (fh.FenceRefused, KeyError, TypeError) as e:
             raise RestoreRefused("burn refused: " + str(e)[:80])
+        sm = fh.ledger_summary(dest_dir)
+        if not sm.get("consistent"):
+            raise RestoreRefused("restored ledger accounting is inconsistent (spent/committed): %r" % {k: sm.get(k) for k in ("spent", "committed")})
         return info
     except BaseException:
+        os.close(claim); claim = None
         # cleanup only what THIS call wrote, and only while we hold the dest lock-free
         # fresh dir (nothing else may use it: it did not exist or was empty)
         for fn in list(files):
@@ -151,3 +167,6 @@ def restore(tar_bytes, dest_dir, *, expected_sha256, expected_receipt_hash,
         except OSError:
             pass            # someone else wrote there: leave their files, fail closed
         raise
+    finally:
+        if claim is not None:
+            os.close(claim)
