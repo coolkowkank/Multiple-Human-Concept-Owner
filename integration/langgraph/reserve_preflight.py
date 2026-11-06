@@ -299,6 +299,8 @@ def preflight(planned_calls, *, log_dir=None, cap=None, anchor=None, allow_fresh
         out["problems"].extend(ctl["problems"])
         floor = ctl["floor"]; out["historic_floor"] = ctl["floor_line"]
         total = floor
+        okw, whyw, infow = fenced_http.window_status(dd)
+        out["window"] = {"open": okw, "why": whyw, **infow}     # report only; the fence enforces
         for fn in names:
             if fn == fenced_http.CONTROL_NAME:
                 continue

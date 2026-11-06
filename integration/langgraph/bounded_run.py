@@ -74,6 +74,7 @@ import secrets
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import reserve_preflight as rp  # noqa: E402
+import fenced_http as fh  # noqa: E402
 
 MAX_DEADLINE = 80           # s. Envelope: <=80 + TERM_GRACE 3 + KILL_BUDGET 6 + scans/writes, ~25 s margin under a 120 s tool limit
 TERM_GRACE = 3.0
@@ -393,6 +394,36 @@ def run_live(state_dir, lane, db, config, deadline, thread="live-1", env=None):
                planned=None if eb else 0, env=env, cwd=HERE)
 
 
+def window_gate(state_dir, log_dir, planned):
+    """None or the reason to refuse BEFORE spawn. Requires the fence's own
+    verified open window with room for the planned calls, and a local copy
+    of the pending-window receipt whose sha256 equals the window line's
+    receipt_hash. The orchestrator must have written that receipt to a
+    private Hosted File first; the wrapper only checks the local copy (it
+    cannot see or prove the upload). Skipped only when fh.WINDOW_GATE is
+    False (tests); the fence enforces the same window on every reserve."""
+    if not fh.WINDOW_GATE:
+        return None
+    ok, why, info = fh.window_status(log_dir)
+    if not ok:
+        return why
+    ctl = fh.read_control(log_dir)
+    w = ctl["windows"][-1]
+    if planned > info["k"] - info["used"]:
+        return "planned %d exceeds the window's remaining %d" % (planned, info["k"] - info["used"])
+    p = os.path.join(state_dir, "window-receipt-%s.json" % w["nonce"])
+    try:
+        st = os.lstat(p)
+        if not stat.S_ISREG(st.st_mode) or st.st_size > 100_000:
+            return "receipt is not a small regular file"
+        got = hashlib.sha256(open(p, "rb").read()).hexdigest()
+    except OSError:
+        return "pending-window receipt missing in the state dir"
+    if got != w["receipt_hash"]:
+        return "receipt hash does not match the window line"
+    return None
+
+
 # --------------------------------------------------------------------- run
 def run(state_dir, argv, deadline, *, planned=None, epoch_budgets=None,
         log_dir=None, cap=None, allow_fresh=False, env=None, cwd=None):
@@ -449,6 +480,10 @@ def run(state_dir, argv, deadline, *, planned=None, epoch_budgets=None,
         if pf["status"] != "ok_to_plan":
             _subreaper_off()
             return refuse("preflight %s" % pf["status"], problems=pf.get("problems"))
+        why = window_gate(state_dir, log_dir or fh.HTTP_LOG_DIR, planned)
+        if why:
+            _subreaper_off()
+            return refuse("window gate: " + why)
         base_unmatched = _unmatched(pf)
         pre_anchor = _anchor(pf)
         run_id = secrets.token_hex(8)

@@ -4,6 +4,8 @@ reaped or killed by this test."""
 import hashlib, json, os, shutil, signal, subprocess, sys, tempfile, time
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import bounded_run as br  # noqa: E402
+NG = [sys.executable, "-c", "import sys;sys.path.insert(0,%r);import fenced_http;fenced_http.WINDOW_GATE=False;import bounded_run;sys.exit(bounded_run.main(sys.argv[1:]))" % os.path.dirname(os.path.abspath(__file__))]
+br.fh.WINDOW_GATE = False  # wrapper window gate is covered by window_wrapper_test.py
 
 ok = True
 def check(name, cond):
@@ -222,7 +224,7 @@ write_log(hl, LOG, [{"phase": "reserve", "n": 1, "model": "m/free", "via": "comp
                     {"phase": "result", "n": 1, "model": "m/free", "status": 200, "class": "ok-shape", "usage": {"cost": 0}, "cost_zero": True}])
 stl = mk()
 henv = dict(os.environ, HOME=home); henv.pop("LG_VERIFY_SANDBOX", None); henv.pop("REQUESTY_API_KEY", None)
-p = subprocess.run([sys.executable, os.path.join(HERE, "bounded_run.py"), "live", "--state-dir", stl, "--deadline", "20",
+p = subprocess.run(NG + ["live", "--state-dir", stl, "--deadline", "20",
                     "--lane", lane, "--db", os.path.join(cfgd, "db.sqlite"), "--config", cfgp],
                    env=henv, capture_output=True, text=True)
 d = br._read_state(stl)[0]
@@ -320,7 +322,7 @@ check("tail truncated BETWEEN runs: next start refused from the last clean ancho
 # ---- wrapper killed mid-run
 if os.path.exists(MARK): os.remove(MARK)
 def spawn_wrapper(state, L, child, deadline="30"):
-    return subprocess.Popen([sys.executable, os.path.join(HERE, "bounded_run.py"), "raw", "--state-dir", state,
+    return subprocess.Popen(NG + ["raw", "--state-dir", state,
                              "--deadline", deadline, "--planned", "1", "--log-dir", L, "--cap", "5", "--"] + child,
                             stderr=subprocess.PIPE)
 def wait_state(state, want, secs=10):
@@ -418,7 +420,7 @@ check("wrapper SIGTERM: child group killed, state wrapper-signaled (blocks)", d[
 
 # ---- CLI exit codes and status
 st, L = mk(), ledger(1)
-cli = [sys.executable, os.path.join(HERE, "bounded_run.py")]
+cli = list(NG)
 p = subprocess.run(cli + ["raw", "--state-dir", st, "--deadline", "5", "--planned", "1", "--log-dir", L, "--cap", "5", "--", "true"],
                    capture_output=True, text=True)
 check("CLI clean exit 0 and result line", p.returncode == 0 and "BOUNDED_RUN_RESULT" in p.stderr)
