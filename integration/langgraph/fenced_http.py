@@ -85,7 +85,7 @@ def read_control(dirpath):
     many are unknown vs settled and which epoch files it covers) and
     'window-open' (see open_window)."""
     out = {"problems": [], "floor": 0, "floor_line": None, "windows": [],
-           "tip": "0", "tips_ok": True}
+           "tip": "0", "tips_ok": True, "burnt": 0}
     p = os.path.join(dirpath, CONTROL_NAME)
     if not os.path.lexists(p):
         return out
@@ -129,9 +129,10 @@ def read_control(dirpath):
                 out["problems"].append("malformed historic-floor line")
             else:
                 out["floor"], out["floor_line"] = e["count"], e
-        elif k == "window-open":
-            ok = (_isint(e.get("seq"), 1, 10 ** 6) and e["seq"] == len(out["windows"]) + 1
-                  and _isint(e.get("k"), 1, HTTP_LIFETIME_CAP)
+        elif k in ("window-open", "window-burn"):
+            ok = ((k == "window-open" or isinstance(e.get("supersedes"), bool))
+                  and _isint(e.get("seq"), 1, 10 ** 6) and e["seq"] == len(out["windows"]) + 1
+                  and _isint(e.get("k"), 0 if k == "window-burn" else 1, HTTP_LIFETIME_CAP)
                   and _isint(e.get("base"), 0, 10 ** 6)
                   and isinstance(e.get("nonce"), str) and _HEX64.match(e["nonce"])
                   and e["nonce"] not in nonces
@@ -149,12 +150,22 @@ def read_control(dirpath):
                 out["problems"].append("malformed or out-of-sequence window-open line %d" % (i + 1))
             else:
                 nonces.add(e["nonce"]); out["windows"].append(e)
+                if k == "window-burn":
+                    out["burnt"] += e["k"]
         else:
             out["problems"].append("unknown control kind at line %d" % (i + 1))
         if out["problems"]:
             break
     out["tip"] = prev
     return out
+
+
+def _fsync_dir(dirpath):
+    fd = os.open(dirpath, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
 
 
 def _append_control(dirpath, entry):
@@ -169,6 +180,7 @@ def _append_control(dirpath, entry):
         before = os.fstat(fd).st_size
         os.write(fd, (json.dumps(e, sort_keys=True) + "\n").encode())
         os.fsync(fd)
+        _fsync_dir(dirpath)
         c2 = read_control(dirpath)
         if c2["problems"]:       # invalid line: take it back out before anyone else reads it
             os.ftruncate(fd, before); os.fsync(fd)
@@ -200,13 +212,20 @@ class _DirLock:
         self.close()
 
 
-def import_historic_floor(dirpath, count, unknown, settled, covered_files):
+def import_historic_floor(dirpath, count, unknown, settled, covered_files, *, external_manifest_present):
     """One-time, offline import of the operator-REPORTED count of reserves
     from a chain that was lost. It forges no old hash chain and does not
     claim the old log was recovered: the line carries a fixed provenance
     string. Refused if any control line or any log already exists (so it
     can only be the first thing in a fresh ledger dir). Never called by a
-    runtime path. Unknown stays unknown: 'unknown' calls count as spent."""
+    runtime path. Unknown stays unknown: 'unknown' calls count as spent.
+    external_manifest_present is REQUIRED and must be the orchestrator's
+    verified answer to "does the private File already hold a ledger
+    manifest/bundle?". True refuses: a fresh dir plus a fresh floor would
+    otherwise reset a ledger that exists elsewhere (use restore). The fence
+    cannot check this itself; it is a single-writer, no-CAS procedure."""
+    if external_manifest_present is not False:
+        raise FenceRefused("external manifest present or unknown; restore, do not re-import a floor")
     with _DirLock(dirpath):
         if os.path.getsize(os.path.join(dirpath, CONTROL_NAME)) or any(
                 f.endswith(".jsonl") for f in os.listdir(dirpath)):
@@ -260,10 +279,12 @@ def window_status(dirpath):
     if not c["windows"]:
         return False, "no window open", {}
     w = c["windows"][-1]
+    if w["kind"] == "window-burn":
+        return False, "no window open", {}
     res, halted, ok, hs, tips = _log_scan(dirpath)
     if not ok:
         return False, "usage log chain broken", {}
-    total = res + c["floor"]
+    total = res + c["floor"] + c["burnt"]
     for w2 in c["windows"]:
         for fn, tip in w2["tips"].items():
             if tip != "0" and tip not in hs.get(fn, set()):
@@ -293,20 +314,60 @@ def open_window(dirpath, k, nonce, config_hash, receipt_hash, prev_receipt_hash)
         res, halted, ok, hs, tips = _log_scan(dirpath)
         if not ok or halted:
             raise FenceRefused("ledger not clean; refusing to open a window")
-        committed = c["floor"] + sum(w["k"] for w in c["windows"])
+        committed = c["floor"] + sum(w["k"] for w in c["windows"]
+                                     if not (w["kind"] == "window-burn" and w["supersedes"]))
         if committed + k > HTTP_LIFETIME_CAP:
             raise FenceRefused("window K exceeds the remaining lifetime cap")
         if c["windows"]:
             okw, why, _ = window_status(dirpath)
-            if not okw and why not in ("window exhausted",):
+            if not okw and why not in ("window exhausted",) and not (
+                    why == "no window open" and c["windows"][-1]["kind"] == "window-burn"):
                 raise FenceRefused("previous window unusable: " + why)
         _append_control(dirpath, {"kind": "window-open", "seq": len(c["windows"]) + 1,
-                                  "k": k, "base": res + c["floor"], "nonce": nonce,
+                                  "k": k, "base": res + c["floor"] + c["burnt"], "nonce": nonce,
                                   "config_hash": config_hash, "receipt_hash": receipt_hash,
                                   "prev_receipt_hash": prev_receipt_hash, "tips": tips})
         c2 = read_control(dirpath)
         if c2["problems"]:
             raise FenceRefused("window line rejected: " + c2["problems"][0])
+
+
+def burn_window(dirpath, nonce, config_hash, receipt_hash, prev_receipt_hash, *,
+                pending_k=None):
+    """Recovery after a lost ledger. Appends a 'window-burn' line that
+    counts calls as SPENT-UNKNOWN and closes any open window:
+    - pending_k=None: supersede the last OPEN window; burns its remaining
+      K - used (the run may have made reserves we can no longer see).
+    - pending_k=K: a pending-window receipt exists in private storage but
+      no window line survived (crash after the receipt upload, before or
+      after open_window, ledger lost). The whole K is burnt and counts
+      toward the lifetime cap.
+    Nothing is erased or replayed; a burn is never undone."""
+    with _DirLock(dirpath):
+        c = read_control(dirpath)
+        if c["problems"]:
+            raise FenceRefused("control file invalid; refusing")
+        res, halted, ok, hs, tips = _log_scan(dirpath)
+        if not ok:
+            raise FenceRefused("ledger chain broken; refusing")
+        total = res + c["floor"] + c["burnt"]
+        if pending_k is None:
+            if not c["windows"] or c["windows"][-1]["kind"] != "window-open":
+                raise FenceRefused("no open window to supersede")
+            w = c["windows"][-1]
+            k = max(0, w["k"] - max(0, total - w["base"]))
+            sup = True
+        else:
+            k, sup = pending_k, False
+            committed = c["floor"] + sum(x["k"] for x in c["windows"]
+                                         if not (x["kind"] == "window-burn" and x["supersedes"]))
+            if committed + k > HTTP_LIFETIME_CAP:
+                raise FenceRefused("pending K exceeds the remaining lifetime cap")
+        _append_control(dirpath, {"kind": "window-burn", "seq": len(c["windows"]) + 1,
+                                  "k": k, "base": total, "nonce": nonce,
+                                  "config_hash": config_hash, "receipt_hash": receipt_hash,
+                                  "prev_receipt_hash": prev_receipt_hash, "supersedes": sup,
+                                  "tips": tips})
 
 
 def _read_all(dirpath):
@@ -319,7 +380,7 @@ def _read_all(dirpath):
     ctl = read_control(dirpath)
     if ctl["problems"]:
         ok = False
-    reserves = ctl["floor"]     # imported historic floor counts as spent
+    reserves = ctl["floor"] + ctl["burnt"]     # imported floor and burnt windows count as spent
     for fn in sorted(os.listdir(dirpath)):
         if not fn.endswith(".jsonl"):
             continue
@@ -378,6 +439,17 @@ def reserve_states(dirpath=None):
     out, d = {}, dirpath or HTTP_LOG_DIR
     if not os.path.isdir(d):
         return out
+    ctl = read_control(d)
+    fl = ctl["floor_line"]
+    if fl:       # typed, never 'not-started': operator-reported, original chain not recovered
+        for i in range(fl["unknown"]):
+            out["floor-unknown:%d" % i] = "historic-unknown"
+        for i in range(fl["settled"]):
+            out["floor-settled:%d" % i] = "historic-settled"
+    for w in ctl["windows"]:
+        if w["kind"] == "window-burn":
+            for i in range(w["k"]):
+                out["burn:%d:%d" % (w["seq"], i)] = "burnt-unknown"
     for fn in sorted(os.listdir(d)):
         if not fn.endswith(".jsonl"):
             continue
@@ -696,8 +768,12 @@ class FencedHttpAdapter(Adapter):
         try:
             rid = secrets.token_hex(8)
             n = self._check_and_reserve(fh, rid, "complete")
-            return self._record(fh, n, self._io(key, system, prompt),
-                                rid=rid)
+        finally:
+            fh.close()          # locks are NOT held across provider I/O
+        io = self._io(key, system, prompt)
+        fh = self._open_log()   # reacquire to record the result
+        try:
+            return self._record(fh, n, io, rid=rid)
         finally:
             fh.close()
 

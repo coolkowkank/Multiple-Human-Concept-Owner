@@ -67,6 +67,27 @@ check("6 processes on different epoch files, K=2: exactly 2 win (dir-level lock)
 fh.WINDOW_GATE = False; fh.HTTP_LOG_DIR = os.path.join(tmp, "Z"); check("gate constant off lets a test through (never the default)", adapter().reserve().n == 1)
 fh.WINDOW_GATE = True
 check("default is gated", fh.WINDOW_GATE is True)
+import fcntl, urllib.error
+fh.HTTP_LOG_DIR = os.path.join(tmp, "IO"); os.makedirs(fh.HTTP_LOG_DIR, mode=0o700); openw(2)
+PROBE = {}
+class _Probe:
+    def open(self, req, timeout=None):
+        fd = os.open(os.path.join(fh.HTTP_LOG_DIR, fh.CONTROL_NAME), os.O_RDWR)
+        lf = os.open(adapter("m-io", "eio").path, os.O_RDWR)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB); fcntl.flock(lf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            PROBE["free"] = True
+        except OSError:
+            PROBE["free"] = False
+        finally:
+            os.close(fd); os.close(lf)
+        raise urllib.error.URLError("probe")
+aio = adapter("m-io", "eio"); aio._opener = _Probe()
+try: aio.complete("s", "p")
+except Exception: pass
+check("complete(): directory and file locks are NOT held across provider I/O", PROBE.get("free") is True)
+fl = [json.loads(l)["phase"] for l in open(aio.path)]
+check("complete(): reserve then result recorded around the I/O", fl == ["reserve", "result"])
 from launcher.adapters import HttpAdapter, AdapterError
 class _NoNet:
     def open(self, *a, **k): raise AssertionError("network attempted")

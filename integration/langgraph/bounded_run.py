@@ -394,21 +394,22 @@ def run_live(state_dir, lane, db, config, deadline, thread="live-1", env=None):
                planned=None if eb else 0, env=env, cwd=HERE)
 
 
-def window_gate(state_dir, log_dir, planned):
+def window_gate(state_dir, log_dir, planned, argv=None, epoch_budgets=None):
     """None or the reason to refuse BEFORE spawn. Requires the fence's own
     verified open window with room for the planned calls, and a local copy
-    of the pending-window receipt whose sha256 equals the window line's
-    receipt_hash. The orchestrator must have written that receipt to a
-    private Hosted File first; the wrapper only checks the local copy (it
-    cannot see or prove the upload). Skipped only when fh.WINDOW_GATE is
-    False (tests); the fence enforces the same window on every reserve."""
+    of the pending-window receipt that is PARSED and compared field by
+    field to the window line and to this actual run: kind, seq, k, nonce,
+    config_hash, prev_receipt_hash, argv_sha256, planned (or epoch_budgets,
+    the shared config+roster computation), plus its sha256 = receipt_hash.
+    The orchestrator must have written the receipt to a private Hosted
+    File first; the wrapper only checks the local copy (it cannot see or
+    prove the upload). Skipped only when fh.WINDOW_GATE is False (tests)."""
     if not fh.WINDOW_GATE:
         return None
     ok, why, info = fh.window_status(log_dir)
     if not ok:
         return why
-    ctl = fh.read_control(log_dir)
-    w = ctl["windows"][-1]
+    w = fh.read_control(log_dir)["windows"][-1]
     if planned > info["k"] - info["used"]:
         return "planned %d exceeds the window's remaining %d" % (planned, info["k"] - info["used"])
     p = os.path.join(state_dir, "window-receipt-%s.json" % w["nonce"])
@@ -416,12 +417,46 @@ def window_gate(state_dir, log_dir, planned):
         st = os.lstat(p)
         if not stat.S_ISREG(st.st_mode) or st.st_size > 100_000:
             return "receipt is not a small regular file"
-        got = hashlib.sha256(open(p, "rb").read()).hexdigest()
+        raw = open(p, "rb").read()
     except OSError:
         return "pending-window receipt missing in the state dir"
-    if got != w["receipt_hash"]:
+    if hashlib.sha256(raw).hexdigest() != w["receipt_hash"]:
         return "receipt hash does not match the window line"
+    try:
+        r = json.loads(raw)
+    except ValueError:
+        return "receipt is not JSON"
+    if not isinstance(r, dict) or r.get("kind") != "pending-window":
+        return "receipt kind is not pending-window"
+    for f in ("seq", "k", "nonce", "config_hash", "prev_receipt_hash"):
+        if r.get(f) != w[f]:
+            return "receipt field %s differs from the window line" % f
+    if r.get("argv_sha256") != hashlib.sha256("\0".join(argv or []).encode()).hexdigest():
+        return "receipt argv binding differs from this run"
+    if epoch_budgets is not None:
+        if r.get("epoch_budgets") != dict(epoch_budgets):
+            return "receipt epoch_budgets differ from the live config+roster computation"
+    elif r.get("planned") != planned:
+        return "receipt planned differs from this run"
     return None
+
+
+def close_window(log_dir, run_id):
+    """Typed close, only called once the process tree is dead: burns the
+    window's remaining K as spent-unknown so the window can never be
+    reopened or reused (also what a restore does to an unclosed window).
+    Returns None or a short failure text."""
+    try:
+        okw, whyw, _ = fh.window_status(log_dir)
+        w = fh.read_control(log_dir)["windows"][-1]
+        if w["kind"] != "window-open":
+            return None
+        rh = hashlib.sha256((w["receipt_hash"] + ":close:" + run_id).encode()).hexdigest()
+        nn = hashlib.sha256(("close:" + w["nonce"] + run_id).encode()).hexdigest()
+        fh.burn_window(log_dir, nn, w["config_hash"], rh, w["receipt_hash"])
+        return None
+    except (fh.FenceRefused, OSError, IndexError) as exc:
+        return "window close failed: %s" % str(exc)[:80]
 
 
 # --------------------------------------------------------------------- run
@@ -480,7 +515,7 @@ def run(state_dir, argv, deadline, *, planned=None, epoch_budgets=None,
         if pf["status"] != "ok_to_plan":
             _subreaper_off()
             return refuse("preflight %s" % pf["status"], problems=pf.get("problems"))
-        why = window_gate(state_dir, log_dir or fh.HTTP_LOG_DIR, planned)
+        why = window_gate(state_dir, log_dir or fh.HTTP_LOG_DIR, planned, argv, epoch_budgets)
         if why:
             _subreaper_off()
             return refuse("window gate: " + why)
@@ -574,6 +609,11 @@ def run(state_dir, argv, deadline, *, planned=None, epoch_budgets=None,
                 state, why, kind = "unknown-reserve", "%d new reserve(s) without result" % new_unmatched, "needs-review"
             else:
                 state, why, kind = CLEAN, "child exited 0, ledger verified, no new unmatched reserve", "clean"
+            close_note = None
+            if fh.WINDOW_GATE and not left_alive:
+                close_note = close_window(log_dir or fh.HTTP_LOG_DIR, run_id)
+                if close_note and state == CLEAN:
+                    state, why, kind = "needs-review", close_note, "needs-review"
             extra = {"anchor": _anchor(post)} if state == CLEAN else {}
             _write_state(state_dir, dict(base, state=state, reason=why, child_pid=p.pid,
                                          child_pgid=pgid, exit_code=rc, **extra))

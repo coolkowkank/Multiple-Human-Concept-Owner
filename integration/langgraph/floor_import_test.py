@@ -12,7 +12,7 @@ def fresh(tag):
 COV = ["research-model-vs-harness-v2.x.jsonl"]
 def imp(d, **kw):
     a = dict(count=11, unknown=4, settled=7, covered_files=COV); a.update(kw)
-    fh.import_historic_floor(d, a["count"], a["unknown"], a["settled"], a["covered_files"])
+    fh.import_historic_floor(d, a["count"], a["unknown"], a["settled"], a["covered_files"], external_manifest_present=a.get("emp", False))
 def refused(f):
     try: f(); return False
     except fh.FenceRefused: return True
@@ -21,6 +21,7 @@ c = fh.read_control(d)
 check("floor read back typed, provenance fixed, not a recovered chain", c["floor"] == 11 and not c["problems"] and c["floor_line"]["provenance"] == fh.FLOOR_PROVENANCE and c["floor_line"]["unknown"] == 4)
 check("_read_all counts floor as spent", fh._read_all(d) == (11, False, True))
 check("preflight sees floor in total and the control file is not a stray file", (lambda r: r["reserves_total"] == 11 and not any("non-log" in p for p in r["problems"]))(rp.preflight(1, log_dir=d, cap=fh.HTTP_LIFETIME_CAP)))
+check("manifest present/unknown refuses a fresh floor import", refused(lambda: imp(fresh("emp"), emp=True)) and refused(lambda: imp(fresh("emp2"), emp=None)))
 check("second import refused (dir not fresh)", refused(lambda: imp(d)))
 d2 = fresh("b"); os.makedirs(d2, mode=0o700); open(os.path.join(d2, "x.y.jsonl"), "w").write("")
 check("import into dir with a log refused", refused(lambda: imp(d2)))

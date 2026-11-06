@@ -49,10 +49,26 @@ def bundle(src_dir):
 
 
 def restore(tar_bytes, dest_dir, *, expected_sha256, expected_receipt_hash,
-            expected_seq, expected_total):
+            expected_seq, expected_total, recover=None, pending=None, burn=None):
     """Verify, then materialize into a NEW empty dir (0700). Returns the
     window_status info. All expected_* come from the private File; any
-    mismatch raises RestoreRefused and leaves nothing behind."""
+    mismatch raises RestoreRefused and leaves nothing behind.
+
+    Crash points (the bundle in the private File always predates the loss):
+      recover=None       the bundle is a POST-RUN (or pre-first-window)
+                         bundle and nothing newer exists: restore as is.
+      recover="pending"  the File's newest record is a pending-window
+                         receipt (uploaded BEFORE open_window) with no
+                         bundle after it: the window may have been opened
+                         and may have run. pending={k,nonce,config_hash,
+                         receipt_hash} is burnt in full as spent-unknown.
+      recover="post-open" the newest bundle was taken after open_window
+                         but no post-run bundle exists: the run may have
+                         made reserves that are gone. The window's whole
+                         remaining K is burnt as spent-unknown (burn=
+                         {nonce,config_hash,receipt_hash}).
+    After either burn no window is open; a new one needs a new receipt,
+    and its base includes the burnt calls."""
     if not isinstance(tar_bytes, (bytes, bytearray)) or len(tar_bytes) > MAX_TAR:
         raise RestoreRefused("bundle missing or too large")
     if hashlib.sha256(tar_bytes).hexdigest() != expected_sha256:
@@ -81,25 +97,57 @@ def restore(tar_bytes, dest_dir, *, expected_sha256, expected_receipt_hash,
             fd = os.open(os.path.join(dest_dir, fn), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             with os.fdopen(fd, "wb") as f:
                 f.write(data); f.flush(); os.fsync(f.fileno())
+        fh._fsync_dir(dest_dir)
         c = fh.read_control(dest_dir)
-        if c["problems"] or not c["windows"]:
-            raise RestoreRefused("restored control invalid or has no window")
-        w = c["windows"][-1]
-        if w["receipt_hash"] != expected_receipt_hash:
+        if c["problems"]:
+            raise RestoreRefused("restored control invalid")
+        w = c["windows"][-1] if c["windows"] else None
+        if (w["receipt_hash"] if w else "0") != expected_receipt_hash:
             raise RestoreRefused("last receipt hash differs from the private record (older or foreign bundle)")
-        if w["seq"] != expected_seq:
+        if (w["seq"] if w else 0) != expected_seq:
             raise RestoreRefused("window seq differs from the private record")
+        if recover not in (None, "pending", "post-open"):
+            raise RestoreRefused("unknown recover mode")
+        if recover == "post-open" and not (w and w["kind"] == "window-open"):
+            raise RestoreRefused("post-open recovery needs an open window in the bundle")
+        if w and w["kind"] == "window-open" and recover != "post-open":
+            raise RestoreRefused("bundle holds an unclosed window; it can only be restored as exhausted "
+                                 "(recover='post-open'), never reusable")
         res, halted, ok, hs, tips = fh._log_scan(dest_dir)
         if not ok:
             raise RestoreRefused("restored log chain broken")
-        if res + c["floor"] != expected_total:
+        if res + c["floor"] + c["burnt"] != expected_total:
             raise RestoreRefused("reserve total differs from the private record (rollback or extra)")
         okw, why, info = fh.window_status(dest_dir)
-        if not okw and why != "window exhausted":
+        if w and w["kind"] == "window-open" and not okw and why != "window exhausted":
             raise RestoreRefused("window check: " + why)
+        prev_r = w["receipt_hash"] if w else "0"
+        try:
+            if recover == "pending":
+                _res, _h, _ok, _hs, _tips = fh._log_scan(dest_dir)
+                if not (isinstance(pending, dict) and pending.get("tar_sha256") == expected_sha256
+                        and pending.get("prev_receipt_hash") == prev_r
+                        and pending.get("seq") == (w["seq"] if w else 0) + 1
+                        and pending.get("tips") == _tips):
+                    raise RestoreRefused("pending receipt does not bind this bundle (tar sha, prev receipt, seq, tips)")
+                fh.burn_window(dest_dir, pending["nonce"], pending["config_hash"],
+                               pending["receipt_hash"], prev_r, pending_k=pending["k"])
+            elif recover == "post-open":
+                fh.burn_window(dest_dir, burn["nonce"], burn["config_hash"],
+                               burn["receipt_hash"], prev_r)
+        except (fh.FenceRefused, KeyError, TypeError) as e:
+            raise RestoreRefused("burn refused: " + str(e)[:80])
         return info
     except BaseException:
-        for fn in list(os.listdir(dest_dir)):
-            os.remove(os.path.join(dest_dir, fn))
-        os.rmdir(dest_dir)
+        # cleanup only what THIS call wrote, and only while we hold the dest lock-free
+        # fresh dir (nothing else may use it: it did not exist or was empty)
+        for fn in list(files):
+            try:
+                os.remove(os.path.join(dest_dir, fn))
+            except FileNotFoundError:
+                pass
+        try:
+            os.rmdir(dest_dir)
+        except OSError:
+            pass            # someone else wrote there: leave their files, fail closed
         raise
