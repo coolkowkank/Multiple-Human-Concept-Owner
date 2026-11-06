@@ -157,8 +157,35 @@ def snapshot(preflight_result):
                       for x in preflight_result.get("files", [])}}
 
 
+def _needed(planned_calls, epoch_budgets, files):
+    """Calls the plan can still make. Without epoch_budgets: planned_calls
+    unchanged. With epoch_budgets ({'slug.epoch.jsonl': lifetime budget}):
+    per file max(0, budget - reserves already recorded in that file), summed.
+    Fenced's call_budget is a LIFETIME count per model+epoch, so a resume that
+    reuses the same epochs must not be charged again for reserves already
+    spent in them. Reserves in files not named in epoch_budgets are not
+    credited. Never lowers what the global cap check sees below real demand."""
+    if epoch_budgets is None:
+        return planned_calls
+    used = {x["file"]: x["reserves"] for x in files}
+    return sum(max(0, b - used.get(fn, 0)) for fn, b in epoch_budgets.items())
+
+
+def _check_budgets(eb):
+    if eb is None:
+        return None
+    if not isinstance(eb, dict) or not eb:
+        return "epoch_budgets must be a non-empty dict"
+    for fn, b in eb.items():
+        if not (isinstance(fn, str) and _SLUG_EPOCH.match(fn)):
+            return "epoch_budgets key is not a slug.epoch.jsonl name: %r" % (fn,)
+        if not (isinstance(b, int) and not isinstance(b, bool) and b >= 0):
+            return "epoch_budgets value must be a non-negative int: %r" % (fn,)
+    return None
+
+
 def preflight(planned_calls, *, log_dir=None, cap=None, anchor=None, allow_fresh=False,
-              expected_min_reserves=None):
+              expected_min_reserves=None, epoch_budgets=None):
     """Read-only. Returns a dict; status is one of:
       ok_to_plan      logs verify, planned_calls <= remaining (still not a reservation)
       over_cap        verified, but planned_calls > remaining
@@ -176,6 +203,10 @@ def preflight(planned_calls, *, log_dir=None, cap=None, anchor=None, allow_fresh
     try:
         if not (isinstance(planned_calls, int) and not isinstance(planned_calls, bool) and planned_calls >= 0):
             out["problems"].append("planned_calls must be a non-negative int"); return out
+        bad = _check_budgets(epoch_budgets)
+        if bad:
+            out["problems"].append(bad); return out
+        out["epoch_budgets"] = dict(epoch_budgets) if epoch_budgets is not None else None
         dd, dc = (log_dir, cap)
         if dd is None or dc is None:
             d0, c0 = _defaults(); dd = dd or d0; dc = dc if dc is not None else c0
@@ -194,8 +225,9 @@ def preflight(planned_calls, *, log_dir=None, cap=None, anchor=None, allow_fresh
             out["status"] = "unestablished"
             out["problems"].append("no log directory: first run, deleted ledger and changed HOME look the same")
             if allow_fresh and not out["problems"][:-1] and anchor is None and not expected_min_reserves:
-                out.update(status="ok_to_plan" if planned_calls <= dc else "over_cap", reserves_total=0,
-                           remaining=dc, fresh_asserted_by_operator=True)
+                nd = _needed(planned_calls, epoch_budgets, [])
+                out.update(status="ok_to_plan" if nd <= dc else "over_cap", reserves_total=0,
+                           remaining=dc, needed_calls=nd, fresh_asserted_by_operator=True)
             return out
         out["problems"].extend(dprobs)
         names = sorted(os.listdir(dd))
@@ -220,7 +252,9 @@ def preflight(planned_calls, *, log_dir=None, cap=None, anchor=None, allow_fresh
             out["status"] = "unestablished"
             out["problems"].append("log dir has no logs: cannot distinguish first run from deletion")
             if allow_fresh and anchor is None and not expected_min_reserves and not out["problems"][:-1]:
-                out.update(status="ok_to_plan" if planned_calls <= dc else "over_cap", fresh_asserted_by_operator=True)
+                nd = _needed(planned_calls, epoch_budgets, [])
+                out.update(status="ok_to_plan" if nd <= dc else "over_cap", needed_calls=nd,
+                           fresh_asserted_by_operator=True)
             return out
         if expected_min_reserves is not None and total < expected_min_reserves:
             out["problems"].append("fewer reserves than the operator expects (%d < %d): deletion or truncation"
@@ -249,7 +283,9 @@ def preflight(planned_calls, *, log_dir=None, cap=None, anchor=None, allow_fresh
         if out["problems"]:
             out["status"] = "refuse"
         else:
-            out["status"] = "ok_to_plan" if planned_calls <= out["remaining"] else "over_cap"
+            nd = _needed(planned_calls, epoch_budgets, out["files"])
+            out["needed_calls"] = nd
+            out["status"] = "ok_to_plan" if nd <= out["remaining"] else "over_cap"
         for x in out["files"]:
             x.pop("line_hashes", None)
         return out
@@ -281,6 +317,9 @@ def main(argv):
     ap.add_argument("--log-dir"); ap.add_argument("--cap", type=int)
     ap.add_argument("--anchor-file"); ap.add_argument("--expected-min-reserves", type=int)
     ap.add_argument("--allow-fresh", action="store_true")
+    ap.add_argument("--epoch-budget", action="append", metavar="FILE=N",
+                    help="lifetime call budget of one slug.epoch.jsonl; repeatable; "
+                         "charges only what remains in each epoch (resume-safe)")
     a = ap.parse_args(argv)
     anchor = None
     if a.anchor_file:
@@ -290,8 +329,17 @@ def main(argv):
             anchor = {"schema": "unreadable"}
         if not isinstance(anchor, dict):   # null/list/string must never read as "no anchor"
             anchor = {"schema": "unreadable"}
+    eb = None
+    if a.epoch_budget:
+        eb = {}
+        for item in a.epoch_budget:
+            k, _, v = item.rpartition("=")
+            try:
+                eb[k] = int(v)
+            except ValueError:
+                eb[k] = None   # rejected by preflight as malformed
     r = preflight(a.planned, log_dir=a.log_dir, cap=a.cap, anchor=anchor, allow_fresh=a.allow_fresh,
-                  expected_min_reserves=a.expected_min_reserves)
+                  expected_min_reserves=a.expected_min_reserves, epoch_budgets=eb)
     print(json.dumps(r, sort_keys=True))
     return 0 if r["status"] == "ok_to_plan" else 1
 
