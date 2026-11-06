@@ -130,5 +130,12 @@ except fh.FenceRefused as e: okq = "no window open" in str(e)
 check("and future use is halted (no window can open over the cap)", okq and refused(lambda: fh.open_window(Dq, 1, secrets.token_hex(32), H("c"), H("q"), PEND["receipt_hash"])) is not None)
 check("recover mode that disagrees with the verified record is refused", refused(lambda: lr.restore(pre, os.path.join(tmp, "q3"), expected_sha256=pre_sha, expected_receipt_hash="0", expected_seq=0, expected_total=4, recover="post-open", burn=dict(nonce=secrets.token_hex(32), config_hash=H("c"), receipt_hash=H("z")))))
 check("newest private receipt two windows ahead (gap) refused", refused(lambda: lr.restore(pre, os.path.join(tmp, "q4"), expected_sha256=pre_sha, expected_receipt_hash="0", expected_seq=0, expected_total=4, pending=dict(PEND, seq=2))))
+# open last window + a NEWER pending receipt: derives "pending" but the open window's remaining K would be forgotten -> refused, nothing left
+d = fresh("p5"); fh.open_window(d, 3, secrets.token_hex(32), H("c"), H("rP5"), "0")
+ob, ob_sha = lr.bundle(d); D5 = os.path.join(tmp, "p5r")
+P5 = dict(k=1, nonce=secrets.token_hex(32), config_hash=H("c"), receipt_hash=H("pp5"), tar_sha256=ob_sha, prev_receipt_hash=H("rP5"), seq=2, tips=fh._log_scan(d)[4])
+check("open last window + newer pending receipt: refused (previous remaining K would be forgotten), nothing left",
+      refused(lambda: lr.restore(ob, D5, expected_sha256=ob_sha, expected_receipt_hash=H("rP5"), expected_seq=1, expected_total=4, pending=P5)) and not os.path.exists(D5))
+check("omitting the newest private receipt cannot hide it: a bundle with an open window never restores as usable", refused(lambda: lr.restore(ob, D5, expected_sha256=ob_sha, expected_receipt_hash=H("rP5"), expected_seq=1, expected_total=4)))
 shutil.rmtree(tmp)
 print("FAILED" if FAIL else "ALL PASS"); sys.exit(1 if FAIL else 0)
