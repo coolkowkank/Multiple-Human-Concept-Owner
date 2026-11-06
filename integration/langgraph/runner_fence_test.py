@@ -7,6 +7,7 @@ import http.server, json, os, shutil, sys, tempfile, threading, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import fenced_http as fh
+fh.WINDOW_GATE = False  # window gate is covered by window_gate_test.py; this suite tests other properties
 import runner_lane as rl
 import ryan_cycle as rc
 import runner_lane_demo_fixtures as fx
@@ -163,7 +164,7 @@ ths = [threading.Thread(target=worker, args=(i,)) for i in range(8)]
 check("F16 8 threads, separate token objects, one reserve: exactly one request, one exec line, one result",
       outs.count("ran") == 1 and len(HITS) == 1 and sum(1 for e in shared_lines() if e["phase"] == "exec") == 1 and sum(1 for e in shared_lines() if e["phase"] == "result") == 1)
 # second PROCESS with the same rid
-child = ("import sys,os;sys.path.insert(0,%r);import fenced_http as fh;fh.HTTP_LOG_DIR=%r;"
+child = ("import sys,os;sys.path.insert(0,%r);import fenced_http as fh;fh.WINDOW_GATE=False;fh.HTTP_LOG_DIR=%r;"
          "os.environ['FAKE_KEY_ENV']='x';ad=fh.FencedHttpAdapter(%r,%r,'FAKE_KEY_ENV','cc',8,64,5,'low');"
          "t=fh.Reservation(%r,%d,%r,ad.path)\ntry:\n ad.execute(t,'s','p');print('RAN')\nexcept fh.FenceRefused:\n print('REFUSED')\n"
          % (HERE, fh.HTTP_LOG_DIR, BASE, MN, MN, tok.n, tok.rid))

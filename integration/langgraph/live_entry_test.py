@@ -7,6 +7,7 @@ import contextlib, http.server, io, json, os, shutil, sys, tempfile, threading
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import fenced_http  # noqa: E402
+fenced_http.WINDOW_GATE = False  # window gate is covered by window_gate_test.py; this suite tests other properties
 import langgraph_team as lt  # noqa: E402
 
 NEM, LING = "nvidia/nemotron-3-ultra-550b-a55b", "novita/ling-3.1-flash"
@@ -181,7 +182,7 @@ try:
     check("expected_min_reserves with a missing ledger: refused", msg and clean and not GETS)
     fenced_http.HTTP_LOG_DIR = saved
     # tail truncation of a log is caught by the anchor
-    lf = os.path.join(saved, sorted(os.listdir(saved))[0]); lines = open(lf).read().splitlines(True)
+    lf = os.path.join(saved, sorted(f for f in os.listdir(saved) if f.endswith(".jsonl"))[0]); lines = open(lf).read().splitlines(True)
     open(lf, "w").write("".join(lines[:-1]))
     r5, d5 = lane(); msg, clean = attempt(cfg(preflight={"anchor_file": anchor_f}), r5, d5)
     check("truncated log vs anchor refused, no request", msg and "refuse" in msg and clean and not GETS)

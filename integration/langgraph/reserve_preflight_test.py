@@ -159,6 +159,7 @@ fh.close()
 
 # --- real Fenced writes parse cleanly (cross-check against the actual writer, fake opener, no network)
 import fenced_http as fh_mod
+fh_mod.WINDOW_GATE = False  # window gate is covered by window_gate_test.py; this suite tests other properties
 class _Resp:
     status = 200
     def __init__(s, b): s.b = b

@@ -6,6 +6,7 @@ import os as _os; _os.environ.setdefault("LG_VERIFY_SANDBOX", "1")
 import http.server, json, os, shutil, sys, tempfile, threading
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import fenced_http
+fenced_http.WINDOW_GATE = False  # window gate is covered by window_gate_test.py; this suite tests other properties
 import langgraph_team as lt
 
 APP = "def add(a, b):\n    return a + b\n"

@@ -16,6 +16,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import fenced_http  # noqa: E402
+fenced_http.WINDOW_GATE = False  # window gate is covered by window_gate_test.py; this suite tests other properties
 import langgraph_team as lt  # noqa: E402
 
 HITS = []

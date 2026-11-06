@@ -163,10 +163,16 @@ def _append_control(dirpath, entry):
     if c["problems"]:
         raise FenceRefused("control file invalid; refusing")
     e = dict(entry, prev=c["tip"])
-    fd = os.open(os.path.join(dirpath, CONTROL_NAME), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+    p = os.path.join(dirpath, CONTROL_NAME)
+    fd = os.open(p, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
     try:
+        before = os.fstat(fd).st_size
         os.write(fd, (json.dumps(e, sort_keys=True) + "\n").encode())
         os.fsync(fd)
+        c2 = read_control(dirpath)
+        if c2["problems"]:       # invalid line: take it back out before anyone else reads it
+            os.ftruncate(fd, before); os.fsync(fd)
+            raise FenceRefused("control line rejected: " + c2["problems"][0][:80])
     finally:
         os.close(fd)
 
@@ -213,6 +219,94 @@ def import_historic_floor(dirpath, count, unknown, settled, covered_files):
         if c["problems"]:
             os.truncate(os.path.join(dirpath, CONTROL_NAME), 0)
             raise FenceRefused("floor line malformed; nothing imported")
+
+
+WINDOW_GATE = True     # every reserve must fall inside an open, verified window
+WINDOW_REFUSALS = ("no window open", "window exhausted", "ledger rolled back")
+
+
+def _log_scan(dirpath):
+    """-> (reserves_in_logs, halted, ok, {file: set(line sha256)}, {file: tip})."""
+    res, halted, ok, hs, tips = 0, False, True, {}, {}
+    for fn in sorted(os.listdir(dirpath)) if os.path.isdir(dirpath) else []:
+        if not fn.endswith(".jsonl"):
+            continue
+        prev, seen = "0", set()
+        for raw in open(os.path.join(dirpath, fn), "rb"):
+            if not raw.strip():
+                continue
+            try:
+                e = json.loads(raw)
+                if e.get("prev") != prev:
+                    ok = False
+            except ValueError:
+                ok = False; e = {}
+            prev = hashlib.sha256(raw.rstrip(b"\n")).hexdigest()
+            seen.add(prev)
+            res += e.get("phase") == "reserve"
+            halted = halted or e.get("phase") == "halt"
+        hs[fn], tips[fn] = seen, prev
+    return res, halted, ok, hs, tips
+
+
+def window_status(dirpath):
+    """Read-only. -> (ok, why, info). ok means the LAST window is open,
+    its history is intact (every recorded log tip is still a line hash of
+    its file, total reserves never fell below the window base) and
+    reserves-in-window < K. Never repairs."""
+    c = read_control(dirpath)
+    if c["problems"]:
+        return False, "control file invalid", {}
+    if not c["windows"]:
+        return False, "no window open", {}
+    w = c["windows"][-1]
+    res, halted, ok, hs, tips = _log_scan(dirpath)
+    if not ok:
+        return False, "usage log chain broken", {}
+    total = res + c["floor"]
+    for w2 in c["windows"]:
+        for fn, tip in w2["tips"].items():
+            if tip != "0" and tip not in hs.get(fn, set()):
+                return False, "ledger rolled back or rewritten (recorded tip missing in %s)" % fn, {}
+    if total < w["base"]:
+        return False, "ledger rolled back (total below window base)", {}
+    used = total - w["base"]
+    info = {"seq": w["seq"], "k": w["k"], "used": used, "total": total, "halted": halted}
+    if used >= w["k"]:
+        return False, "window exhausted", info
+    return True, "", info
+
+
+def open_window(dirpath, k, nonce, config_hash, receipt_hash, prev_receipt_hash):
+    """Record a window-open line. Offline/orchestrator-side: the CALLER
+    must already have durably written the pending-window receipt (hash
+    given here) to private storage BEFORE calling this and before any
+    spawn; the fence cannot verify that upload (no network, no tools
+    CLI). Refused when: a log chain or control is bad, a halt exists, the
+    floor + the K of every window opened so far + this K exceeds the
+    lifetime cap (each window's planned K is burnt whether or not it was
+    spent), the nonce was used, or the receipt chain does not continue."""
+    with _DirLock(dirpath):
+        c = read_control(dirpath)
+        if c["problems"]:
+            raise FenceRefused("control file invalid; refusing")
+        res, halted, ok, hs, tips = _log_scan(dirpath)
+        if not ok or halted:
+            raise FenceRefused("ledger not clean; refusing to open a window")
+        committed = c["floor"] + sum(w["k"] for w in c["windows"])
+        if committed + k > HTTP_LIFETIME_CAP:
+            raise FenceRefused("window K exceeds the remaining lifetime cap")
+        if c["windows"]:
+            okw, why, _ = window_status(dirpath)
+            if not okw and why not in ("window exhausted",):
+                raise FenceRefused("previous window unusable: " + why)
+        _append_control(dirpath, {"kind": "window-open", "seq": len(c["windows"]) + 1,
+                                  "k": k, "base": res + c["floor"], "nonce": nonce,
+                                  "config_hash": config_hash, "receipt_hash": receipt_hash,
+                                  "prev_receipt_hash": prev_receipt_hash, "tips": tips})
+        c2 = read_control(dirpath)
+        if c2["problems"]:
+            raise FenceRefused("window line rejected: " + c2["problems"][0])
 
 
 def _read_all(dirpath):
@@ -308,6 +402,20 @@ def reserve_states(dirpath=None):
     return out
 
 
+class _LogHandle:
+    """Log file plus the held directory lock; close() releases both."""
+    def __init__(self, fh, dl):
+        self._fh, self._dl = fh, dl
+        self.seek, self.read, self.write = fh.seek, fh.read, fh.write
+        self.flush, self.fileno = fh.flush, fh.fileno
+
+    def close(self):
+        try:
+            self._fh.close()
+        finally:
+            self._dl.close()
+
+
 class FencedHttpAdapter(Adapter):
     REPORTS_PROVIDER_USAGE = True
 
@@ -336,10 +444,14 @@ class FencedHttpAdapter(Adapter):
 
     def _open_log(self):
         os.makedirs(HTTP_LOG_DIR, mode=0o700, exist_ok=True)   # private: reserve_preflight refuses group/other-accessible dirs
-        fd = os.open(self.path, os.O_RDWR | os.O_CREAT, 0o600)
-        fh = os.fdopen(fd, "r+b")
-        fcntl.flock(fh, fcntl.LOCK_EX)    # exclusive writer
-        return fh
+        dl = _DirLock(HTTP_LOG_DIR)        # one directory-level lock first, then the file lock
+        try:
+            fd = os.open(self.path, os.O_RDWR | os.O_CREAT, 0o600)
+            fh = os.fdopen(fd, "r+b")
+            fcntl.flock(fh, fcntl.LOCK_EX)    # exclusive writer
+        except BaseException:
+            dl.close(); raise
+        return _LogHandle(fh, dl)
 
     def complete(self, system, prompt):
         r = self._core(system, prompt)
@@ -414,6 +526,10 @@ class FencedHttpAdapter(Adapter):
                     why = "usage log chain broken; refusing"
                 elif halted:
                     why = "adapter halted earlier; refusing"
+                elif WINDOW_GATE:
+                    okw, whyw, _ = window_status(HTTP_LOG_DIR)
+                    if not okw and whyw != "window exhausted":
+                        why = whyw     # exhausted is fine here: this reserve may be the last one
             if why:
                 if "reserve" in seen:
                     self._append(fh, {"phase": "exec-refused",
@@ -458,6 +574,10 @@ class FencedHttpAdapter(Adapter):
         total, halted, chain_ok = _read_all(HTTP_LOG_DIR)
         if not chain_ok:
             raise FenceRefused("usage log chain broken; refusing")
+        if WINDOW_GATE:
+            okw, whyw, _ = window_status(HTTP_LOG_DIR)
+            if not okw:
+                raise FenceRefused(whyw[:80])
         if halted:
             raise FenceRefused("adapter halted earlier; refusing")
         ctl = read_control(HTTP_LOG_DIR)

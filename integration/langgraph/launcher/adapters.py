@@ -256,7 +256,14 @@ class HttpAdapter(Adapter):
         except OSError:
             return 0
 
+    # Fail closed: this generic adapter retries and has no durable
+    # reserve/window fence. The fenced path (FencedHttpAdapter) replaces
+    # it before any call; any other use must opt in explicitly in code.
+    ALLOW_UNFENCED_NETWORK = False
+
     def complete(self, system, prompt):
+        if not self.ALLOW_UNFENCED_NETWORK:
+            raise AdapterError("unfenced HTTP adapter refused: use the fenced adapter")
         key = os.environ.get(self.api_key_env)
         if not key:
             raise AdapterError(f"missing API key env var {self.api_key_env}")
