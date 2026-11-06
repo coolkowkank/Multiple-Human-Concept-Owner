@@ -17,30 +17,38 @@ own session under a hard deadline, and fails closed:
     and the final marker write. (The lock fd is inherited only by the direct
     child; close_fds launchers do not pass it on, so overlap protection is the
     wrapper's own lock plus the marker, not descendant fd inheritance.)
- 3. Mandatory read-only reserve_preflight before spawn. Accounting input is
-    exactly one of `planned` or a `roster` (.team/roster.json) from which
-    per-epoch lifetime budgets are derived for EVERY http seat; unknown or cli
-    adapter types, shared log files and malformed budgets are refused. The
+ 3. Mandatory read-only reserve_preflight before spawn. The supported path is
+    run_live(): the wrapper builds `python3 langgraph_team.py live LANE DB
+    CONFIG THREAD` itself and derives per-epoch lifetime budgets from that
+    same config plus the lane's own roster through the SAME function
+    (reserve_preflight.live_epoch_budgets) live_entry uses, so the accounting
+    binds the actual child entry. Arbitrary argv (`raw`) takes only a flat
+    planned count and makes no such binding. Unknown/cli adapters, shared log
+    files and malformed budgets are refused. The
     pre-run ledger snapshot is the anchor for the post-run scan, so deleted
     or truncated or rewritten logs block, and the last clean run's anchor
     guards the next start.
  4. Durable marker (atomic tmp+fsync+rename+fsync dir) written BEFORE spawn.
     Only state "clean" (or no state) allows a start. Every other state, and
     any "starting"/"running" found at the next start (wrapper died), refuses
-    until a human runs `clear` with a reason. No auto-resume, no retry, no
-    repair of the lane or the ledger. A reserve with no result stays
-    consumed/unknown.
+    until `clear`. RECOVERABLE states (tree verified gone) clear with a
+    reason; LOST-CONTAINMENT states (wrapper died, orphans-alive) do not clear
+    in this tool at all unless the kernel boot id changed. No auto-resume, no
+    retry, no repair of the lane or the ledger. A reserve with no result stays
+    consumed/unknown. The ledger anchor survives every clear; allow_fresh is
+    ignored once a state file exists.
  5. Any exception after spawn kills and reaps the tree before returning.
  6. PR_SET_PDEATHSIG(SIGKILL) on the direct child.
 
 LIMITS (not claimed away):
  - If the WRAPPER ITSELF is SIGKILLed, only the direct child dies
-   (PDEATHSIG). Grandchildren that are setsid'd and env-scrubbed (for
-   example the launcher's sandboxed verify: `env -i` + `bwrap --new-session`)
-   are then no longer findable by this tool. Their containment in that case
-   rests on bwrap's own --die-with-parent (read in source, not executed here).
-   The marker still blocks the next start; clear is refused while the group,
-   session or run-id scan sees anything alive.
+   (PDEATHSIG). Scrubbed setsid grandchildren (the launcher's sandboxed
+   verify: `env -i` + `bwrap --new-session`) are then invisible to this tool.
+   bwrap's --die-with-parent very probably kills that payload (proxy-tested by
+   a reviewer, not run through the real shim), but nothing here can verify it.
+   So that state is deliberately left blocked: see clear().
+ - Matching by numeric pid/pgid/sid and the run-id environ can false-block
+   (pid reuse), never false-allow. The marker records the direct child only.
  - PID reuse: matching by numeric pid/pgid can false-block, never false-allow.
  - Killing the client does not cancel a provider request: a killed call stays
    consumed/unknown exactly as before.
@@ -75,6 +83,29 @@ EXIT = {"clean": 0, "refused": 10, "timeout": 11, "child-failed": 12,
         "needs-review": 13, "orphans-alive": 14, "internal": 15}
 CLEAN = "clean"
 PR_SET_PDEATHSIG = 1
+
+
+def _boot_id():
+    try:
+        return open("/proc/sys/kernel/random/boot_id").read().strip() or None
+    except OSError:
+        return None
+
+
+def _pidns():
+    try:
+        return os.readlink("/proc/self/ns/pid")
+    except OSError:
+        return None
+
+
+# States after which the process tree is KNOWN contained and verified gone (or
+# was never started). An ordinary clear (with a reason) may release these.
+RECOVERABLE = ("timeout-killed", "wrapper-signaled", "child-failed", "needs-review",
+               "unknown-reserve", "escaped-descendants-killed", "internal-error-after-spawn")
+# Containment was lost or cannot be shown: a surviving descendant may exist
+# that no scan can see (setsid + env-scrubbed). NOT clearable by a reason.
+LOST_CONTAINMENT = ("wrapper-crashed-unknown", "starting", "running", "orphans-alive")
 
 
 # ---------------------------------------------------------------- state dir
@@ -296,59 +327,79 @@ def kill_tree(root, exclude_roots, run_id, pgid, budget=KILL_BUDGET):
         time.sleep(0.03)
 
 
-# ------------------------------------------------------------------ roster
-HTTP_MAX_BUDGET = 8      # source: langgraph_team.HTTP_MAX_BUDGET
-_EPOCH = __import__("re").compile(r"^[a-z0-9-]{1,32}$")
-_SPEND_FREE_TYPES = ("mock", "queue")
+# ------------------------------------------------------- bound live entry
+LIVE_ENTRY = os.path.join(HERE, "langgraph_team.py")
 
 
-def epoch_budgets_from_roster(path):
-    """Source-grounded epoch budgets: {'slug.epoch.jsonl': call_budget} for
-    EVERY http seat in <lane>/.team/roster.json (the same file
-    langgraph_team's live preflight reads). Refuses, never guesses: unknown
-    or cli adapter types (an unbounded spend path), a bad budget, a
-    usage_log that is not the derived slug.epoch.jsonl, or two seats sharing
-    a log file. Returns (dict_or_None, problem_or_None)."""
-    import re
+def _source_constant(name):
+    """Read a literal constant from langgraph_team.py source with ast (no
+    import: the entry needs langgraph, the wrapper must not)."""
+    import ast
+    tree = ast.parse(open(LIVE_ENTRY, encoding="utf-8").read())
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 \
+                and isinstance(node.targets[0], ast.Name) and node.targets[0].id == name:
+            return ast.literal_eval(node.value)
+    raise KeyError(name)
+
+
+def live_binding(lane, db, config, thread="live-1"):
+    """Bind the wrapper to the ACTUAL child entry: argv is built HERE as
+    `python3 langgraph_team.py live LANE DB CONFIG THREAD` and the epoch
+    budgets come from that same config + the lane's own .team/roster.json via
+    the shared reserve_preflight.live_epoch_budgets, i.e. what live_entry
+    will itself configure. No caller-supplied argv or roster path.
+    Returns (argv, epoch_budgets, None) or (None, None, problem)."""
     try:
-        doc = json.load(open(path, encoding="utf-8"))
-        seats = doc["seats"]
-        if not isinstance(seats, dict):
-            raise ValueError
-    except (OSError, ValueError, KeyError, TypeError):
-        return None, "roster unreadable or has no seats object"
-    out = {}
-    for name, rs in seats.items():
-        ad = rs.get("adapter") if isinstance(rs, dict) else None
-        if not isinstance(ad, dict):
-            return None, "seat %r has no adapter object" % (name,)
-        kind = ad.get("type", "mock")
-        if kind in _SPEND_FREE_TYPES:
-            continue
-        if kind != "http":
-            return None, "seat %r adapter type %r is not covered; refusing" % (name, kind)
-        b, ep, model, ul = (ad.get("call_budget"), ad.get("log_epoch"),
-                            ad.get("model"), ad.get("usage_log"))
-        if not (isinstance(b, int) and not isinstance(b, bool) and 1 <= b <= HTTP_MAX_BUDGET):
-            return None, "seat %r call_budget is not an int in 1..%d" % (name, HTTP_MAX_BUDGET)
-        if not (isinstance(ep, str) and _EPOCH.match(ep) and isinstance(model, str) and isinstance(ul, str)):
-            return None, "seat %r has a malformed model/log_epoch/usage_log" % (name,)
-        slug = re.sub(r"[^a-z0-9]+", "-", model.lower()).strip("-")
-        fn = "%s.%s.jsonl" % (slug, ep)
-        if os.path.basename(ul) != fn:
-            return None, "seat %r usage_log is not the derived %s" % (name, fn)
-        if fn in out:
-            return None, "seats share log file %s; ambiguous budget, refusing" % fn
-        out[fn] = b
-    return out, None
+        lane = os.path.abspath(lane)
+        rpath = os.path.join(lane, ".team", "roster.json")
+        for pth, what in ((rpath, "roster"), (config, "config")):
+            st = os.lstat(pth)
+            if not stat.S_ISREG(st.st_mode):
+                return None, None, "%s is not a regular file" % what
+        if not os.path.isdir(os.path.join(lane, ".git")):
+            return None, None, "lane is not a git repo"
+        for tok in (db, thread):
+            if not isinstance(tok, str) or not tok or tok.startswith("-") or "\0" in tok:
+                return None, None, "db/thread must be plain non-empty arguments"
+        cfg = json.load(open(config, encoding="utf-8"))
+        roster = json.load(open(rpath, encoding="utf-8"))
+        cfg_keys, seat_keys = _source_constant("LIVE_CFG_KEYS"), _source_constant("LIVE_SEAT_KEYS")
+        if not isinstance(cfg, dict) or set(cfg) - cfg_keys or not isinstance(cfg.get("seats"), dict) \
+                or not cfg["seats"]:
+            return None, None, "config keys/seats do not match the entry's own rules"
+        for name, sc in cfg["seats"].items():
+            if name not in roster["seats"]:
+                return None, None, "configured seat %r not in the lane roster" % (name,)
+            if not isinstance(sc, dict) or set(sc) - seat_keys:
+                return None, None, "configured seat %r has keys outside the entry's set" % (name,)
+        eb, why = rp.live_epoch_budgets(cfg["seats"], roster["seats"], strict=True)
+        if why:
+            return None, None, why
+    except (OSError, ValueError, KeyError, TypeError, SyntaxError) as exc:
+        return None, None, "cannot ground the entry: %s" % type(exc).__name__
+    argv = [sys.executable, LIVE_ENTRY, "live", lane, db, os.path.abspath(config), thread]
+    return argv, eb, None
+
+
+def run_live(state_dir, lane, db, config, deadline, thread="live-1", env=None):
+    """The supported path: bounded `langgraph_team.py live`, ledger = the
+    entry's own default dir/cap, accounting from the entry's own inputs. No
+    allow_fresh, no log-dir/cap override."""
+    argv, eb, why = live_binding(lane, db, config, thread)
+    if why:
+        return "refused", {"reason": "entry binding: " + why}
+    return run(state_dir, argv, deadline, epoch_budgets=eb if eb else None,
+               planned=None if eb else 0, env=env, cwd=HERE)
 
 
 # --------------------------------------------------------------------- run
-def run(state_dir, argv, deadline, *, planned=None, roster=None,
-        log_dir=None, cap=None, allow_fresh=False, env=None):
+def run(state_dir, argv, deadline, *, planned=None, epoch_budgets=None,
+        log_dir=None, cap=None, allow_fresh=False, env=None, cwd=None):
     """Returns (outcome, detail dict). Never spawns unless every gate passed.
-    Exactly one of planned (a flat call count) or roster (source-grounded
-    epoch budgets from .team/roster.json) must be given."""
+    Exactly one of planned (a flat call count) or epoch_budgets must be
+    given. Generic argv is for tests/operators and makes no claim that the
+    child's own ledger use matches; run_live() is the bound entry."""
     t_start = time.monotonic()
 
     def refuse(why, **kw):
@@ -358,18 +409,14 @@ def run(state_dir, argv, deadline, *, planned=None, roster=None,
     if not (isinstance(deadline, (int, float)) and not isinstance(deadline, bool)
             and 0 < deadline <= MAX_DEADLINE):
         return refuse("deadline must be in (0, %d] seconds" % MAX_DEADLINE)
-    if (planned is None) == (roster is None):
-        return refuse("give exactly one of planned or roster (ambiguous/missing accounting input)")
+    if (planned is None) == (epoch_budgets is None):
+        return refuse("give exactly one of planned or epoch_budgets (ambiguous/missing accounting input)")
     if planned is not None and not (isinstance(planned, int) and not isinstance(planned, bool) and planned >= 0):
         return refuse("planned must be a non-negative int")
-    epoch_budgets = None
-    if roster is not None:
-        epoch_budgets, prob = epoch_budgets_from_roster(roster)
-        if prob:
-            return refuse("roster: " + prob)
-        planned = sum(epoch_budgets.values())
-        if not epoch_budgets:
-            epoch_budgets = None
+    if epoch_budgets is not None:
+        planned = sum(epoch_budgets.values()) if isinstance(epoch_budgets, dict) and epoch_budgets else None
+        if planned is None:
+            return refuse("epoch_budgets must be a non-empty dict")
     try:
         _prep_dir(state_dir)
     except (OSError, RuntimeError) as exc:
@@ -398,7 +445,7 @@ def run(state_dir, argv, deadline, *, planned=None, roster=None,
             return refuse("containment unavailable: cannot become a child subreaper; "
                           "refusing (a full descendant tree cannot be bounded)")
         pf = rp.preflight(planned, log_dir=log_dir, cap=cap, anchor=anchor,
-                          allow_fresh=allow_fresh, epoch_budgets=epoch_budgets)
+                          allow_fresh=bool(allow_fresh and doc is None), epoch_budgets=epoch_budgets)
         if pf["status"] != "ok_to_plan":
             _subreaper_off()
             return refuse("preflight %s" % pf["status"], problems=pf.get("problems"))
@@ -406,7 +453,8 @@ def run(state_dir, argv, deadline, *, planned=None, roster=None,
         pre_anchor = _anchor(pf)
         run_id = secrets.token_hex(8)
         wpid = os.getpid()
-        base = {"v": 2, "run_id": run_id, "wrapper_pid": wpid,
+        base = {"v": 3, "run_id": run_id, "wrapper_pid": wpid,
+                "boot_id": _boot_id(), "pidns": _pidns(), "anchor": pre_anchor,
                 "wrapper_start": (_stat_fields(wpid) or {}).get("start"),
                 "argv_sha256": hashlib.sha256("\0".join(argv).encode()).hexdigest(),
                 "deadline_s": deadline, "child_pid": None, "child_pgid": None,
@@ -429,11 +477,11 @@ def run(state_dir, argv, deadline, *, planned=None, roster=None,
         p = None
         try:
             try:
-                p = subprocess.Popen(argv, stdin=subprocess.DEVNULL, env=cenv,
+                p = subprocess.Popen(argv, stdin=subprocess.DEVNULL, env=cenv, cwd=cwd,
                                      start_new_session=True, close_fds=True,
                                      pass_fds=(lockfd,), preexec_fn=pdeathsig)
             except OSError as exc:
-                _write_state(state_dir, dict(base, state=CLEAN, anchor=anchor,
+                _write_state(state_dir, dict(base, state=CLEAN, anchor=pre_anchor,
                              reason="spawn failed before any child ran: %s" % type(exc).__name__))
                 return refuse("spawn failed: %s" % type(exc).__name__)
             child_started = True
@@ -507,7 +555,8 @@ def run(state_dir, argv, deadline, *, planned=None, roster=None,
             except BaseException:
                 left_alive = ["unknown"]
             try:
-                _write_state(state_dir, dict(base, state="internal-error-after-spawn",
+                _write_state(state_dir, dict(base,
+                             state="internal-error-after-spawn" if not left_alive else "orphans-alive",
                              reason="%s after spawn; group killed, survivors %s" % (type(exc).__name__, left_alive),
                              child_pid=getattr(p, "pid", None), child_pgid=pgid))
             except BaseException:
@@ -535,9 +584,19 @@ def _anchor(pf):
 
 
 def clear(state_dir, reason):
-    """Human-only. Needs the lock (no live descendant holds it), no survivors,
-    and a written reason. Archives the old state in history. Does not touch
-    the ledger or the lane."""
+    """Human-only release of a blocked state. A reason string never erases
+    uncertainty:
+      - RECOVERABLE states (tree verified gone or never started) are released
+        with a written reason, when no survivor is visible and the lock is free.
+      - LOST_CONTAINMENT states (wrapper died mid-run, orphans-alive) are NOT
+        released by this interface unless the machine has rebooted since the
+        marker was written (a different kernel boot_id: every process of the
+        old boot is gone). A scrubbed setsid descendant is invisible to any
+        scan here, so no flag, reason or acknowledgement can establish that it
+        is dead. Otherwise the state stays blocked; recovery needs a separate
+        manual policy outside this tool.
+    The ledger anchor survives every clear and allow_fresh is never honored
+    again after a state file exists. Nothing here touches the ledger or lane."""
     if not (isinstance(reason, str) and len(reason.strip()) >= 8):
         return False, "a written reason (8+ chars) is required"
     try:
@@ -553,12 +612,24 @@ def clear(state_dir, reason):
             return False, prob
         if doc is None or doc["state"] == CLEAN:
             return False, "nothing to clear"
+        st = doc["state"]
+        ident = "run_id=%s child_pid=%s state=%s" % (doc.get("run_id"), doc.get("child_pid"), st)
+        if st in LOST_CONTAINMENT:
+            old, now = doc.get("boot_id"), _boot_id()
+            if not (old and now and old != now):
+                return False, ("refused: %s lost containment (unmonitored descendants may still run, "
+                               "invisible to any scan). Not clearable by a reason in this tool; "
+                               "needs a reboot or a separate manual recovery policy." % ident)
+        elif st not in RECOVERABLE:
+            return False, "refused: unknown state %r is not clearable" % st
         s = survivors(doc.get("run_id"), doc.get("child_pgid"))
         if s:
             return False, "survivors still alive: %s" % s
-        _write_state(state_dir, {"v": 1, "state": CLEAN, "run_id": doc.get("run_id"),
-                                 "reason": "cleared by operator: %s (was %s)" % (reason.strip(), doc["state"])})
-        return True, "cleared"
+        _write_state(state_dir, {"v": 3, "state": CLEAN, "run_id": doc.get("run_id"),
+                                 "boot_id": _boot_id(), "pidns": _pidns(),
+                                 "anchor": doc.get("anchor"), "cleared_from": st,
+                                 "reason": "cleared by operator: %s (was %s)" % (reason.strip(), st)})
+        return True, "cleared (%s)" % ident
     finally:
         os.close(lockfd)
 
@@ -567,13 +638,16 @@ def main(argv):
     import argparse
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
-    r = sub.add_parser("run")
+    lv = sub.add_parser("live", help="bounded `langgraph_team.py live` (the supported path)")
+    lv.add_argument("--state-dir", required=True)
+    lv.add_argument("--deadline", type=float, required=True)
+    lv.add_argument("--lane", required=True); lv.add_argument("--db", required=True)
+    lv.add_argument("--config", required=True); lv.add_argument("--thread", default="live-1")
+    r = sub.add_parser("raw", help="generic argv with a flat planned count (tests/operators; no entry binding)")
     r.add_argument("--state-dir", required=True)
     r.add_argument("--deadline", type=float, required=True)
-    r.add_argument("--planned", type=int)
-    r.add_argument("--roster", help="<lane>/.team/roster.json; derives epoch budgets for every http seat")
+    r.add_argument("--planned", type=int, required=True)
     r.add_argument("--log-dir"); r.add_argument("--cap", type=int)
-    r.add_argument("--allow-fresh", action="store_true")
     r.add_argument("child", nargs=argparse.REMAINDER)
     s = sub.add_parser("status"); s.add_argument("--state-dir", required=True)
     c = sub.add_parser("clear")
@@ -581,17 +655,21 @@ def main(argv):
     a = ap.parse_args(argv)
     if a.cmd == "status":
         doc, prob = _read_state(a.state_dir)
-        print(json.dumps({"state": doc, "problem": prob}, sort_keys=True))
+        rec = None if doc is None else ("clean" if doc["state"] == CLEAN else
+                                         "recoverable" if doc["state"] in RECOVERABLE else "lost-containment")
+        print(json.dumps({"state": doc, "problem": prob, "class": rec}, sort_keys=True))
         return 0 if doc is None or doc["state"] == CLEAN else 1
     if a.cmd == "clear":
         ok, msg = clear(a.state_dir, a.reason)
         print(msg)
         return 0 if ok else 1
-    child = a.child[1:] if a.child[:1] == ["--"] else a.child
     try:
-        kind, detail = run(a.state_dir, child, a.deadline, planned=a.planned, roster=a.roster,
-                           log_dir=a.log_dir, cap=a.cap,
-                           allow_fresh=a.allow_fresh)
+        if a.cmd == "live":
+            kind, detail = run_live(a.state_dir, a.lane, a.db, a.config, a.deadline, a.thread)
+        else:
+            child = a.child[1:] if a.child[:1] == ["--"] else a.child
+            kind, detail = run(a.state_dir, child, a.deadline, planned=a.planned,
+                               log_dir=a.log_dir, cap=a.cap)
     except Exception as exc:    # fail closed on anything unexpected
         kind, detail = "internal", {"reason": "wrapper error: %s" % type(exc).__name__}
     print("BOUNDED_RUN_RESULT " + json.dumps(dict(detail, outcome=kind), sort_keys=True, default=str),

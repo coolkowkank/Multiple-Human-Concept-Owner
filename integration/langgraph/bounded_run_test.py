@@ -128,7 +128,8 @@ check("survivors that cannot be killed -> orphans-alive, blocks", r[0] == "orpha
 br.survivors = lambda run_id, pgid: [4242424]
 check("clear refused while a survivor is reported", br.clear(st, "survivor still reported by scan")[0] is False)
 br.survivors = real_sv
-check("clear allowed when the scan is empty", br.clear(st, "scan empty, lane untouched, operator")[0])
+check("orphans-alive NOT clearable on the same boot even when the scan is empty",
+      br.clear(st, "scan empty, lane untouched, operator")[0] is False and br._read_state(st)[0]["state"] == "orphans-alive")
 
 # ---- post-run ledger classification
 st, L = mk(), ledger(1)
@@ -155,40 +156,78 @@ write_log(L, LOG, [{"phase": "reserve", "n": 1, "model": "m/free", "via": "compl
 check("historic unmatched reserve is baseline, run still clean",
       W(st, touch, 5, log_dir=L, cap=5)[0] == "clean")
 
-# ---- roster-derived epoch budgets through the gate (source-grounded, complete coverage)
-def roster_file(seats):
-    p = os.path.join(mk(), "roster.json"); json.dump({"seats": seats}, open(p, "w")); return p
-def http(model, ep, budget, ul=None):
-    import re
-    slug = re.sub(r"[^a-z0-9]+", "-", model.lower()).strip("-")
-    return {"adapter": {"type": "http", "model": model, "log_epoch": ep, "call_budget": budget,
-                        "usage_log": "/x/" + (ul or "%s.%s.jsonl" % (slug, ep))}}
+# ---- epoch budgets through the gate; shared live computation (what live_entry configures)
+import reserve_preflight as rpf
+def seat(model, ep, budget): return {"model": model, "epoch": ep, "budget": budget}
+def hseat(model, ep, budget):
+    return {"adapter": {"type": "http", "model": model, "log_epoch": ep, "call_budget": budget}}
 st = mk(); L = mk()
 write_log(L, LOG, [{"phase": "reserve", "n": 1, "model": "m/free", "via": "complete"},
                    {"phase": "result", "n": 1, "model": "m/free", "status": 200, "class": "ok-shape", "usage": {"cost": 0}, "cost_zero": True}])
 write_log(L, "o-free.e0.jsonl", [x for i in (1, 2) for x in ({"phase": "reserve", "n": i, "model": "o/free"},
           {"phase": "result", "n": i, "model": "o/free", "status": 200, "class": "ok-shape", "usage": {"cost": 0}, "cost_zero": True})])
-RS = roster_file({"coordinator": http("m/free", "e1", 3), "other": {"adapter": {"type": "mock"}}})
-check("roster gate: budget 3 with 1 used needs 2, fits cap 5 with 3 used", br.run(st, touch, 5, roster=RS, log_dir=L, cap=5)[0] == "clean")
-st = mk(); os.remove(MARK) if os.path.exists(MARK) else None
-RS2 = roster_file({"coordinator": http("m/free", "e1", 4)})
-check("roster that would need 3 more than remaining 2 is refused (no silent undercount)",
-      br.run(st, touch, 5, roster=RS2, log_dir=L, cap=5)[0] == "refused" and not os.path.exists(MARK))
+EB, why = rpf.live_epoch_budgets({"coordinator": seat("m/free", "e1", 3)}, {"coordinator": hseat("m/free", "e1", 9), "other": {"adapter": {"type": "mock"}}}, strict=True)
+check("config overrides the roster budget (live_entry rewrites it): 3 not 9", EB == {LOG: 3} and why is None)
+check("gate: budget 3 with 1 used needs 2 and fits cap 5 with 3 used", br.run(st, touch, 5, epoch_budgets=EB, log_dir=L, cap=5)[0] == "clean")
+st = mk(); os.path.exists(MARK) and os.remove(MARK)
+check("budget 4 would need 3 > remaining 2: refused, nothing spawned",
+      br.run(st, touch, 5, epoch_budgets={LOG: 4}, log_dir=L, cap=5)[0] == "refused" and not os.path.exists(MARK))
 check("naive planned=3 would have been refused", br.run(st, touch, 5, planned=3, log_dir=L, cap=5)[0] == "refused")
-check("planned AND roster together refused", br.run(st, touch, 5, planned=1, roster=RS, log_dir=L, cap=5)[0] == "refused")
-check("neither planned nor roster refused", br.run(st, touch, 5, log_dir=L, cap=5)[0] == "refused")
-for nm, seats in (("cli adapter type is not covered", {"a": {"adapter": {"type": "cli", "command": ["x"]}}}),
-                  ("unknown adapter type", {"a": {"adapter": {"type": "zzz"}}}),
-                  ("seat without adapter", {"a": {}}),
-                  ("budget 0", {"a": http("m/free", "e1", 0)}), ("budget above 8", {"a": http("m/free", "e1", 9)}),
-                  ("bool budget", {"a": http("m/free", "e1", True)}),
-                  ("usage_log not the derived name", {"a": http("m/free", "e1", 2, "other.e1.jsonl")}),
-                  ("two seats sharing a log file", {"a": http("m/free", "e1", 2), "b": http("m/free", "e1", 2)}),
-                  ("bad epoch", {"a": http("m/free", "E 1", 2)})):
-    check("roster refused: " + nm, br.run(st, touch, 5, roster=roster_file(seats), log_dir=L, cap=5)[0] == "refused" and not os.path.exists(MARK))
-check("missing roster file refused", br.run(st, touch, 5, roster="/nonexistent/roster.json", log_dir=L, cap=5)[0] == "refused")
-check("no-http roster (mock/queue only) is accepted as zero spend, still needs the ledger gate",
-      br.run(mk(), touch, 5, roster=roster_file({"a": {"adapter": {"type": "mock"}}}), log_dir=L, cap=5)[0] == "clean")
+check("planned AND epoch_budgets together refused", br.run(st, touch, 5, planned=3, epoch_budgets=EB, log_dir=L, cap=5)[0] == "refused")
+check("neither refused", br.run(st, touch, 5, log_dir=L, cap=5)[0] == "refused")
+LEB = rpf.live_epoch_budgets
+RS_OK = {"a": hseat("m/free", "e1", 2)}
+for nm, cs, rs in (("other roster http seat counted at its roster budget (no undercount)", {"b": seat("n/free", "e2", 2)}, {"a": hseat("m/free", "e1", 2), "b": {"adapter": {"type": "mock"}}}),):
+    got, w = LEB(cs, rs, strict=True)
+    check(nm, got == {"n-free.e2.jsonl": 2, LOG: 2} and w is None)
+for nm, cs, rs in (("strict: cli adapter not covered", {}, {"a": {"adapter": {"type": "cli"}}}),
+                   ("unknown adapter type (strict)", {}, {"a": {"adapter": {"type": "zzz"}}}),
+                   ("roster seat without adapter", {}, {"a": {}}),
+                   ("budget 0", {"a": seat("m/free", "e1", 0)}, {}), ("budget above 8", {"a": seat("m/free", "e1", 9)}, {}),
+                   ("bool budget", {"a": seat("m/free", "e1", True)}, {}),
+                   ("bad epoch", {"a": seat("m/free", "E 1", 2)}, {}),
+                   ("two seats sharing a log file", {"a": seat("m/free", "e1", 2), "b": seat("m/free", "e1", 2)}, {}),
+                   ("configured seat shares a file with an unconfigured roster seat", {"a": seat("m/free", "e1", 2)}, {"z": hseat("m/free", "e1", 2)}),
+                   ("non-object seats", [], {})):
+    got, w = LEB(cs, rs, strict=True)
+    check("live_epoch_budgets refuses: " + nm, got is None and w)
+check("non-strict (live_entry) tolerates a cli seat it does not budget", LEB({}, {"a": {"adapter": {"type": "cli"}}})[0] == {})
+
+# ---- bound live entry: argv built by the wrapper, accounting from the entry's own inputs
+lane = mk(); os.makedirs(os.path.join(lane, ".git")); os.makedirs(os.path.join(lane, ".team"))
+json.dump({"seats": {"coordinator": hseat("m/free", "e1", 2), "builder": {"adapter": {"type": "mock"}}}},
+          open(os.path.join(lane, ".team", "roster.json"), "w"))
+cfgd = mk(); cfgp = os.path.join(cfgd, "cfg.json")
+json.dump({"key_file": "/x/k", "seats": {"coordinator": seat("m/free", "e1", 3)}}, open(cfgp, "w"))
+argv, eb, w = br.live_binding(lane, "db.sqlite", cfgp, "live-1")
+check("live_binding builds the entry argv itself and derives budgets from config+roster",
+      w is None and eb == {LOG: 3} and argv[1:5] == [br.LIVE_ENTRY, "live", os.path.abspath(lane), "db.sqlite"]
+      and argv[5] == os.path.abspath(cfgp) and argv[6] == "live-1")
+for nm, mut in (("config key outside the entry's set", lambda c: c.update(evil=1)),
+                ("seat key outside the entry's set", lambda c: c["seats"]["coordinator"].update(x=1)),
+                ("configured seat not in the lane roster", lambda c: c["seats"].update(ghost=seat("m/free", "e9", 1))),
+                ("no seats", lambda c: c.update(seats={}))):
+    c = json.load(open(cfgp)); mut(c); p2 = os.path.join(cfgd, "c2.json"); json.dump(c, open(p2, "w"))
+    check("live_binding refuses: " + nm, br.live_binding(lane, "db", p2)[2])
+check("live_binding refuses a db/thread that looks like an option", br.live_binding(lane, "--evil", cfgp)[2]
+      and br.live_binding(lane, "db", cfgp, "-x")[2])
+nl = mk()
+check("live_binding refuses a lane without roster/.git", br.live_binding(nl, "db", cfgp)[2])
+cl = os.path.join(cfgd, "link.json"); os.symlink(cfgp, cl)
+check("live_binding refuses a symlinked config", br.live_binding(lane, "db", cl)[2])
+check("run_live refuses with the binding reason before any spawn",
+      br.run_live(mk(), nl, "db", cfgp, 5)[0] == "refused")
+home = mk(); hl = os.path.join(home, ".lg-http-usage"); os.makedirs(hl); os.chmod(hl, 0o700)
+write_log(hl, LOG, [{"phase": "reserve", "n": 1, "model": "m/free", "via": "complete"},
+                    {"phase": "result", "n": 1, "model": "m/free", "status": 200, "class": "ok-shape", "usage": {"cost": 0}, "cost_zero": True}])
+stl = mk()
+henv = dict(os.environ, HOME=home); henv.pop("LG_VERIFY_SANDBOX", None); henv.pop("REQUESTY_API_KEY", None)
+p = subprocess.run([sys.executable, os.path.join(HERE, "bounded_run.py"), "live", "--state-dir", stl, "--deadline", "20",
+                    "--lane", lane, "--db", os.path.join(cfgd, "db.sqlite"), "--config", cfgp],
+                   env=henv, capture_output=True, text=True)
+d = br._read_state(stl)[0]
+check("the wrapper refuses a live entry whose HOME differs from the account home (default ledger path would move); nothing spawned",
+      br._read_state(stl)[0] is None and p.returncode == 10 and "HOME differs" in p.stderr)
 
 # ---- containment: scrubbed + setsid + close_fds descendants (the real sandbox shape)
 SCRUB = ("import subprocess,sys,time;"
@@ -281,7 +320,7 @@ check("tail truncated BETWEEN runs: next start refused from the last clean ancho
 # ---- wrapper killed mid-run
 if os.path.exists(MARK): os.remove(MARK)
 def spawn_wrapper(state, L, child, deadline="30"):
-    return subprocess.Popen([sys.executable, os.path.join(HERE, "bounded_run.py"), "run", "--state-dir", state,
+    return subprocess.Popen([sys.executable, os.path.join(HERE, "bounded_run.py"), "raw", "--state-dir", state,
                              "--deadline", deadline, "--planned", "1", "--log-dir", L, "--cap", "5", "--"] + child,
                             stderr=subprocess.PIPE)
 def wait_state(state, want, secs=10):
@@ -317,10 +356,54 @@ check("grandchild survives wrapper kill (PDEATHSIG is direct-child only) but the
       r[0] == "refused" and (os.path.exists("/proc/%d" % g2)))
 check("clear refused while that grandchild lives", br.clear(st, "attempt while grandchild lives")[0] is False)
 os.kill(g2, signal.SIGKILL); time.sleep(0.3)
-check("cleared once it is gone", br.clear(st, "grandchild reaped by test, lane untouched")[0])
+check("lost-containment state still NOT clearable same boot, even with the grandchild gone",
+      br.clear(st, "grandchild reaped by test, lane untouched")[0] is False)
+
+# ---- reviewer B repro: wrapper SIGKILL, scrubbed setsid escapee alive, clear must not release
+st, L = mk(), ledger(1); pidf = os.path.join(mk(), "esc")
+esc = ("import subprocess,sys,time;"
+       "p=subprocess.Popen(['env','-i','setsid','sleep','40'],close_fds=True);"
+       "time.sleep(60)")
+w = spawn_wrapper(st, L, [sys.executable, "-c", esc]); d = wait_state(st, "running"); time.sleep(0.8)
+w.kill(); w.wait(); time.sleep(0.4)
+sl = [p for p in os.listdir("/proc") if p.isdigit() and open("/proc/%s/cmdline" % p, "rb").read().startswith(b"sleep\x0040")] if True else []
+check("escapee (env -i setsid sleep) survived the wrapper SIGKILL", len(sl) >= 1)
+check("next start refused", W(st, touch, 5, log_dir=L, cap=5)[0] == "refused")
+ok1, msg1 = br.clear(st, "operator says it is fine, please clear")
+check("clear refused on the same boot even though no scan finds the escapee: " + msg1[:60], ok1 is False and "lost containment" in msg1)
+check("a later start is still refused", W(st, touch, 5, log_dir=L, cap=5)[0] == "refused" and not os.path.exists(MARK))
+doc0 = br._read_state(st)[0]
+check("blocked marker keeps the pre-run anchor and v3", doc0.get("anchor") is not None and doc0["v"] == 3 and doc0.get("boot_id"))
+real_boot = br._boot_id
+br._boot_id = lambda: "forged-different-boot"
+ok2, msg2 = br.clear(st, "verified reboot happened, lane untouched")
+br._boot_id = real_boot
+d2 = br._read_state(st)[0]
+check("only a different boot id releases it, anchor and v preserved", ok2 and d2["state"] == "clean"
+      and d2["anchor"] == doc0["anchor"] and d2["v"] == 3)
+for q in sl:
+    try: os.kill(int(q), signal.SIGKILL)
+    except OSError: pass
+
+# ---- anchor survives an ordinary clear; allow_fresh never honored after a state exists
+st, L = mk(), ledger(1)
+check("clean run with anchor", W(st, [sys.executable, "-c", "pass"], 5, log_dir=L, cap=5)[0] == "clean")
+a0 = br._read_state(st)[0]["anchor"]
+W(st, [sys.executable, "-c", "import sys; sys.exit(3)"], 5, log_dir=L, cap=5)
+check("child-failed carries the pre-run anchor", br._read_state(st)[0]["anchor"] == a0)
+check("child-failed is recoverable by clear", br.clear(st, "child exit 3 examined by operator")[0])
+d3 = br._read_state(st)[0]
+check("clear preserved anchor and v", d3["anchor"] == a0 and d3["v"] == 3)
+open(os.path.join(L, LOG), "w").close() if False else None
+r = W(st, touch, 5, log_dir=L, cap=5, allow_fresh=True)
+check("allow_fresh not honored after a state exists (anchor still enforced; anchored run ok when ledger unchanged)", r[0] == "clean")
+os.truncate(os.path.join(L, LOG), 0)
+r = W(st, touch, 5, log_dir=L, cap=5, allow_fresh=True)
+check("ledger truncated after clear: blocked even with allow_fresh", r[0] == "refused")
 
 # ---- overlap
 st, L = mk(), ledger(1)
+os.path.exists(MARK) and os.remove(MARK)
 w = spawn_wrapper(st, L, [sys.executable, "-c", "import time; time.sleep(20)"], "30"); wait_state(st, "running")
 r = W(st, touch, 5, log_dir=L, cap=5)
 check("overlapping start refused while one wrapper runs", r[0] == "refused" and "lock" in r[1]["reason"] and not os.path.exists(MARK))
@@ -336,15 +419,15 @@ check("wrapper SIGTERM: child group killed, state wrapper-signaled (blocks)", d[
 # ---- CLI exit codes and status
 st, L = mk(), ledger(1)
 cli = [sys.executable, os.path.join(HERE, "bounded_run.py")]
-p = subprocess.run(cli + ["run", "--state-dir", st, "--deadline", "5", "--planned", "1", "--log-dir", L, "--cap", "5", "--", "true"],
+p = subprocess.run(cli + ["raw", "--state-dir", st, "--deadline", "5", "--planned", "1", "--log-dir", L, "--cap", "5", "--", "true"],
                    capture_output=True, text=True)
 check("CLI clean exit 0 and result line", p.returncode == 0 and "BOUNDED_RUN_RESULT" in p.stderr)
-p = subprocess.run(cli + ["run", "--state-dir", st, "--deadline", "1", "--planned", "1", "--log-dir", L, "--cap", "5", "--", "sleep", "30"],
+p = subprocess.run(cli + ["raw", "--state-dir", st, "--deadline", "1", "--planned", "1", "--log-dir", L, "--cap", "5", "--", "sleep", "30"],
                    capture_output=True, text=True)
 check("CLI timeout exit 11", p.returncode == 11)
 p = subprocess.run(cli + ["status", "--state-dir", st], capture_output=True, text=True)
 check("CLI status exit 1 while blocked", p.returncode == 1 and "timeout-killed" in p.stdout)
-p = subprocess.run(cli + ["run", "--state-dir", st, "--deadline", "1", "--planned", "1", "--log-dir", L, "--cap", "5", "--", "true"],
+p = subprocess.run(cli + ["raw", "--state-dir", st, "--deadline", "1", "--planned", "1", "--log-dir", L, "--cap", "5", "--", "true"],
                    capture_output=True, text=True)
 check("CLI refused exit 10", p.returncode == 10)
 
