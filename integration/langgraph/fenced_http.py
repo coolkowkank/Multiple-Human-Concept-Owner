@@ -130,7 +130,8 @@ def read_control(dirpath):
             else:
                 out["floor"], out["floor_line"] = e["count"], e
         elif k in ("window-open", "window-burn"):
-            ok = ((k == "window-open" or isinstance(e.get("supersedes"), bool))
+            ok = ((k == "window-open" and isinstance(e.get("owner_hash"), str) and bool(_HEX64.match(e["owner_hash"]))
+                   or k == "window-burn" and isinstance(e.get("supersedes"), bool))
                   and _isint(e.get("seq"), 1, 10 ** 6) and e["seq"] == len(out["windows"]) + 1
                   and _isint(e.get("k"), 0 if k == "window-burn" else 1, HTTP_LIFETIME_CAP)
                   and _isint(e.get("base"), 0, 10 ** 6)
@@ -240,6 +241,7 @@ def import_historic_floor(dirpath, count, unknown, settled, covered_files, *, ex
             raise FenceRefused("floor line malformed; nothing imported")
 
 
+WINDOW_TOKEN_ENV = "FENCE_WINDOW_TOKEN"
 WINDOW_GATE = True     # every reserve must fall inside an open, verified window
 WINDOW_REFUSALS = ("no window open", "window exhausted", "ledger rolled back")
 
@@ -268,7 +270,7 @@ def _log_scan(dirpath):
     return res, halted, ok, hs, tips
 
 
-def window_status(dirpath):
+def window_status(dirpath, check_token=True):
     """Read-only. -> (ok, why, info). ok means the LAST window is open,
     its history is intact (every recorded log tip is still a line hash of
     its file, total reserves never fell below the window base) and
@@ -281,6 +283,14 @@ def window_status(dirpath):
     w = c["windows"][-1]
     if w["kind"] == "window-burn":
         return False, "no window open", {}
+    committed = c["floor"] + sum(x["k"] for x in c["windows"]
+                                 if not (x["kind"] == "window-burn" and x["supersedes"]))
+    if committed > HTTP_LIFETIME_CAP:
+        return False, "committed liability exceeds the cap; future use halted", {}
+    if check_token:
+        tok = os.environ.get(WINDOW_TOKEN_ENV)
+        if not tok or hashlib.sha256(tok.encode()).hexdigest() != w["owner_hash"]:
+            return False, "window owner token missing or wrong (stale or foreign use)", {}
     res, halted, ok, hs, tips = _log_scan(dirpath)
     if not ok:
         return False, "usage log chain broken", {}
@@ -298,7 +308,7 @@ def window_status(dirpath):
     return True, "", info
 
 
-def open_window(dirpath, k, nonce, config_hash, receipt_hash, prev_receipt_hash):
+def open_window(dirpath, k, nonce, config_hash, receipt_hash, prev_receipt_hash, owner_hash):
     """Record a window-open line. Offline/orchestrator-side: the CALLER
     must already have durably written the pending-window receipt (hash
     given here) to private storage BEFORE calling this and before any
@@ -329,7 +339,8 @@ def open_window(dirpath, k, nonce, config_hash, receipt_hash, prev_receipt_hash)
         _append_control(dirpath, {"kind": "window-open", "seq": len(c["windows"]) + 1,
                                   "k": k, "base": res + c["floor"] + c["burnt"], "nonce": nonce,
                                   "config_hash": config_hash, "receipt_hash": receipt_hash,
-                                  "prev_receipt_hash": prev_receipt_hash, "tips": tips})
+                                  "prev_receipt_hash": prev_receipt_hash, "tips": tips,
+                                  "owner_hash": owner_hash})
         c2 = read_control(dirpath)
         if c2["problems"]:
             raise FenceRefused("window line rejected: " + c2["problems"][0])
@@ -362,10 +373,8 @@ def burn_window(dirpath, nonce, config_hash, receipt_hash, prev_receipt_hash, *,
             sup = True
         else:
             k, sup = pending_k, False
-            committed = c["floor"] + sum(x["k"] for x in c["windows"]
-                                         if not (x["kind"] == "window-burn" and x["supersedes"]))
-            if committed + k > HTTP_LIFETIME_CAP:
-                raise FenceRefused("pending K exceeds the remaining lifetime cap")
+            # genuine pending liability is ALWAYS recorded, even past the cap; the fence then
+            # halts future use (window_status: committed > cap) instead of erasing accounting
         _append_control(dirpath, {"kind": "window-burn", "seq": len(c["windows"]) + 1,
                                   "k": k, "base": total, "nonce": nonce,
                                   "config_hash": config_hash, "receipt_hash": receipt_hash,
@@ -384,7 +393,9 @@ def ledger_summary(dirpath):
     Invariants: spent <= committed (a window cannot spend beyond its K);
     when the last window is closed/burnt, spent == committed (nothing
     forgotten: every committed K is accounted as spent or burnt);
-    committed <= HTTP_LIFETIME_CAP. 'consistent' reports all three."""
+    committed <= HTTP_LIFETIME_CAP is reported as over_cap, NOT as inconsistency:
+    real liability stays recorded even if the cap constant is later lowered,
+    and the fence halts future use instead (window_status)."""
     c = read_control(dirpath)
     if c["problems"]:
         return {"ok": False, "problems": c["problems"]}
@@ -393,7 +404,7 @@ def ledger_summary(dirpath):
     committed = c["floor"] + sum(w["k"] for w in c["windows"]
                                  if not (w["kind"] == "window-burn" and w["supersedes"]))
     last_open = bool(c["windows"]) and c["windows"][-1]["kind"] == "window-open"
-    consistent = (ok and spent <= committed + 0 and committed <= HTTP_LIFETIME_CAP
+    consistent = (ok and spent <= committed + 0
                   and (last_open or not c["windows"] or spent == committed))
     if not c["windows"]:
         consistent = bool(ok)
@@ -401,6 +412,7 @@ def ledger_summary(dirpath):
             "spent": spent, "committed": committed, "windows": [
                 {"seq": w["seq"], "kind": w["kind"], "k": w["k"], "supersedes": w.get("supersedes")}
                 for w in c["windows"]], "last_window_open": last_open, "consistent": bool(consistent),
+            "over_cap": committed > HTTP_LIFETIME_CAP,
             "halted": halted}
 
 

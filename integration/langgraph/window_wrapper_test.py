@@ -2,6 +2,11 @@
 import hashlib, json, os, secrets, shutil, sys, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import bounded_run as br, fenced_http as fh
+
+import hashlib as _hl
+TOKEN = "test-owner-token"; OWN = _hl.sha256(TOKEN.encode()).hexdigest(); os.environ["FENCE_WINDOW_TOKEN"] = TOKEN
+_ow = fh.open_window
+fh.open_window = lambda *a, **k: _ow(*a, owner_hash=k.pop("owner_hash", OWN), **k)
 FAIL = []
 def check(n, c):
     print(("PASS " if c else "FAIL ") + n)
@@ -13,7 +18,7 @@ L = mk("L"); fh.HTTP_LOG_DIR = L
 nonce = secrets.token_hex(32); CFG = hashlib.sha256(b"cfg").hexdigest()
 MARK = os.path.join(mk("m"), "ran"); touch = [sys.executable, "-c", "open(%r,'w').write('x')" % MARK]
 def mkreceipt(**kw):
-    r = {"kind": "pending-window", "seq": 1, "k": 2, "nonce": nonce, "config_hash": CFG, "prev_receipt_hash": "0",
+    r = {"kind": "pending-window", "seq": 1, "k": 2, "nonce": nonce, "config_hash": CFG, "prev_receipt_hash": "0", "owner_hash": OWN,
          "argv_sha256": hashlib.sha256("\0".join(touch).encode()).hexdigest(), "planned": 1, "note": "synthetic test receipt"}
     r.update(kw); return json.dumps(r, sort_keys=True).encode()
 receipt = mkreceipt(); rh = hashlib.sha256(receipt).hexdigest()

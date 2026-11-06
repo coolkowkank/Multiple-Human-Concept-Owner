@@ -4,6 +4,11 @@ concurrency; usage_report ledger section. Offline, temp dirs."""
 import hashlib, json, os, random, secrets, shutil, sys, tempfile, threading
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import fenced_http as fh, ledger_restore as lr, bounded_run as br, usage_report as U
+
+import hashlib as _hl
+TOKEN = "test-owner-token"; OWN = _hl.sha256(TOKEN.encode()).hexdigest(); os.environ["FENCE_WINDOW_TOKEN"] = TOKEN
+_ow = fh.open_window
+fh.open_window = lambda *a, **k: _ow(*a, owner_hash=k.pop("owner_hash", OWN), **k)
 FAIL = []
 def check(n, c):
     print(("PASS " if c else "FAIL ") + n)

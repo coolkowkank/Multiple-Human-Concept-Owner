@@ -2,13 +2,18 @@
 import hashlib, io, os, secrets, shutil, sys, tarfile, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import fenced_http as fh, ledger_restore as lr
+
+import hashlib as _hl
+TOKEN = "test-owner-token"; OWN = _hl.sha256(TOKEN.encode()).hexdigest(); os.environ["FENCE_WINDOW_TOKEN"] = TOKEN
+_ow = fh.open_window
+fh.open_window = lambda *a, **k: _ow(*a, owner_hash=k.pop("owner_hash", OWN), **k)
 FAIL = []
 def check(n, c):
     print(("PASS " if c else "FAIL ") + n)
     if not c: FAIL.append(n)
 def refused(f):
     try: f(); return False
-    except lr.RestoreRefused: return True
+    except (lr.RestoreRefused, fh.FenceRefused): return True
 tmp = tempfile.mkdtemp(); os.environ["WK"] = "x"
 S = os.path.join(tmp, "src"); os.makedirs(S, mode=0o700); fh.HTTP_LOG_DIR = S
 H = lambda s: hashlib.sha256(s.encode()).hexdigest()
@@ -112,7 +117,15 @@ D3 = os.path.join(tmp, "p3r")
 lr.restore(pr, D3, expected_sha256=pr_sha, expected_receipt_hash=r3, expected_seq=2, expected_total=6)
 check("P3: post-run (closed) restore: 1 reserve + 1 burnt remainder counted, no window open", fh._read_all(D3)[0] == 6 and fh.window_status(D3)[1] == "no window open")
 # bad recovery inputs
-check("post-open recovery without an open window refused", refused(lambda: lr.restore(pre, os.path.join(tmp, "q1"), expected_sha256=pre_sha, expected_receipt_hash="0", expected_seq=0, expected_total=4, recover="post-open", burn=dict(nonce=secrets.token_hex(32), config_hash=H("c"), receipt_hash=H("z")))))
-check("pending K beyond the lifetime cap refused, nothing left", refused(lambda: lr.restore(pre, os.path.join(tmp, "q2"), expected_sha256=pre_sha, expected_receipt_hash="0", expected_seq=0, expected_total=4, recover="pending", pending=dict(PEND, k=9, nonce=secrets.token_hex(32)))) and not os.path.exists(os.path.join(tmp, "q2")))
+check("post-open recovery without an open window refused (mode disagrees with record)", refused(lambda: lr.restore(pre, os.path.join(tmp, "q1"), expected_sha256=pre_sha, expected_receipt_hash="0", expected_seq=0, expected_total=4, recover="post-open", burn=dict(nonce=secrets.token_hex(32), config_hash=H("c"), receipt_hash=H("z")))))
+Dq = os.path.join(tmp, "q2")
+lr.restore(pre, Dq, expected_sha256=pre_sha, expected_receipt_hash="0", expected_seq=0, expected_total=4, recover="pending", pending=dict(PEND, k=9, nonce=secrets.token_hex(32)))
+fh.HTTP_LOG_DIR = Dq; sq = fh.ledger_summary(Dq)
+check("pending liability past the cap is still RECORDED (spent 13), flagged over_cap, consistent", sq["spent"] == 13 and sq["over_cap"] and sq["consistent"])
+try: new_adapter().reserve(); okq = False
+except fh.FenceRefused as e: okq = "no window open" in str(e)
+check("and future use is halted (no window can open over the cap)", okq and refused(lambda: fh.open_window(Dq, 1, secrets.token_hex(32), H("c"), H("q"), PEND["receipt_hash"])) is not None)
+check("recover mode that disagrees with the verified record is refused", refused(lambda: lr.restore(pre, os.path.join(tmp, "q3"), expected_sha256=pre_sha, expected_receipt_hash="0", expected_seq=0, expected_total=4, recover="post-open", burn=dict(nonce=secrets.token_hex(32), config_hash=H("c"), receipt_hash=H("z")))))
+check("newest private receipt two windows ahead (gap) refused", refused(lambda: lr.restore(pre, os.path.join(tmp, "q4"), expected_sha256=pre_sha, expected_receipt_hash="0", expected_seq=0, expected_total=4, pending=dict(PEND, seq=2))))
 shutil.rmtree(tmp)
 print("FAILED" if FAIL else "ALL PASS"); sys.exit(1 if FAIL else 0)

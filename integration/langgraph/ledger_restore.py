@@ -118,13 +118,22 @@ def restore(tar_bytes, dest_dir, *, expected_sha256, expected_receipt_hash,
             raise RestoreRefused("last receipt hash differs from the private record (older or foreign bundle)")
         if (w["seq"] if w else 0) != expected_seq:
             raise RestoreRefused("window seq differs from the private record")
-        if recover not in (None, "pending", "post-open"):
-            raise RestoreRefused("unknown recover mode")
-        if recover == "post-open" and not (w and w["kind"] == "window-open"):
-            raise RestoreRefused("post-open recovery needs an open window in the bundle")
-        if w and w["kind"] == "window-open" and recover != "post-open":
-            raise RestoreRefused("bundle holds an unclosed window; it can only be restored as exhausted "
-                                 "(recover='post-open'), never reusable")
+        # recovery mode is DERIVED from the verified bundle and the newest private record, never guessed
+        lastseq = w["seq"] if w else 0
+        if isinstance(pending, dict) and isinstance(pending.get("seq"), int):
+            if pending["seq"] == lastseq + 1:
+                derived = "pending"
+            elif pending["seq"] > lastseq + 1:
+                raise RestoreRefused("newest private receipt is more than one window ahead of the bundle (gap)")
+            else:
+                derived = "post-open" if (w and w["kind"] == "window-open") else "none"
+        else:
+            derived = "post-open" if (w and w["kind"] == "window-open") else "none"
+        if recover not in (None, "pending", "post-open", "none") or (recover is not None and recover != derived):
+            raise RestoreRefused("recover mode %r disagrees with the verified record (derived %r)" % (recover, derived))
+        recover = None if derived == "none" else derived
+        if w and w["kind"] == "window-open" and recover is None:
+            raise RestoreRefused("bundle holds an unclosed window; it can only be restored as exhausted, never reusable")
         res, halted, ok, hs, tips = fh._log_scan(dest_dir)
         if not ok:
             raise RestoreRefused("restored log chain broken")

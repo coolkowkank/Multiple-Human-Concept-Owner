@@ -427,7 +427,13 @@ def window_gate(state_dir, log_dir, planned, argv=None, epoch_budgets=None, conf
     ok, why, info = fh.window_status(log_dir)
     if not ok:
         return why
+    sm = fh.ledger_summary(log_dir)
+    if not sm.get("consistent") or sm.get("over_cap"):
+        return "ledger accounting not consistent (spent/committed) or over the cap: %r" % {k: sm.get(k) for k in ("spent", "committed", "over_cap")}
     w = fh.read_control(log_dir)["windows"][-1]
+    tok = os.environ.get(fh.WINDOW_TOKEN_ENV)
+    if not tok or hashlib.sha256(tok.encode()).hexdigest() != w["owner_hash"]:
+        return "window owner token missing or wrong"
     if planned > info["k"] - info["used"]:
         return "planned %d exceeds the window's remaining %d" % (planned, info["k"] - info["used"])
     p = os.path.join(state_dir, "window-receipt-%s.json" % w["nonce"])
@@ -446,7 +452,7 @@ def window_gate(state_dir, log_dir, planned, argv=None, epoch_budgets=None, conf
         return "receipt is not JSON"
     if not isinstance(r, dict) or r.get("kind") != "pending-window":
         return "receipt kind is not pending-window"
-    for f in ("seq", "k", "nonce", "config_hash", "prev_receipt_hash"):
+    for f in ("seq", "k", "nonce", "config_hash", "prev_receipt_hash", "owner_hash"):
         if r.get(f) != w[f]:
             return "receipt field %s differs from the window line" % f
     if config_hash_fn is not None:      # live entry: window config_hash must equal the content hash NOW

@@ -2,6 +2,11 @@
 import json, os, secrets, subprocess, sys, tempfile, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import fenced_http as fh
+
+import hashlib as _hl
+TOKEN = "test-owner-token"; OWN = _hl.sha256(TOKEN.encode()).hexdigest(); os.environ["FENCE_WINDOW_TOKEN"] = TOKEN
+_ow = fh.open_window
+fh.open_window = lambda *a, **k: _ow(*a, owner_hash=k.pop("owner_hash", OWN), **k)
 FAIL = []
 def check(n, c):
     print(("PASS " if c else "FAIL ") + n)
@@ -41,6 +46,22 @@ check("one reserve in the new window ok", adapter().reserve().n == 1 or True)
 lf = a.path; L = open(lf).read().splitlines(True); open(lf, "w").write("".join(L[:-2]))
 check("log truncated below window tip refused", "rolled back" in (refused(a.reserve) or ""))
 open(lf, "w").write("".join(L))
+# S5: a dead/foreign owner cannot reuse capacity by a direct reserve (no/wrong owner token), even with the window open
+fh.HTTP_LOG_DIR = os.path.join(tmp, "O"); os.makedirs(fh.HTTP_LOG_DIR, mode=0o700); openw(2)
+saved_tok = os.environ.pop("FENCE_WINDOW_TOKEN")
+check("S5: open window, no owner token (stale/direct use): reserve refused", "owner token" in (refused(adapter().reserve) or ""))
+os.environ["FENCE_WINDOW_TOKEN"] = "wrong"
+check("S5: wrong owner token refused", "owner token" in (refused(adapter().reserve) or ""))
+os.environ["FENCE_WINDOW_TOKEN"] = saved_tok
+check("S5: right token works; nothing was written by the refusals", adapter().reserve().n == 1 and fh._read_all(fh.HTTP_LOG_DIR)[0] == 1)
+os.environ.pop("FENCE_WINDOW_TOKEN")
+class _B:
+    def open(self, *x, **k): raise AssertionError("request attempted")
+os.environ["FENCE_WINDOW_TOKEN"] = saved_tok
+a5 = adapter("m-s5", "es5"); a5._opener = _B(); t5 = a5.reserve()
+os.environ.pop("FENCE_WINDOW_TOKEN")
+check("S5: execute with the token gone is refused with no request", "owner token" in (refused(lambda: a5.execute(t5, "s", "p")) or ""))
+os.environ["FENCE_WINDOW_TOKEN"] = saved_tok
 # execute is gated too: a reserve taken, then the control file is lost -> no request
 class _Boom:
     def open(self, *a, **k): raise AssertionError("request attempted")
