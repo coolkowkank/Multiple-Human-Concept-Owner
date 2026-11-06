@@ -38,12 +38,19 @@ tar0, sha0 = lr.bundle(L)
 rid1, rec1, LOC = upload("closed", tar0, rev_no=1, prev_revision_id=None, prev_manifest_sha=None, last_receipt_hash="0", seq=0, total=11)
 # window: receipt first
 nonce = secrets.token_hex(32); cfgh = H("cfg")
-body = dict(seq=1, k=1, nonce=nonce, config_hash=cfgh, tar_sha256=sha0, prev_receipt_hash="0", tips=fh._log_scan(L)[4], owner_hash=OWN, argv_sha256=H("argv"), planned=1)
+body = dict(kind="pending-window", seq=1, k=1, nonce=nonce, config_hash=cfgh, tar_sha256=sha0, prev_receipt_hash="0", tips=fh._log_scan(L)[4], owner_hash=OWN, argv_sha256=hashlib.sha256("\0".join(["entry", "live"]).encode()).hexdigest(), planned=1)
 rcpt = pr.finalize_receipt(body)
 rid2, rec2, LOC2 = upload("pending", tar0, rev_no=2, prev_revision_id=rid1, prev_manifest_sha=rec1["manifest_sha"], last_receipt_hash="0", seq=0, total=11, receipt=rcpt)
 check("pending revision chains to the previous verified record", pr.check_chain(rec2, rec1, rid1))
 check("locator naming the newest revision accepts it", pr.check_against_locator(rec2, LOC2, rid2))
+# the seam with the wrapper: the record's raw receipt bytes ARE the local copy the wrapper hashes
+sdir = os.path.join(tmp, "state"); os.makedirs(sdir, mode=0o700)
+open(os.path.join(sdir, "window-receipt-%s.json" % nonce), "wb").write(rec2["receipt_raw"])
+check("record receipt bytes hash to the receipt_hash the window line will carry", hashlib.sha256(rec2["receipt_raw"]).hexdigest() == rcpt["receipt_hash"])
 fh.open_window(L, 1, nonce, cfgh, rcpt["receipt_hash"], "0", OWN); wts.bind_live_run(L)
+check("wrapper window_gate accepts the local copy written from the record (receipt fields, argv, planned all match)", br.window_gate(sdir, L, 1, argv=["entry", "live"]) is None)
+check("wrapper window_gate refuses when the local copy differs by one byte", (lambda: (open(os.path.join(sdir, "window-receipt-%s.json" % nonce), "ab").write(b" "), br.window_gate(sdir, L, 1, argv=["entry", "live"]))[1])() is not None)
+open(os.path.join(sdir, "window-receipt-%s.json" % nonce), "wb").write(rec2["receipt_raw"])
 a = fh.FencedHttpAdapter("http://127.0.0.1:1", "m-a", "WK", "e1", 9, 16, 1, None); a.reserve()
 # crash cases all share the state "File newest = pending": restore must burn the whole pending K
 def restore_from(rec):

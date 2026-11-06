@@ -32,10 +32,15 @@ def stage(out_dir, kind, tar_bytes, *, rev_no, prev_revision_id, prev_manifest_s
     os.makedirs(out_dir, mode=0o700)
     rb = None
     if receipt is not None:
-        rb = json.dumps(receipt, sort_keys=True).encode()
-        for f in ("seq", "k", "nonce", "config_hash", "receipt_hash", "tar_sha256", "prev_receipt_hash", "tips"):
+        for f in ("kind", "seq", "k", "nonce", "config_hash", "receipt_hash", "tar_sha256", "prev_receipt_hash", "tips"):
             if f not in receipt:
                 raise RecordRefused("receipt lacks %s" % f)
+        if receipt["kind"] != "pending-window":
+            raise RecordRefused("receipt kind must be pending-window (what the wrapper checks)")
+        body = {k: v for k, v in receipt.items() if k != "receipt_hash"}
+        rb = json.dumps(body, sort_keys=True).encode()         # these exact bytes are the local copy the wrapper hashes
+        if receipt["receipt_hash"] != _sha(rb):
+            raise RecordRefused("receipt_hash is not the sha256 of the receipt file bytes")
         if receipt["tar_sha256"] != _sha(tar_bytes):
             raise RecordRefused("receipt does not bind this tar")
     m = {"kind": kind, "rev_no": rev_no, "prev_revision_id": prev_revision_id,
@@ -53,8 +58,9 @@ def stage(out_dir, kind, tar_bytes, *, rev_no, prev_revision_id, prev_manifest_s
 
 
 def finalize_receipt(body):
-    """body: receipt fields WITHOUT receipt_hash. Returns the receipt with receipt_hash =
-    sha256 of the canonical body (this is the hash open_window records)."""
+    """body: receipt fields WITHOUT receipt_hash (kind must be "pending-window"). Returns it with
+    receipt_hash = sha256 of the canonical file bytes (the hash open_window records and the wrapper
+    recomputes from its local copy)."""
     if "receipt_hash" in body:
         raise RecordRefused("body must not carry receipt_hash")
     r = dict(body); r["receipt_hash"] = _sha(json.dumps(body, sort_keys=True).encode())
@@ -82,9 +88,11 @@ def load(rev_dir):
         if _sha(rb) != m.get("receipt_sha256"):
             raise RecordRefused("receipt hash differs from manifest")
         receipt = json.loads(rb)
-        body = {k: v for k, v in receipt.items() if k != "receipt_hash"}
-        if receipt.get("receipt_hash") != _sha(json.dumps(body, sort_keys=True).encode()):
-            raise RecordRefused("receipt_hash is not the hash of the receipt body")
+        if not isinstance(receipt, dict) or "receipt_hash" in receipt or receipt.get("kind") != "pending-window":
+            raise RecordRefused("receipt file must be a pending-window body without receipt_hash")
+        if json.dumps(receipt, sort_keys=True).encode() != rb:
+            raise RecordRefused("receipt file is not in canonical form")
+        receipt["receipt_hash"] = _sha(rb)         # = the hash the window line records
         if receipt.get("tar_sha256") != m["tar_sha256"] or receipt.get("seq") != m.get("seq", -9) + 1:
             raise RecordRefused("receipt does not bind the manifest's tar/seq")
         if receipt.get("prev_receipt_hash") != m.get("last_receipt_hash"):
@@ -101,12 +109,12 @@ def load(rev_dir):
     for f in ("rev_no", "seq", "total"):
         if not isinstance(m.get(f), int) or isinstance(m.get(f), bool) or m[f] < 0:
             raise RecordRefused("manifest field %s invalid" % f)
-    return {"manifest": m, "manifest_sha": _sha(mb), "tar": tar, "receipt": receipt}
+    return {"manifest": m, "manifest_sha": _sha(mb), "tar": tar, "receipt": receipt, "receipt_raw": rb if m["kind"] == "pending" else None}
 
 
 def same_revision(a, b):
     """True only if two loaded revisions are byte-identical records."""
-    return a["manifest_sha"] == b["manifest_sha"] and a["tar"] == b["tar"] and a["receipt"] == b["receipt"]
+    return a["manifest_sha"] == b["manifest_sha"] and a["tar"] == b["tar"] and a["receipt_raw"] == b["receipt_raw"]
 
 
 def check_against_locator(rec, locator, revision_id):
