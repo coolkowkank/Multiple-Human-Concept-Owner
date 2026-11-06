@@ -24,7 +24,7 @@ def wlog(name, n, model):
             raw = json.dumps(dict(e, prev=prev), sort_keys=True).encode(); out += raw + b"\n"; prev = hashlib.sha256(raw).hexdigest()
     p = os.path.join(logs, name); open(p, "wb").write(out); os.chmod(p, 0o600)
 slug = lambda m: os.path.basename(fenced_http.log_path(m, "X"))[:-len(".X.jsonl")]
-wlog("old-free.e0.jsonl", 8, "old/free"); wlog(f"{slug(NEM)}.c1.jsonl", 1, NEM); wlog(f"{slug(LING)}.b1.jsonl", 1, LING)
+wlog("old-free.e0.jsonl", 10, "old/free"); wlog(f"{slug(NEM)}.c1.jsonl", 1, NEM); wlog(f"{slug(LING)}.b1.jsonl", 1, LING)
 print([f for f in os.listdir(logs)])
 cd = os.path.join(tmp, "cfg"); os.makedirs(cd, mode=0o700)
 keyf = os.path.join(cd, "k"); open(keyf, "w").write("fake-key-not-real-0123\n"); os.chmod(keyf, 0o600)
@@ -41,9 +41,9 @@ def go(c, fresh=False):
     except SystemExit as e: return str(e.code)
     return "returned"
 go.n = 0
-# 8 historic + c1 + b1 = 10 = cap. Resume with budget 1/1 needs 0 new calls.
+# 10 historic + c1 + b1 = 12 = cap. Resume with budget 1/1 needs 0 new calls.
 res = go(cfg(1, 1, "a.json"))
-check("resume (8 historic + c1/b1 already consumed, budgets 1/1) passes the preflight and reaches the listing sentinel: " + res[:80], res == "reached")
+check("resume (10 historic + c1/b1 already consumed, budgets 1/1) passes the preflight and reaches the listing sentinel: " + res[:80], res == "reached")
 res = go(cfg(2, 1, "b.json"))
 check("one more call than remaining is still refused", res.startswith("refused") and ("over_cap" in res or "remaining" in res))
 res = go(cfg(2, 2, "c.json"))
