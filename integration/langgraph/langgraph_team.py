@@ -1210,9 +1210,20 @@ def live_entry(repo, db, config_path, thread_id="live-1", allow_fresh=False) -> 
             if not isinstance(ad.get("call_budget"), int) or isinstance(ad.get("call_budget"), bool):
                 raise SystemExit(f"refused: roster seat {seat!r} is http with an unreadable budget")
             planned += ad["call_budget"]
+    # Resume-safe accounting: same shared computation the bounded wrapper
+    # gates on. Fenced's call_budget is a LIFETIME count per model+epoch, so
+    # reserves already spent in the SAME epochs are not charged twice. Any
+    # problem (shared log file, unreadable seat) falls back to the unchanged
+    # naive sum above, which can only over-charge.
+    eb, _why = reserve_preflight.live_epoch_budgets(seats, roster["seats"])
+    if eb:
+        planned = sum(eb.values())
+    else:
+        eb = None
     pf = reserve_preflight.preflight(planned, anchor=anchor,
                                      allow_fresh=bool(allow_fresh),
-                                     expected_min_reserves=emr)
+                                     expected_min_reserves=emr,
+                                     epoch_budgets=eb)
     print(f"live: reserve preflight status={pf['status']} planned={planned} "
           f"recorded_reserves={pf['reserves_total']} remaining={pf['remaining']} "
           f"cap={pf['cap']} (read-only; not a reservation, not atomic)", flush=True)

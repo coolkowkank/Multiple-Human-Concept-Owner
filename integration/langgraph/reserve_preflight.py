@@ -157,6 +157,62 @@ def snapshot(preflight_result):
                       for x in preflight_result.get("files", [])}}
 
 
+_EPOCH_RE = re.compile(r"^[a-z0-9-]{1,32}$")
+HTTP_MAX_BUDGET = 8      # source: langgraph_team.HTTP_MAX_BUDGET
+
+
+def live_epoch_budgets(cfg_seats, roster_seats, *, strict=False):
+    """({'slug.epoch.jsonl': lifetime budget}, None) or (None, problem).
+
+    The single shared computation of what langgraph_team.live_entry will
+    configure and what the wrapper gates on: every configured seat
+    (model, epoch, budget; the config OVERRIDES the roster entry, exactly as
+    live_entry rewrites it) plus every OTHER http seat already in the roster
+    at its roster budget. No guessing: a seat that cannot be read, a bad
+    budget (not an int in 1..8), a malformed epoch, or two seats sharing one
+    log file returns a problem and never an undercount. strict=True (the
+    wrapper) also refuses roster seats whose adapter type is neither
+    http/mock/queue (a cli adapter is an unbounded spend path)."""
+    out = {}
+
+    def add(name, model, epoch, budget):
+        if not (isinstance(model, str) and model and isinstance(epoch, str) and _EPOCH_RE.match(epoch)):
+            return "seat %r has a malformed model/epoch" % (name,)
+        if not (isinstance(budget, int) and not isinstance(budget, bool) and 1 <= budget <= HTTP_MAX_BUDGET):
+            return "seat %r budget is not an int in 1..%d" % (name, HTTP_MAX_BUDGET)
+        slug = re.sub(r"[^a-z0-9]+", "-", model.lower()).strip("-")
+        fn = "%s.%s.jsonl" % (slug, epoch)
+        if fn in out:
+            return "seats share log file %s; budget is ambiguous" % fn
+        out[fn] = budget
+        return None
+    if not isinstance(cfg_seats, dict) or not isinstance(roster_seats, dict):
+        return None, "seats must be objects"
+    for name, sc in cfg_seats.items():
+        if not isinstance(sc, dict):
+            return None, "configured seat %r is not an object" % (name,)
+        why = add(name, sc.get("model"), sc.get("epoch"), sc.get("budget"))
+        if why:
+            return None, why
+    for name, rs in roster_seats.items():
+        if name in cfg_seats:
+            continue
+        ad = rs.get("adapter") if isinstance(rs, dict) else None
+        if not isinstance(ad, dict):
+            return None, "roster seat %r has no adapter object" % (name,)
+        kind = ad.get("type", "mock")
+        if kind in ("mock", "queue"):
+            continue
+        if kind != "http":
+            if strict:
+                return None, "roster seat %r adapter type %r is not covered" % (name, kind)
+            continue
+        why = add(name, ad.get("model"), ad.get("log_epoch"), ad.get("call_budget"))
+        if why:
+            return None, why
+    return out, None
+
+
 def _needed(planned_calls, epoch_budgets, files):
     """Calls the plan can still make. Without epoch_budgets: planned_calls
     unchanged. With epoch_budgets ({'slug.epoch.jsonl': lifetime budget}):
