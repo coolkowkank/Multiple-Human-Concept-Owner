@@ -51,7 +51,7 @@ try:
     check("model/epoch file covered by floor refuses before any request", refused(a.reserve))
     b = fh.FencedHttpAdapter("http://127.0.0.1:1", "other-model", "K_TEST", "e1", 1, 16, 1, None)
     cap0 = fh.HTTP_LIFETIME_CAP
-    check("floor 11 exceeds cap 10: no room (cap constant amendment is a separate reviewed proposal)", refused(b.reserve))
+    check("floor 11 under cap 12 and no window open: reserve still refused (window gate)", refused(b.reserve))
     fh.HTTP_LOG_DIR = dd
     check("fence refuses on invalid control", refused(b.reserve))
 finally:
