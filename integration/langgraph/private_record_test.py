@@ -41,7 +41,7 @@ nonce = secrets.token_hex(32); cfgh = H("cfg")
 body = dict(seq=1, k=1, nonce=nonce, config_hash=cfgh, tar_sha256=sha0, prev_receipt_hash="0", tips=fh._log_scan(L)[4], owner_hash=OWN, argv_sha256=H("argv"), planned=1)
 rcpt = pr.finalize_receipt(body)
 rid2, rec2, LOC2 = upload("pending", tar0, rev_no=2, prev_revision_id=rid1, prev_manifest_sha=rec1["manifest_sha"], last_receipt_hash="0", seq=0, total=11, receipt=rcpt)
-check("pending revision chains to the previous verified record", pr.check_chain(rec2, rec1["manifest_sha"], rid1))
+check("pending revision chains to the previous verified record", pr.check_chain(rec2, rec1, rid1))
 check("locator naming the newest revision accepts it", pr.check_against_locator(rec2, LOC2, rid2))
 fh.open_window(L, 1, nonce, cfgh, rcpt["receipt_hash"], "0", OWN); wts.bind_live_run(L)
 a = fh.FencedHttpAdapter("http://127.0.0.1:1", "m-a", "WK", "e1", 9, 16, 1, None); a.reserve()
@@ -81,7 +81,38 @@ check("tar tampered -> refused", refused(lambda: pr.load(mut("t", flip))))
 def rcpt_edit(d):
     import json; p = os.path.join(d, "receipt.json"); r = json.load(open(p)); r["k"] = 0; open(p, "w").write(json.dumps(r, sort_keys=True))
 check("receipt edited (k lowered) -> refused", refused(lambda: pr.load(mut("e", rcpt_edit))))
-check("chain break (wrong previous manifest) -> refused", refused(lambda: pr.check_chain(rec3, H("other"), rid2)))
+check("chain break (wrong previous revision id) -> refused", refused(lambda: pr.check_chain(rec3, rec2, "wrong-id")))
+def man(rec, **ch):
+    m = dict(rec["manifest"]); m.update(ch); return {"manifest": m, "manifest_sha": rec["manifest_sha"], "tar": rec["tar"], "receipt": rec["receipt"]}
+def linked(rec, **ch):
+    m = man(rec, **ch); return m
+check("same rev_no refused", refused(lambda: pr.check_chain(linked(rec3, rev_no=2, prev_manifest_sha=rec2["manifest_sha"], prev_revision_id=rid2), rec2, rid2)))
+check("skipped rev_no refused", refused(lambda: pr.check_chain(linked(rec3, rev_no=4), rec2, rid2)))
+check("older rev_no refused", refused(lambda: pr.check_chain(linked(rec3, rev_no=1), rec2, rid2)))
+check("seq decrease refused (explicit)", refused(lambda: pr.check_chain(linked(rec3, seq=1), linked(rec2, rev_no=2, seq=5), rid2)))
+check("total decrease refused", refused(lambda: pr.check_chain(linked(rec3, total=10), rec2, rid2)))
+check("good next record accepted", pr.check_chain(rec3, rec2, rid2))
+# pending receipt field tightening
+import json as _j
+def pend_mut(**ch):
+    r = dict(rcpt); r.update(ch); body = {k: v for k, v in r.items() if k != "receipt_hash"}; r = pr.finalize_receipt(body)
+    return refused(lambda: pr.stage(os.path.join(tmp, "src", "pm" + secrets.token_hex(3)), "pending", tar0, rev_no=2, prev_revision_id=rid1, prev_manifest_sha=rec1["manifest_sha"], last_receipt_hash="0", seq=0, total=11, receipt=r) and pr.load(os.path.join(tmp, "src")))
+def load_pend(**ch):
+    r = pr.finalize_receipt({k: v for k, v in dict(rcpt, **ch).items() if k != "receipt_hash"}); d = os.path.join(tmp, "src", "lp" + secrets.token_hex(3))
+    try:
+        pr.stage(d, "pending", tar0, rev_no=2, prev_revision_id=rid1, prev_manifest_sha=rec1["manifest_sha"], last_receipt_hash="0", seq=0, total=11, receipt=r); pr.load(d); return False
+    except pr.RecordRefused: return True
+check("pending: prev_receipt_hash must equal the manifest's last receipt", load_pend(prev_receipt_hash=H("zz")))
+check("pending: k must be a positive int", load_pend(k=0) and load_pend(k="1") and load_pend(k=True))
+check("pending: tips must be an object of strings ({} ok for a floor-only ledger)", load_pend(tips="") and load_pend(tips=[]) and load_pend(tips={"a": 1}) and not load_pend(tips={}))
+check("pending: nonce/config_hash must be non-empty strings", load_pend(nonce="") and load_pend(config_hash=5))
+check("pending: the good receipt loads", not load_pend())
+# adoption rule: new revision uploaded, locator for it not yet stored
+check("adopt: returns a candidate locator only after anchored locator and chain verify",
+      pr.adopt(rec3, rid3, rec2, rid2, LOC2)["rev_no"] == 3)
+check("adopt: anchored record not matching its locator -> refused (no fallback)", refused(lambda: pr.adopt(rec3, rid3, rec2, rid2, LOC)))
+check("adopt: new record does not chain from the anchored one -> refused", refused(lambda: pr.adopt(rec3, rid3, rec1, rid1, LOC)))
+check("adopt: skipping a revision (rev1 anchored, rev3 new) refused", refused(lambda: pr.adopt(rec3, rid3, rec1, rid1, dict(LOC, file_id="f"))))
 check("a pending receipt with the wrong tar cannot be staged", refused(lambda: pr.stage(os.path.join(tmp, "src", "w"), "pending", tar1, rev_no=9, prev_revision_id=rid3, prev_manifest_sha="x", last_receipt_hash=LR, seq=2, total=12, receipt=rcpt)))
 check("pending needs a receipt; closed must not carry one", refused(lambda: pr.stage(os.path.join(tmp, "src", "w2"), "pending", tar1, rev_no=9, prev_revision_id=None, prev_manifest_sha=None, last_receipt_hash=LR, seq=2, total=12)) and refused(lambda: pr.stage(os.path.join(tmp, "src", "w3"), "closed", tar1, rev_no=9, prev_revision_id=None, prev_manifest_sha=None, last_receipt_hash=LR, seq=2, total=12, receipt=rcpt)))
 check("file modes 0600 / dir 0700 in staged revision", all(oct(os.stat(os.path.join(tmp, "store", rid2, f)).st_mode & 0o777) == "0o600" for f in os.listdir(os.path.join(tmp, "store", rid2))))

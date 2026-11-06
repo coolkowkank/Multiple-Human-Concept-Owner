@@ -87,6 +87,17 @@ def load(rev_dir):
             raise RecordRefused("receipt_hash is not the hash of the receipt body")
         if receipt.get("tar_sha256") != m["tar_sha256"] or receipt.get("seq") != m.get("seq", -9) + 1:
             raise RecordRefused("receipt does not bind the manifest's tar/seq")
+        if receipt.get("prev_receipt_hash") != m.get("last_receipt_hash"):
+            raise RecordRefused("receipt prev_receipt_hash differs from the manifest's last receipt")
+        k = receipt.get("k")
+        if not isinstance(k, int) or isinstance(k, bool) or k < 1:
+            raise RecordRefused("receipt k must be a positive int")
+        tips = receipt.get("tips")   # {log file name: chain tip}; {} is valid for a floor-only ledger
+        if not isinstance(tips, dict) or not all(isinstance(a, str) and isinstance(b, str) for a, b in tips.items()):
+            raise RecordRefused("receipt tips must be an object of name -> tip strings")
+        for f in ("nonce", "config_hash", "tar_sha256", "prev_receipt_hash"):
+            if not isinstance(receipt.get(f), str) or not receipt[f]:
+                raise RecordRefused("receipt %s must be a non-empty string" % f)
     for f in ("rev_no", "seq", "total"):
         if not isinstance(m.get(f), int) or isinstance(m.get(f), bool) or m[f] < 0:
             raise RecordRefused("manifest field %s invalid" % f)
@@ -109,11 +120,33 @@ def check_against_locator(rec, locator, revision_id):
     return True
 
 
-def check_chain(newer, older_manifest_sha, older_revision_id):
-    m = newer["manifest"]
-    if m["rev_no"] < 1 or m["prev_manifest_sha"] != older_manifest_sha or m["prev_revision_id"] != older_revision_id:
+def check_chain(newer, older, older_revision_id):
+    """newer/older: loaded records. The newer record must be EXACTLY the next one after
+    the older (already anchored) record: rev_no + 1, linked by manifest sha and revision
+    id, seq and total never decreasing."""
+    m, o = newer["manifest"], older["manifest"]
+    if m["rev_no"] != o["rev_no"] + 1:
+        raise RecordRefused("rev_no must be exactly the previous + 1 (same, skipped or older refused)")
+    if m["prev_manifest_sha"] != older["manifest_sha"] or m["prev_revision_id"] != older_revision_id:
         raise RecordRefused("revision chain does not link to the previous verified record")
+    if m["seq"] < o["seq"]:
+        raise RecordRefused("seq decreased")
+    if m["total"] < o["total"]:
+        raise RecordRefused("total decreased")
     return True
+
+
+def adopt(new_rec, new_revision_id, anchored_rec, anchored_revision_id, anchored_locator):
+    """Adoption rule for a newly uploaded revision whose locator is NOT yet stored: verify the
+    anchored record against its stored locator, then verify the chain from it. Returns the
+    CANDIDATE locator for the caller to store and have acknowledged BEFORE any open/spawn.
+    Any failure raises: no spawn, never fall back to an older record."""
+    check_against_locator(anchored_rec, anchored_locator, anchored_revision_id)
+    check_chain(new_rec, anchored_rec, anchored_revision_id)
+    return {"file_id": anchored_locator.get("file_id"), "revision_id": new_revision_id,
+            "rev_no": new_rec["manifest"]["rev_no"], "manifest_sha": new_rec["manifest_sha"],
+            "kind": new_rec["manifest"]["kind"], "seq": new_rec["manifest"]["seq"],
+            "total": new_rec["manifest"]["total"]}
 
 
 def restore_args(rec):
