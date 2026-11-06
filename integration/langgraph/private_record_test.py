@@ -92,6 +92,18 @@ check("older rev_no refused", refused(lambda: pr.check_chain(linked(rec3, rev_no
 check("seq decrease refused (explicit)", refused(lambda: pr.check_chain(linked(rec3, seq=1), linked(rec2, rev_no=2, seq=5), rid2)))
 check("total decrease refused", refused(lambda: pr.check_chain(linked(rec3, total=10), rec2, rid2)))
 check("good next record accepted", pr.check_chain(rec3, rec2, rid2))
+# fork guard: equal seq/total but a different, internally valid ledger
+import io as _io, tarfile as _tf
+def ledger_with(floor_unknown):
+    d2 = os.path.join(tmp, "fk" + secrets.token_hex(3)); os.makedirs(d2, mode=0o700); fh.HTTP_LOG_DIR = d2
+    fh.import_historic_floor(d2, 11, floor_unknown, 11 - floor_unknown, ["fork.e0.jsonl"], external_manifest_present=False)
+    fh.HTTP_LOG_DIR = L; return lr.bundle(d2)[0]
+fork_tar = ledger_with(3)
+frec = pr.load(os.path.join(tmp, "store", rid1)); frec = dict(frec, tar=fork_tar)
+check("fork: same seq/total, different valid ledger -> refused as non-extending", refused(lambda: pr.check_chain(dict(rec2, tar=fork_tar), rec1, rid1)))
+check("append-only holds for the real next record", pr.check_append_only(rec1["tar"], rec3["tar"]))
+check("append-only: shrinking (newer shorter than older) refused", refused(lambda: pr.check_append_only(rec3["tar"], rec1["tar"])))
+check("append-only: unreadable tar refused", refused(lambda: pr.check_append_only(b"junk", rec1["tar"])))
 # pending receipt field tightening
 import json as _j
 def pend_mut(**ch):

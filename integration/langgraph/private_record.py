@@ -7,7 +7,7 @@ window receipt, only for kind 'pending') and manifest.json. Nothing here is secr
 Fail closed: any missing, extra, malformed, mismatching or non-monotone item raises
 RecordRefused; nothing is guessed or repaired. Not a CAS: 'latest' is only what the
 separately kept locator says it is (see check_against_locator)."""
-import hashlib, json, os
+import hashlib, io, json, os, tarfile
 
 KINDS = ("pending", "closed")
 FILES = {"pending": ("ledger.tar", "receipt.json", "manifest.json"),
@@ -120,6 +120,30 @@ def check_against_locator(rec, locator, revision_id):
     return True
 
 
+def _members(tar_bytes):
+    try:
+        with tarfile.open(fileobj=io.BytesIO(tar_bytes), mode="r:") as t:
+            out = {}
+            for m in t.getmembers():
+                if not m.isreg() or "/" in m.name:
+                    raise RecordRefused("unexpected tar member")
+                out[m.name] = t.extractfile(m).read()
+            return out
+    except (tarfile.TarError, OSError):
+        raise RecordRefused("tar unreadable")
+
+
+def check_append_only(older_tar, newer_tar):
+    """Fork guard: the newer ledger must extend the older one byte for byte. Every older file
+    (the hash-chained control file and each usage log) must be an exact prefix of the same file
+    in the newer tar. Two different internally valid ledgers with equal seq and total fail."""
+    o, n = _members(older_tar), _members(newer_tar)
+    for name, data in o.items():
+        if name not in n or not n[name].startswith(data):
+            raise RecordRefused("newer ledger does not extend the older one (%s): fork or rewrite" % name)
+    return True
+
+
 def check_chain(newer, older, older_revision_id):
     """newer/older: loaded records. The newer record must be EXACTLY the next one after
     the older (already anchored) record: rev_no + 1, linked by manifest sha and revision
@@ -133,6 +157,7 @@ def check_chain(newer, older, older_revision_id):
         raise RecordRefused("seq decreased")
     if m["total"] < o["total"]:
         raise RecordRefused("total decreased")
+    check_append_only(older["tar"], newer["tar"])
     return True
 
 
