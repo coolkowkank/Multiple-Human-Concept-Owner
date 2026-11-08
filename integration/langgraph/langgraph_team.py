@@ -201,6 +201,7 @@ class TeamState(TypedDict):
     control_mode: str
     instruction_seq: int
     pause_waits: int
+    waiting_seat: str | None
 
 
 # ---------- repo setup ----------------------------------------------------
@@ -536,6 +537,11 @@ def sync_node(state: TeamState) -> dict:
                           for n, spec in roster.get("seats", {}).items()},
         "control_mode": control["mode"],
         "instruction_seq": control["instruction_seq"],
+        # Recomputed every sync: clears a waiting flag set by the seat
+        # node that just ran, so a RESUMED run (operator fed the queue
+        # meanwhile) routes normally instead of re-waiting on the stale
+        # checkpoint value.
+        "waiting_seat": None,
     }
 
 
@@ -824,6 +830,16 @@ def seat_node(seat: str, state: TeamState) -> dict:
     try:
         acted = seat_obj.act_once()
     except SeatError as exc:
+        if spec_type == "queue" and "response queue empty" in str(exc):
+            # A queue seat with nothing queued is not an error - it is
+            # the expected waiting state of an operator-driven seat.
+            # Surface it as WAITING (run_graph stops gracefully at this
+            # node boundary with the exact resume commands), not as a
+            # refusal.
+            rec = (f"[pid {os.getpid()} tid {threading.get_ident()}] "
+                   f"seat={seat} WAITING (response queue empty)")
+            print(f"  step: {rec}", flush=True)
+            return {"steps": [rec], "waiting_seat": seat}
         # The project's own machinery refused (stale queued response,
         # lease, verify failure, ...). Record; never swallow.
         rec = (f"[pid {os.getpid()} tid {threading.get_ident()}] "
@@ -929,7 +945,8 @@ def run_graph(repo: str, checkpoint_db: str, stop_after: int,
                    "status": "", "turn": None, "adapter_types": {},
                    "steps": [], "outcome": None, "seat_error": None,
                    "max_steps": 50, "control_mode": "run",
-                   "instruction_seq": 1, "pause_waits": 0}
+                   "instruction_seq": 1, "pause_waits": 0,
+                   "waiting_seat": None}
     else:
         # Identity match, fail closed: a stored thread must name the SAME
         # repo and checkpoint file the caller asked to run. Resuming a
@@ -949,6 +966,27 @@ def run_graph(repo: str, checkpoint_db: str, stop_after: int,
     for chunk in app.stream(initial, config, stream_mode="updates"):
         if any(k.startswith("seat_") for k in chunk):
             seat_steps += 1
+            update = chunk[[k for k in chunk if k.startswith("seat_")][0]]
+            waiting = update.get("waiting_seat") if isinstance(update, dict) \
+                else None
+            if waiting:
+                # Graceful stop at the node boundary, exactly like
+                # stop_after: the checkpoint is durable mid-graph and a
+                # re-run with the same repo/db/thread resumes at sync.
+                print(f"run[{thread_id}]: WAITING for an operator response "
+                      f"for seat {waiting!r} (.team/queues/{waiting}.jsonl "
+                      f"is empty). This is the expected state of a queue "
+                      f"seat, not an error.", flush=True)
+                print(f"  1. read the prompt:   python3 -m launcher prompt "
+                      f"{waiting} --repo {repo_abs}", flush=True)
+                print(f"  2. queue the answer:  python3 -m launcher respond "
+                      f"{waiting} --repo {repo_abs} --file response.json",
+                      flush=True)
+                print(f"  3. resume the run:    python3 langgraph_team.py "
+                      f"run {repo_abs} {db_abs} 0 {thread_id}", flush=True)
+                print(f"run[{thread_id}]: stopped gracefully while waiting "
+                      f"(checkpoint durable in {db_abs})", flush=True)
+                return "waiting"
             if stop_after and seat_steps >= stop_after:
                 print(f"run[{thread_id}]: stopped gracefully after "
                       f"{seat_steps} seat actions (checkpoint durable in "
@@ -1372,7 +1410,11 @@ def main(argv) -> int:
             "usage_log": fenced_http.log_path(model, usage_log)}})
         return 0
     if phase == "run":
-        run_graph(repo, db, stop_after, thread_id)
+        result = run_graph(repo, db, stop_after, thread_id)
+        if result == "waiting":
+            # Deliberate resumable stop (like stop_after): the cycle is
+            # not done, closeout is not evaluated, exit 0.
+            return 0
         # Operator-owned closeout. LG_OPERATOR_CONFIG is a PATH to an operator
         # config outside the lane (never the key). Unset = quality unproven.
         if not (stop_after and Bus(os.path.abspath(repo), BRANCH).state().get("status") != "done"):

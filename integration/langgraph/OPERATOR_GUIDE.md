@@ -41,7 +41,7 @@ exit 2.
 |---|---|---|
 | `init LANE DB` | New mock-seat lane. Refuses root, home, cwd and any non-empty directory. | 0 |
 | `init-http LANE DB SEAT MODEL EPOCH` | New lane with ONE seat on a fenced http spec, `call_budget` fixed at 2. Prefer `live` for real use. | 0 |
-| `run LANE DB [STOP_AFTER [THREAD]]` | Run the graph. `STOP_AFTER` N stops gracefully after N seat actions (resumable). Default thread `team-demo-1`. When the bus is done it runs the operator closeout. | 0 only if closeout allowed, or `LG_ALLOW_UNPROVEN=1`, or a deliberate stop that left the bus running. 3 otherwise. |
+| `run LANE DB [STOP_AFTER [THREAD]]` | Run the graph. `STOP_AFTER` N stops gracefully after N seat actions (resumable). Default thread `team-demo-1`. When the bus is done it runs the operator closeout. On a queue seat with an empty queue it stops gracefully with an explicit WAITING surface (prompt/respond/resume commands), checkpoint durable, resumable with the same command after `launcher respond`. | 0 only if closeout allowed, or `LG_ALLOW_UNPROVEN=1`, or a deliberate stop that left the bus running (incl. the queue WAITING stop). 3 otherwise. |
 | `verify LANE DB [N [THREAD]]` | Re-verify a resumed run. | 0 / 1 |
 | `status LANE` | Closeout status with no record: prints "cycle complete, quality unproven" (or "cycle not complete"). | 1 |
 | `status LANE --record R --key-file K --checker-id C --path P [--path P ...]` | Re-verifies the signed operator record. `--repo` and `--branch` are fixed by the launcher and refused. | 0 only if closeout allowed; 1 otherwise; 2 for a repeated `--repo`/`--branch` |

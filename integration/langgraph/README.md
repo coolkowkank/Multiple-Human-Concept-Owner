@@ -59,6 +59,13 @@ python3 -m launcher respond coordinator --repo /tmp/my-project --file response.j
 python3 -m launcher seat coordinator --repo /tmp/my-project --once
 ```
 
+Or let the graph drive: `langgraph_team.py run` on a scaffolded repo
+stops gracefully at each seat whose queue is empty, prints an explicit
+WAITING surface with the exact respond/resume commands (exit 0,
+checkpoint durable), and resumes through the same checkpoint once you
+queue the response. A full five-seat cycle with real transcripts:
+CONCEPT_WORKED_EXAMPLE.md.
+
 Files:
 
 - `langgraph_team.py` - single-lane orchestrator with execution-time
@@ -74,6 +81,8 @@ Files:
   four controls below.
 - `concept_scaffold.py` - one command from a project concept to a
   conformant queue-seated team repo ready for its first turn (offline).
+- `CONCEPT_WORKED_EXAMPLE.md` - a full queue-driven five-seat cycle on a
+  scaffolded concept repo, with real transcripts and the honest closeout.
 - `cleanroom_test.py` - clean-room install/run proof of the quickstart
   sequence on a pristine export of HEAD.
 - `launcher/` - vendored copy of the project's own seat runtime (bus,

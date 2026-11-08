@@ -138,7 +138,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(
         description="Scaffold a conformant concept team repo (offline).")
     ap.add_argument("repo", help="new empty directory to create")
-    ap.add_argument("--branch", default="team")
+    ap.add_argument("--branch", default="team-work")
     group = ap.add_mutually_exclusive_group(required=True)
     group.add_argument("--concept", help="the project concept, inline")
     group.add_argument("--concept-file",
