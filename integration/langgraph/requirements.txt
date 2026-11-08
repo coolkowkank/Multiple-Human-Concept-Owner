@@ -1,0 +1,6 @@
+# Pinned runtime dependencies for the LangGraph orchestration layer
+# (langgraph_team.py, parallel_team.py, controls_demo.py). The vendored
+# launcher/ itself is stdlib-only and needs nothing from this file.
+# Keep in sync with OPERATOR_GUIDE.md "Prerequisites".
+langgraph==1.2.19
+langgraph-checkpoint-sqlite==3.1.3

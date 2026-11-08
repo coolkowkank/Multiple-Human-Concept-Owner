@@ -57,7 +57,7 @@ CYCLE2 = {
         {"summary": "verdict PASS on cycle-2 evidence",
          "writes": {"review/qc-verdict-2.md": "# QC verdict 2\nPASS.\n"},
          "verify_command": "python3 tests/test_app.py",
-         "handoff": "records", "status_line": "QC 2 PASS"}],
+         "handoff": "records", "status_line": "QC PASS"}],
     "records": [
         {"summary": "archived batch 2",
          "writes": {"records/archive-2.md": "# Archive batch 2\n"},
