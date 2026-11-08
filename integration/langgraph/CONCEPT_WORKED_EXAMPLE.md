@@ -13,6 +13,11 @@ Nothing here fakes a model.
 
 Transcripts below are real output from this exact sequence (paths
 shortened: `$W` = the scratch directory, `python` = the venv python).
+The whole walkthrough is also a runnable proof - `concept_cycle.py`
+drives every step below through the real CLIs and asserts each
+transcript's claim (run it: `python3 concept_cycle.py /tmp/lg-concept-cycle`);
+the clean-room proof (`cleanroom_test.py`) runs it on a pristine export
+of HEAD.
 
 ## 1. Setup
 
@@ -174,6 +179,9 @@ verbatim; the full five-seat cycle runs on a scaffolded repo through the
 queue boundary with lease, path guards, verify, stale-binding refusals,
 handoffs, durable checkpoints and graceful waiting stops; the cycle
 closes `done` and every artifact above is committed in the project repo.
+
+Runnable proof: `concept_cycle.py` replays this entire walkthrough and
+asserts every claim above (22 checks).
 
 Not proven: quality. `done` is the team cycle only - closeout stays
 `quality unproven` until the operator's own acceptance evidence exists

@@ -13,6 +13,8 @@ Covers (exactly the OPERATOR_GUIDE offline sequence plus the stdlib demo):
   langgraph_team.py init lane-b / lane-c
   parallel_team.py                                 (3-lane parent graph)
   controls_demo.py                                 (pause/update/resume/assign)
+  concept_cycle.py                                 (concept in, team out:
+                                                    full queue-driven cycle)
 """
 import os, subprocess, sys, tempfile, venv
 
@@ -70,6 +72,9 @@ check("parallel 3-lane parent graph: all checks passed",
 rc, out = run([vp, "controls_demo.py", os.path.join(scratch, "controls")], lg, env)
 check("controls demo (pause/update/resume/assign): all checks passed",
       rc == 0 and "CONTROLS DEMO: ALL CHECKS PASSED" in out)
+rc, out = run([vp, "concept_cycle.py", os.path.join(scratch, "concept")], lg, env)
+check("concept cycle (scaffold + queue-driven 5-seat cycle): all checks passed",
+      rc == 0 and "CONCEPT CYCLE: ALL CHECKS PASSED" in out)
 
 led = os.path.join(home, ".lg-http-usage")
 check("no provider ledger written under the fake HOME (no model calls happened)",

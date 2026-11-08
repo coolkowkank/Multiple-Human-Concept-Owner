@@ -83,6 +83,8 @@ Files:
   conformant queue-seated team repo ready for its first turn (offline).
 - `CONCEPT_WORKED_EXAMPLE.md` - a full queue-driven five-seat cycle on a
   scaffolded concept repo, with real transcripts and the honest closeout.
+- `concept_cycle.py` - that walkthrough as a runnable proof (22 checks);
+  `cleanroom_test.py` runs it on a pristine export of HEAD.
 - `cleanroom_test.py` - clean-room install/run proof of the quickstart
   sequence on a pristine export of HEAD.
 - `launcher/` - vendored copy of the project's own seat runtime (bus,
