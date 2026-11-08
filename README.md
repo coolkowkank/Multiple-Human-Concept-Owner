@@ -4,6 +4,21 @@
 
 **[Open the project site](https://coolkowkank.github.io/Multiple-Human-Concept-Owner/)** - menu to the team, Legacy Members, timeline, and Gantt chart with S-curve. Updated hourly when the project evidence changes.
 
+## Try it offline - no keys, no model calls
+
+The LangGraph integration lane installs and runs the team loop on a fresh checkout with only Python 3 and pip - no provider calls, no spend:
+
+```sh
+cd integration/langgraph
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r requirements.txt
+python3 -m launcher demo --dir /tmp/demo   # full team cycle, stdlib only
+python3 cleanroom_test.py                  # one-command proof of all of it
+python3 concept_scaffold.py /tmp/my-project --concept "your project concept"
+```
+
+Full offline sequence, safety fences and operator guide: [integration/langgraph/README.md](integration/langgraph/README.md).
+
 <details>
 <summary><b>Project Under Construction</b> - current team, timeline, Legacy Members, Gantt and S-curve (click to expand)</summary>
 

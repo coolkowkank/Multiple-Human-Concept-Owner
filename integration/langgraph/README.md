@@ -23,6 +23,42 @@ An orchestration layer that drives the project's existing team machinery
 
 Operator commands, flags, exit codes and prerequisites: OPERATOR_GUIDE.md.
 
+## Quickstart (offline, no keys)
+
+Everything below is offline after the one pip install: no provider calls,
+no window, no spend. Seats run on scripted (mock) adapters or wait on
+operator-queued responses; no model is contacted.
+
+```sh
+cd integration/langgraph
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r requirements.txt        # langgraph + sqlite checkpoint pins
+
+python3 -m launcher demo --dir /tmp/demo-launcher   # full team cycle, stdlib only
+python3 langgraph_team.py init /tmp/lane-a /tmp/db-a.sqlite
+python3 langgraph_team.py run /tmp/lane-a /tmp/db-a.sqlite 2 team-demo-a
+python3 parallel_team.py /tmp/demo                 # 3-lane parent graph
+python3 controls_demo.py /tmp/controls             # pause/update/resume/assign
+```
+
+One-command proof of the whole sequence on a pristine export of HEAD
+(fresh venv, fake HOME, asserts no provider ledger is written):
+
+```sh
+python3 cleanroom_test.py
+```
+
+Then put your own concept in and get a conformant team repo out - queue
+seats that move only on responses you queue (or an approved model route
+later), never a faked answer:
+
+```sh
+python3 concept_scaffold.py /tmp/my-project --concept-file my-concept.md
+python3 -m launcher prompt coordinator --repo /tmp/my-project
+python3 -m launcher respond coordinator --repo /tmp/my-project --file response.json
+python3 -m launcher seat coordinator --repo /tmp/my-project --once
+```
+
 Files:
 
 - `langgraph_team.py` - single-lane orchestrator with execution-time
@@ -36,6 +72,10 @@ Files:
   closeout gate, opt-in audit wrapper (see OPERATOR_GUIDE.md).
 - `controls_demo.py` - scripted operator-intervention run proving the
   four controls below.
+- `concept_scaffold.py` - one command from a project concept to a
+  conformant queue-seated team repo ready for its first turn (offline).
+- `cleanroom_test.py` - clean-room install/run proof of the quickstart
+  sequence on a pristine export of HEAD.
 - `launcher/` - vendored copy of the project's own seat runtime (bus,
   roster, adapters, CLI), copied byte-exact from
   `ryan-continuous-offline` @ e881384dbfb99748359a19a944cb6575b4961f63
